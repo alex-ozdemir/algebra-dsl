@@ -1,0 +1,7 @@
+[package]
+name = "algrebra-dsl"
+version = "0.1.0"
+authors = ["Alex Ozdemir <aozdemir@hmc.edu>", "Adam Dunlap <adunlap@hmc.edu>", "Tim Middlemas <tmiddlemas@hmc.edu"]
+
+[dependencies]
+nom = "2"
