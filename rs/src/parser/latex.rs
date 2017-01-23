@@ -25,7 +25,7 @@ named!(control_sequence<String>,
     )
 );
 
-named!(number<i64>,
+named!(number<u64>,
     map_res!(
         map_res!(
             ws!(digit),
@@ -35,7 +35,7 @@ named!(number<i64>,
     )
 );
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Special {
     Tilde,
     Backtick,
@@ -69,7 +69,7 @@ pub enum Token {
     Special(Special),
     Char(char),
     ControlSequence(String),
-    Number(i64),
+    Number(u64),
     List(Vec<Token>),
 }
 
