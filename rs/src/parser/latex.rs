@@ -3,6 +3,10 @@
 use nom::{alpha, digit, sp};
 use std::str::{self, FromStr};
 
+named!(single_char<char>,
+    one_of!("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+);
+
 named!(identifier<String>,
     map!(
         map_res!(
@@ -63,7 +67,7 @@ pub enum Special {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Token {
     Special(Special),
-    Identifier(String),
+    Char(char),
     ControlSequence(String),
     Number(i64),
     List(Vec<Token>),
@@ -104,7 +108,7 @@ named!(token<Token>,
         alt!(
             map!(special_character, Token::Special) |
             map!(control_sequence, Token::ControlSequence) |
-            map!(identifier, Token::Identifier) |
+            map!(single_char, Token::Char) |
             map!(number, Token::Number) |
             map!(delimited!(char!('{'), many0!(token), char!('}')), Token::List)
         )
@@ -171,6 +175,15 @@ mod tests {
         let input = &b"134"[..];
         let expected = IResult::Done(&b""[..], 134);
         assert_expected_eq_actual!(number(input), expected);
+    }
+
+    #[test]
+    fn test_chars() {
+        let input = &b"hi12"[..];
+        let expected = IResult::Done(&b""[..], Token::List(vec![Token::Char('h'),
+                                                                Token::Char('i'),
+                                                                Token::Number(12)]));
+        assert_expected_eq_actual!(tokens(input), expected);
     }
 
     #[test]

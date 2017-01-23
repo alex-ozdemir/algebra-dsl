@@ -10,17 +10,38 @@ pub enum Expression {
     Sum(Vec<Expression>),
     Product(Vec<Expression>),
     Division(Box<Expression>, Box<Expression>),
-    Variable(Variable),
-    Natural(u64),
+    Atom(Atom),
 }
 
-pub enum Variable {
-    Plain(char),
-    Subscripted(char, Box<Variable>)
+pub enum Atom {
+    PlainVariable(char),
+    SubscriptedVariable(char, Box<Variable>),
+    Natural(u64),
 }
 
 impl Expression {
     fn fmt_as_math_ml(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         unimplemented!()
     }
+}
+
+enum KnownMacros {
+    Frac,
+    Dfrac,
+    Cdot,
+    Times,
+    Div,
+    // Int,
+    // Partial,
+}
+
+pub enum KnownLatex {
+    Frac(Box<KnownLatex>, Box<KnownLatex>),
+    List(Vec<KnownLatex>),
+    Operator(Operator),
+    Atom(Atom),
+}
+
+fn parse(input: latex::Token) -> Expression {
+    unimplemented!()
 }
