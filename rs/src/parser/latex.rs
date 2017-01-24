@@ -1,6 +1,6 @@
 //! Contains a LaTeX parser of sorts.
 
-use nom::{alpha, digit, sp};
+use nom::{alpha, digit, sp, IResult};
 use std::str::{self, FromStr};
 
 named!(single_char<char>,
@@ -69,7 +69,7 @@ pub enum Token {
     Special(Special),
     Char(char),
     ControlSequence(String),
-    Number(u64),
+    Natural(u64),
     List(Vec<Token>),
 }
 
@@ -109,14 +109,20 @@ named!(token<Token>,
             map!(special_character, Token::Special) |
             map!(control_sequence, Token::ControlSequence) |
             map!(single_char, Token::Char) |
-            map!(number, Token::Number) |
+            map!(number, Token::Natural) |
             map!(delimited!(char!('{'), many0!(token), char!('}')), Token::List)
         )
     )
 );
 
-named!(pub tokens<Token>, map!(many0!(token), Token::List));
+named!(tokens<Token>, map!(many0!(token), Token::List));
 
+pub fn parse_tokens(input: &str) -> Result<Token, String> {
+    match tokens(input.as_bytes()) {
+        IResult::Done(b"", token) => Ok(token),
+        result => Err(format!("{:?}", result)),
+    }
+}
 
 mod tests {
 
@@ -182,29 +188,29 @@ mod tests {
         let input = &b"hi12"[..];
         let expected = IResult::Done(&b""[..], Token::List(vec![Token::Char('h'),
                                                                 Token::Char('i'),
-                                                                Token::Number(12)]));
+                                                                Token::Natural(12)]));
         assert_expected_eq_actual!(tokens(input), expected);
     }
 
     #[test]
     fn test_number_sequence() {
         let input = &b"1 3 4"[..];
-        let expected = IResult::Done(&b""[..], Token::List(vec![Token::Number(1),
-                                                                Token::Number(3),
-                                                                Token::Number(4)]));
+        let expected = IResult::Done(&b""[..], Token::List(vec![Token::Natural(1),
+                                                                Token::Natural(3),
+                                                                Token::Natural(4)]));
         assert_expected_eq_actual!(tokens(input), expected);
     }
 
     #[test]
     fn test_1() {
         let input = &b"5 + \\frac {6 + 3} 4"[..];
-        let answer = Token::List(vec![Token::Number(5),
+        let answer = Token::List(vec![Token::Natural(5),
                                       Token::Special(Special::Plus),
                                       Token::ControlSequence(String::from("frac")),
-                                      Token::List(vec![Token::Number(6),
+                                      Token::List(vec![Token::Natural(6),
                                                        Token::Special(Special::Plus),
-                                                       Token::Number(3)]),
-                                      Token::Number(4)]);
+                                                       Token::Natural(3)]),
+                                      Token::Natural(4)]);
         let expected = IResult::Done(&b""[..], answer);
         assert_expected_eq_actual!(tokens(input), expected);
     }
