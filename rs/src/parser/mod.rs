@@ -6,62 +6,35 @@ pub mod latex;
 use self::latex::{Token, Special};
 use std::fmt;
 use nom::IResult;
+use {Equation, Expression, Symbol, Atom, StandaloneSymbol, OperatorSymbol};
 
-pub struct Equation {
-    left: Expression,
-    right: Expression,
-}
 
-#[derive(PartialEq, Debug, Clone)]
-pub enum Expression {
-    Negation(Box<Expression>),
-    Sum(Vec<Expression>),
-    Product(Vec<Expression>),
-    /// Division(numerator, denominator)
-    Division(Box<Expression>, Box<Expression>),
-    Power(Box<Expression>, Box<Expression>),
-    Subscript(Box<Expression>, Box<Expression>),
-    /// An indivisible unit, like a variable or numeric literal
-    Atom(Atom),
-}
-
-#[derive(PartialEq, Debug, Clone, Copy)]
-pub enum Atom {
-    PlainVariable(char),
-    Natural(u64),
-    Floating(f64),
-}
-
-impl Expression {
-    fn fmt_as_math_ml(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        unimplemented!()
-    }
-}
-
+/// The Control Sequences that our system handles. A small set of macros along with a *bunch* of
+/// symbols.
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 enum KnownCS {
     // TODO: Greek letters
-    Frac,
-    Dfrac,
-    Cdot,
-    Times,
-    Div,
-    // Int,
-    // Partial,
+    frac,
+    dfrac,
+    cdot,
+    times,
+    div,
+    Preserved(Symbol),
 }
 
 impl KnownCS {
     fn from_str(s: &str) -> Option<KnownCS> {
         match s {
-            "frac" => Some(KnownCS::Frac),
-            "dfrac" => Some(KnownCS::Dfrac),
-            "cdot" => Some(KnownCS::Cdot),
-            "times" => Some(KnownCS::Times),
-            "div" => Some(KnownCS::Div),
-            _ => None,
+            "frac" => Some(KnownCS::frac),
+            "dfrac" => Some(KnownCS::dfrac),
+            "cdot" => Some(KnownCS::cdot),
+            "times" => Some(KnownCS::times),
+            "div" => Some(KnownCS::div),
+            s => Symbol::from_str(s).map(KnownCS::Preserved)
         }
     }
 }
+
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Operator {
@@ -122,50 +95,11 @@ impl Operator {
 #[derive(PartialEq, Eq, Debug)]
 pub enum KnownLatex {
     Frac(Box<KnownLatex>, Box<KnownLatex>),
-    List(Vec<KnownLatexNoList>),
+    List(Vec<KnownLatex>),
+    Symbol(Symbol),
     Operator(Operator),
     Char(char),
     Natural(u64),
-}
-
-#[derive(PartialEq, Eq, Debug)]
-enum KnownLatexNoList {
-    Frac(Box<KnownLatex>, Box<KnownLatex>),
-    Operator(Operator),
-    Char(char),
-    Natural(u64),
-}
-
-impl KnownLatexNoList {
-    /// Return whether there should be an operator after this type of LaTeX construct.
-    fn expects_op_after(&self) -> bool {
-        match self {
-            &KnownLatexNoList::Frac(_, _) => true,
-            &KnownLatexNoList::Operator(Operator::RGroup) => true,
-            &KnownLatexNoList::Operator(_) => false,
-            &KnownLatexNoList::Char(_) => true,
-            &KnownLatexNoList::Natural(_) => true,
-        }
-    }
-    /// Return whether there should be an operator before this type of LaTeX construct.
-    fn expects_op_before(&self) -> bool {
-        match self {
-            &KnownLatexNoList::Frac(_, _) => true,
-            &KnownLatexNoList::Operator(Operator::LGroup) => true,
-            &KnownLatexNoList::Operator(_) => false,
-            &KnownLatexNoList::Char(_) => true,
-            &KnownLatexNoList::Natural(_) => true,
-        }
-    }
-    /// Upcasts this to a KnownLatex
-    fn to_lists_ok(self) -> KnownLatex {
-        match self {
-            KnownLatexNoList::Frac(top, bottom) => KnownLatex::Frac(top, bottom),
-            KnownLatexNoList::Operator(op) => KnownLatex::Operator(op),
-            KnownLatexNoList::Char(c) => KnownLatex::Char(c),
-            KnownLatexNoList::Natural(n) => KnownLatex::Natural(n),
-        }
-    }
 }
 
 impl KnownLatex {
@@ -175,6 +109,7 @@ impl KnownLatex {
             &KnownLatex::List(ref list) => list.last().expect("No empty lists!").expects_op_after(),
             &KnownLatex::Frac(_, _) => true,
             &KnownLatex::Operator(Operator::RGroup) => true,
+            &KnownLatex::Symbol(sym) => sym.expects_op_after(),
             &KnownLatex::Operator(_) => false,
             &KnownLatex::Char(_) => true,
             &KnownLatex::Natural(_) => true,
@@ -186,19 +121,10 @@ impl KnownLatex {
             &KnownLatex::Frac(_, _) => true,
             &KnownLatex::List(ref list) => list.first().expect("No empty lists!").expects_op_before(),
             &KnownLatex::Operator(Operator::LGroup) => true,
+            &KnownLatex::Symbol(sym) => sym.expects_op_before(),
             &KnownLatex::Operator(_) => false,
             &KnownLatex::Char(_) => true,
             &KnownLatex::Natural(_) => true,
-        }
-    }
-    /// If this isn't a list, turns this into a KnownLatexNoList
-    fn to_no_list(self) -> Result<KnownLatexNoList, Vec<KnownLatexNoList>> {
-        match self {
-            KnownLatex::List(list) => Err(list),
-            KnownLatex::Frac(top, bottom) => Ok(KnownLatexNoList::Frac(top, bottom)),
-            KnownLatex::Operator(op) => Ok(KnownLatexNoList::Operator(op)),
-            KnownLatex::Char(c) => Ok(KnownLatexNoList::Char(c)),
-            KnownLatex::Natural(n) => Ok(KnownLatexNoList::Natural(n)),
         }
     }
 }
@@ -212,7 +138,8 @@ pub enum ParseError {
     EmptyList,
     LoneOperator(Operator),
     OperatorError,
-    LatexError(String)
+    LatexError(String),
+    WrongNumberOfEqualSigns,
 }
 
 pub fn to_known(input: latex::Token) -> Result<KnownLatex, ParseError> {
@@ -233,18 +160,19 @@ pub fn to_known(input: latex::Token) -> Result<KnownLatex, ParseError> {
         Token::ControlSequence(cs) => {
             let known_cs = KnownCS::from_str(cs.as_str()).ok_or(ParseError::UnknownControlSequence(cs))?;
             match known_cs {
-                KnownCS::Div => Ok(KnownLatex::Operator(Operator::Div)),
-                KnownCS::Cdot | KnownCS::Times => Ok(KnownLatex::Operator(Operator::Times)),
+                KnownCS::div => Ok(KnownLatex::Operator(Operator::Div)),
+                KnownCS::cdot | KnownCS::times => Ok(KnownLatex::Operator(Operator::Times)),
+
                 x => Err(ParseError::ControlSequenceCannotStandalone(x)),
             }
         }
         Token::List(mut list) => {
             list.reverse();
-            let mut result_list: Vec<KnownLatexNoList> = vec![];
+            let mut result_list = vec![];
             while let Some(next) = list.pop() {
                 let mut next = match to_known(next) {
-                    Err(ParseError::ControlSequenceCannotStandalone(KnownCS::Dfrac)) | 
-                    Err(ParseError::ControlSequenceCannotStandalone(KnownCS::Frac)) => {
+                    Err(ParseError::ControlSequenceCannotStandalone(KnownCS::dfrac)) | 
+                    Err(ParseError::ControlSequenceCannotStandalone(KnownCS::frac)) => {
                         let (first, second) = two_expressions(&mut list)?;
                         KnownLatex::Frac(box first, box second)
                     }
@@ -252,29 +180,20 @@ pub fn to_known(input: latex::Token) -> Result<KnownLatex, ParseError> {
                     Ok(x) => x,
                 };
                 let op_expected = result_list.last()
-                                             .map(KnownLatexNoList::expects_op_after)
+                                             .map(KnownLatex::expects_op_after)
                                              .unwrap_or(false);
                 let implicit_times = op_expected && next.expects_op_before();
                 if implicit_times {
-                    result_list.push(KnownLatexNoList::Operator(Operator::Times));
+                    result_list.push(KnownLatex::Operator(Operator::Times));
                 }
                 if next == KnownLatex::Operator(Operator::Minus) && !op_expected {
                     next = KnownLatex::Operator(Operator::Neg);
                 }
-                match next.to_no_list() {
-                    Ok(no_list) => result_list.push(no_list),
-                    Err(no_lists) => {
-                        // FIXME(aozdemir): Here, we treat latex {} as grouping operators. This
-                        // may not be correct, but it helps us handle ^{} and _{}.
-                        result_list.push(KnownLatexNoList::Operator(Operator::LGroup));
-                        result_list.extend(no_lists);
-                        result_list.push(KnownLatexNoList::Operator(Operator::RGroup));
-                    },
-                }
+                result_list.push(next);
             }
             match result_list.len() {
                 0 => Err(ParseError::EmptyList),
-                1 => Ok(result_list.pop().unwrap().to_lists_ok()),
+                1 => Ok(result_list.pop().unwrap()),
                 _ => Ok(KnownLatex::List(result_list)),
             }
         }
@@ -287,44 +206,49 @@ fn two_expressions(input: &mut Vec<latex::Token>) -> Result<(KnownLatex, KnownLa
     Ok((first, second))
 }
 
-fn parse_operators_no_list(input: KnownLatexNoList) -> Result<Expression, ParseError> {
+fn parse_operators(input: KnownLatex) -> Result<Expression, ParseError> {
     match input {
-        KnownLatexNoList::Char(c) => Ok(Expression::Atom(Atom::PlainVariable(c))),
-        KnownLatexNoList::Natural(c) => Ok(Expression::Atom(Atom::Natural(c))),
-        KnownLatexNoList::Operator(o) => Err(ParseError::LoneOperator(o)),
-        KnownLatexNoList::Frac(top, bottom) => {
+        KnownLatex::Symbol(_) => unimplemented!(),
+        KnownLatex::Char(c) => Ok(Expression::Atom(Atom::PlainVariable(c))),
+        KnownLatex::Natural(c) => Ok(Expression::Atom(Atom::Natural(c))),
+        KnownLatex::Operator(o) => Err(ParseError::LoneOperator(o)),
+        KnownLatex::Frac(top, bottom) => {
             let parsed_top = parse_operators(*top)?;
             let parsed_bottom = parse_operators(*bottom)?;
             Ok(Expression::Division(box parsed_top, box parsed_bottom))
         }
-    }
-}
-
-fn parse_operators(input: KnownLatex) -> Result<Expression, ParseError> {
-    match input.to_no_list() {
-        Ok(no_list) => parse_operators_no_list(no_list),
-        Err(mut no_lists) => {
+        KnownLatex::List(mut tokens) => {
             let mut operator_stack = vec![Operator::Begin];
             let mut expression_stack = vec![];
-            no_lists.push(KnownLatexNoList::Operator(Operator::End));
-            for no_list in no_lists {
+            tokens.push(KnownLatex::Operator(Operator::End));
+            tokens.reverse();
+            while let Some(token) = tokens.pop() {
                 println!("New Round\n\tOps:   {:?}\n\tExprs: {:?}", operator_stack, expression_stack);
-                if let KnownLatexNoList::Operator(next_op) = no_list {
-                    while operator_stack.last().unwrap().right_precedence() > next_op.left_precedence() {
-                        let combinator = operator_stack.pop().unwrap();
-                        let second = expression_stack.pop().ok_or(ParseError::OperatorError)?;
-                        let new_expr = if combinator.arity() == 1 {
-                            combine1(second, combinator)
-                        } else {
-                            let first = expression_stack.pop().ok_or(ParseError::OperatorError)?;
-                            combine2(first, combinator, second)
-                        };
-                        expression_stack.push(new_expr);
+                match token {
+                    KnownLatex::Operator(next_op) => {
+                        while operator_stack.last().unwrap().right_precedence() > next_op.left_precedence() {
+                            let combinator = operator_stack.pop().unwrap();
+                            let second = expression_stack.pop().ok_or(ParseError::OperatorError)?;
+                            let new_expr = if combinator.arity() == 1 {
+                                combine1(second, combinator)
+                            } else {
+                                let first = expression_stack.pop().ok_or(ParseError::OperatorError)?;
+                                combine2(first, combinator, second)
+                            };
+                            expression_stack.push(new_expr);
+                        }
+                        operator_stack.push(next_op);
+                    },
+                    KnownLatex::List(mut next_list) => {
+                        next_list.reverse();
+                        // FIXME(aozdemir): Here, we treat latex {} as grouping operators. This
+                        // may not be correct, but it helps us handle ^{} and _{}.
+                        tokens.push(KnownLatex::Operator(Operator::RGroup));
+                        tokens.extend(next_list);
+                        tokens.push(KnownLatex::Operator(Operator::LGroup));
                     }
-                    operator_stack.push(next_op);
-                } else {
-                    expression_stack.push(parse_operators_no_list(no_list)?);
-                }
+                    expr => expression_stack.push(parse_operators(expr)?),
+                };
                 if let &[_.., Operator::LGroup, Operator::RGroup] = operator_stack.as_slice() {
                     operator_stack.pop(); operator_stack.pop();
                 }
@@ -380,7 +304,17 @@ fn combine2(left: Expression, op: Operator, right: Expression) -> Expression {
     }
 }
 
-fn parse(input: &str) -> Result<Expression, ParseError> {
+fn parse_equation(input: &str) -> Result<Equation, ParseError> {
+    let mut sides = input.split("=").collect::<Vec<_>>();
+    if sides.len() != 2 {
+        return Err(ParseError::WrongNumberOfEqualSigns);
+    }
+    let right = parse_expr(sides.pop().unwrap())?;
+    let left = parse_expr(sides.pop().unwrap())?;
+    Ok(Equation{ left: left, right: right })
+}
+
+fn parse_expr(input: &str) -> Result<Expression, ParseError> {
     let latex_tokens = latex::parse_tokens(input).map_err(ParseError::LatexError)?;
     println!("{:#?}", latex_tokens);
     let expanded = to_known(latex_tokens)?;
@@ -408,24 +342,24 @@ mod tests {
 
     #[test]
     fn just_a_variable() {
-        assert_expected_eq_actual!(Ok(Expression::Atom(Atom::PlainVariable('x'))), parse("x"));
+        assert_expected_eq_actual!(Ok(Expression::Atom(Atom::PlainVariable('x'))), parse_expr("x"));
     }
 
     #[test]
     fn single_digit_natural() {
-        assert_expected_eq_actual!(Ok(Expression::Atom(Atom::Natural(1))), parse("1"));
+        assert_expected_eq_actual!(Ok(Expression::Atom(Atom::Natural(1))), parse_expr("1"));
     }
 
     #[test]
     fn multi_digit_natural() {
-        assert_expected_eq_actual!(Ok(Expression::Atom(Atom::Natural(123465))), parse("123465"));
+        assert_expected_eq_actual!(Ok(Expression::Atom(Atom::Natural(123465))), parse_expr("123465"));
     }
 
     #[test]
     fn single_addition() {
         let expected = Expression::Sum(vec![Expression::Atom(Atom::PlainVariable('x')),
                                             Expression::Atom(Atom::Natural(2))]);
-        assert_expected_eq_actual!(Ok(expected), parse("x +  2"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("x +  2"));
     }
 
     #[test]
@@ -433,13 +367,13 @@ mod tests {
         let expected = Expression::Sum(vec![Expression::Atom(Atom::PlainVariable('x')),
                                             Expression::Atom(Atom::Natural(2)),
                                             Expression::Atom(Atom::Natural(9))]);
-        assert_expected_eq_actual!(Ok(expected), parse("x +  2+9"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("x +  2+9"));
     }
 
     #[test]
     fn negation() {
         let expected = Expression::Negation(box Expression::Atom(Atom::PlainVariable('y')));
-        assert_expected_eq_actual!(Ok(expected), parse("-y"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("-y"));
     }
 
     #[test]
@@ -449,7 +383,7 @@ mod tests {
                                  Expression::Atom(Atom::Natural(2)),
                                  Expression::Atom(Atom::Natural(9)),
                                  Expression::Negation(box Expression::Atom(Atom::Natural(7)))]);
-        assert_expected_eq_actual!(Ok(expected), parse("-x +  2+9-7"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("-x +  2+9-7"));
     }
 
     #[test]
@@ -461,14 +395,14 @@ mod tests {
                                  Expression::Atom(Atom::Natural(2)),
                                  Expression::Atom(Atom::Natural(9)),
                                  Expression::Negation(box Expression::Atom(Atom::Natural(7)))]);
-        assert_expected_eq_actual!(Ok(expected), parse("--x +  2+9-7"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("--x +  2+9-7"));
     }
 
     #[test]
     fn single_multiplication() {
         let expected = Expression::Product(vec![Expression::Atom(Atom::PlainVariable('x')),
                                             Expression::Atom(Atom::Natural(2))]);
-        assert_expected_eq_actual!(Ok(expected), parse("x \\times  2"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("x \\times  2"));
     }
 
     #[test]
@@ -477,7 +411,7 @@ mod tests {
                                             Expression::Atom(Atom::Natural(2)),
                                             Expression::Atom(Atom::Natural(9)),
                                             Expression::Atom(Atom::Natural(8))]);
-        assert_expected_eq_actual!(Ok(expected), parse("x \\times  2 \\cdot 9 * 8"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("x \\times  2 \\cdot 9 * 8"));
     }
 
     #[test]
@@ -486,7 +420,7 @@ mod tests {
                                             Expression::Atom(Atom::PlainVariable('x')),
                                             Expression::Atom(Atom::Natural(9)),
                                             Expression::Atom(Atom::Natural(8))]);
-        assert_expected_eq_actual!(Ok(expected), parse("2x9(8)"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("2x9(8)"));
     }
 
     #[test]
@@ -495,7 +429,7 @@ mod tests {
                                             Expression::Atom(Atom::PlainVariable('x')),
                                             Expression::Atom(Atom::Natural(9)),
                                             Expression::Atom(Atom::Natural(8))]);
-        assert_expected_eq_actual!(Ok(expected), parse("2x(9)(8)"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("2x(9)(8)"));
     }
 
     #[test]
@@ -504,7 +438,7 @@ mod tests {
             Expression::Sum(vec![Expression::Product(vec![Expression::Atom(Atom::Natural(4)),
                                                           Expression::Atom(Atom::PlainVariable('x'))]),
                                  Expression::Atom(Atom::Natural(2))]);
-        assert_expected_eq_actual!(Ok(expected), parse("4x + 2"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("4x + 2"));
     }
 
     #[test]
@@ -513,28 +447,28 @@ mod tests {
             Expression::Product(vec![Expression::Sum(vec![Expression::Atom(Atom::Natural(4)),
                                                           Expression::Atom(Atom::PlainVariable('x'))]),
                                  Expression::Atom(Atom::Natural(2))]);
-        assert_expected_eq_actual!(Ok(expected), parse("(4 + x)2"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("(4 + x)2"));
     }
 
     #[test]
     fn single_div() {
         let expected = Expression::Division(box Expression::Atom(Atom::PlainVariable('x')),
                                             box Expression::Atom(Atom::Natural(2)));
-        assert_expected_eq_actual!(Ok(expected), parse("x /2"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("x /2"));
     }
 
     #[test]
     fn single_frac() {
         let expected = Expression::Division(box Expression::Atom(Atom::PlainVariable('x')),
                                             box Expression::Atom(Atom::Natural(2)));
-        assert_expected_eq_actual!(Ok(expected), parse("\\frac x 2"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("\\frac x 2"));
     }
 
     #[test]
     fn single_frac_with_braces() {
         let expected = Expression::Division(box Expression::Atom(Atom::PlainVariable('x')),
                                             box Expression::Atom(Atom::Natural(2)));
-        assert_expected_eq_actual!(Ok(expected), parse("\\dfrac{x}{2}"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("\\dfrac{x}{2}"));
     }
 
     #[test]
@@ -543,14 +477,14 @@ mod tests {
             Expression::Division(box Expression::Division(box Expression::Atom(Atom::Natural(4)),
                                                           box Expression::Atom(Atom::PlainVariable('x'))),
                                  box Expression::Atom(Atom::Natural(2)));
-        assert_expected_eq_actual!(Ok(expected), parse("\\frac{\\frac4x}{2}"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("\\frac{\\frac4x}{2}"));
     }
 
     #[test]
     fn power() {
         let expected = Expression::Power(box Expression::Atom(Atom::Natural(4)),
                                          box Expression::Atom(Atom::PlainVariable('x')));
-        assert_expected_eq_actual!(Ok(expected), parse("4^x"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("4^x"));
     }
 
     #[test]
@@ -559,14 +493,14 @@ mod tests {
                                          box Expression::Sum(vec![
                                             Expression::Atom(Atom::PlainVariable('x')),
                                             Expression::Atom(Atom::Natural(1))]));
-        assert_expected_eq_actual!(Ok(expected), parse("4^{x+1}"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("4^{x+1}"));
     }
 
     #[test]
     fn subscript() {
         let expected = Expression::Subscript(box Expression::Atom(Atom::Natural(4)),
                                              box Expression::Atom(Atom::PlainVariable('x')));
-        assert_expected_eq_actual!(Ok(expected), parse("4_x"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("4_x"));
     }
 
     #[test]
@@ -575,6 +509,13 @@ mod tests {
                                              box Expression::Sum(vec![
                                                 Expression::Atom(Atom::PlainVariable('x')),
                                                 Expression::Atom(Atom::Natural(1))]));
-        assert_expected_eq_actual!(Ok(expected), parse("4_{x+1}"));
+        assert_expected_eq_actual!(Ok(expected), parse_expr("4_{x+1}"));
+    }
+
+    #[test]
+    fn equation() {
+        let expected = Equation{ left: Expression::Atom(Atom::PlainVariable('x')),
+                right: Expression::Atom(Atom::Natural(4)) };
+        assert_expected_eq_actual!(Ok(expected), parse_equation("x=4"));
     }
 }
