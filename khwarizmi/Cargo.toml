@@ -1,5 +1,5 @@
 [package]
-name = "algrebra-dsl"
+name = "khwarizmi"
 version = "0.1.0"
 authors = ["Alex Ozdemir <aozdemir@hmc.edu>", "Adam Dunlap <adunlap@hmc.edu>", "Tim Middlemas <tmiddlemas@hmc.edu"]
 
