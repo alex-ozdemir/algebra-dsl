@@ -3,12 +3,110 @@
 extern crate nom;
 mod parser;
 
-use std::fmt;
+use parser::ParseError;
+
+use std::{fmt, mem};
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Equation {
     left: Expression,
     right: Expression,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub enum Side { Left, Right }
+
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub struct EquationIdx<'a> {
+    side: Side,
+    expr_idx: ExpressionIdx<'a>,
+}
+
+pub type ExpressionIdx<'a> = &'a [usize];
+
+impl Equation {
+    pub fn get(&self, index: EquationIdx) -> Result<&Expression, AlgebraDSLError> {
+        (match index.side {
+            Side::Left => &self.left,
+            Side::Right => &self.right,
+        }).get(index.expr_idx)
+    }
+    pub fn get_mut(&mut self, index: EquationIdx) -> Result<&mut Expression, AlgebraDSLError> {
+        (match index.side {
+            Side::Left => &mut self.left,
+            Side::Right => &mut self.right,
+        }).get_mut(index.expr_idx)
+    }
+    pub fn replace_with_expr(&mut self, index: EquationIdx, expr: Expression) -> Result<Expression, AlgebraDSLError> {
+        let subtree = self.get_mut(index)?;
+        let old = subtree.take();
+        *subtree = expr;
+        Ok(old)
+    }
+    pub fn replace_with_str(&mut self, index: EquationIdx, expr: &str) -> Result<Expression, AlgebraDSLError> {
+        self.replace_with_expr(index, Expression::from_str(expr)?)
+    }
+    pub fn from_str(eq: &str) -> Result<Self, AlgebraDSLError> {
+        parser::parse_equation(eq).map_err(AlgebraDSLError::Parse)
+    }
+}
+
+impl Expression {
+    pub fn from_str(expr: &str) -> Result<Self, AlgebraDSLError> {
+        parser::parse_expr(expr).map_err(AlgebraDSLError::Parse)
+    }
+    pub fn take(&mut self) -> Self {
+        mem::replace(self, Expression::Atom(Atom::Natural(0)))
+    }
+    pub fn get(&self, index: ExpressionIdx) -> Result<&Self, AlgebraDSLError> {
+        if index.len() == 0 {
+            Ok(self)
+        } else {
+            let first = index[index.len()-1];
+            let rest = &index[0..index.len()-1];
+            match self {
+                &Expression::Negation(ref e) if first == 0 => e.get(rest),
+                &Expression::Sum(ref e) if first < e.len() => e[first].get(rest),
+                &Expression::Product(ref e) if first < e.len() => e[first].get(rest),
+                &Expression::Division(ref top, _) if first == 0 => top.get(rest),
+                &Expression::Division(_, ref bot) if first == 1 => bot.get(rest),
+                &Expression::Power(ref base, _) if first == 0 => base.get(rest),
+                &Expression::Power(_, ref power) if first == 1 => power.get(rest),
+                &Expression::Subscript(ref base, _) if first == 0 => base.get(rest),
+                &Expression::Subscript(_, ref script) if first == 1 => script.get(rest),
+                &Expression::Application(ref func, _) if first == 0 => func.get(rest),
+                &Expression::Application(_, ref arg) if first == 1 => arg.get(rest),
+                _ => Err(AlgebraDSLError::InvalidIdx),
+            }
+        }
+    }
+    pub fn get_mut(&mut self, index: ExpressionIdx) -> Result<&mut Self, AlgebraDSLError> {
+        if index.len() == 0 {
+            Ok(self)
+        } else {
+            let first = index[index.len()-1];
+            let rest = &index[0..index.len()-1];
+            match self {
+                &mut Expression::Negation(ref mut e) if first == 0 => e.get_mut(rest),
+                &mut Expression::Sum(ref mut e) if first < e.len() => e[first].get_mut(rest),
+                &mut Expression::Product(ref mut e) if first < e.len() => e[first].get_mut(rest),
+                &mut Expression::Division(ref mut top, _) if first == 0 => top.get_mut(rest),
+                &mut Expression::Division(_, ref mut bot) if first == 1 => bot.get_mut(rest),
+                &mut Expression::Power(ref mut base, _) if first == 0 => base.get_mut(rest),
+                &mut Expression::Power(_, ref mut power) if first == 1 => power.get_mut(rest),
+                &mut Expression::Subscript(ref mut base, _) if first == 0 => base.get_mut(rest),
+                &mut Expression::Subscript(_, ref mut script) if first == 1 => script.get_mut(rest),
+                &mut Expression::Application(ref mut func, _) if first == 0 => func.get_mut(rest),
+                &mut Expression::Application(_, ref mut arg) if first == 1 => arg.get_mut(rest),
+                _ => Err(AlgebraDSLError::InvalidIdx),
+            }
+        }
+    }
+}
+
+pub enum AlgebraDSLError {
+    Parse(ParseError),
+    InvalidIdx,
 }
 
 #[derive(PartialEq, Debug, Clone)]
