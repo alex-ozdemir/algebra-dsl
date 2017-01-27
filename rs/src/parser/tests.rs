@@ -204,3 +204,10 @@ fn sin() {
     let expected = Expression::Application(box Expression::Atom(Atom::Symbol(Symbol::Operator(OperatorSymbol::sin))), box Expression::Atom(Atom::PlainVariable('x')));
     assert_expected_eq_actual!(Ok(expected), parse_expr("\\sin x"));
 }
+
+#[test]
+#[ignore]
+fn sin_with_power() {
+    let expected = Expression::Application(box Expression::Atom(Atom::Symbol(Symbol::Operator(OperatorSymbol::sin))), box Expression::Atom(Atom::PlainVariable('x')));
+    assert_expected_eq_actual!(Ok(expected), parse_expr("\\sin^2 x"));
+}
