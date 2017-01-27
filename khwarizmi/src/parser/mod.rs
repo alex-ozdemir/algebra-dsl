@@ -4,8 +4,6 @@
 
 pub mod latex;
 use self::latex::{Token, Special};
-use std::fmt;
-use nom::IResult;
 use {Equation, Expression, Symbol, Atom, StandaloneSymbol, OperatorSymbol};
 
 

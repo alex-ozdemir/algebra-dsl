@@ -4,6 +4,7 @@ extern crate iron;
 extern crate router;
 extern crate mount;
 extern crate staticfile;
+extern crate khwarizmi;
 
 use std::fs::File;
 use std::path::Path;
@@ -15,6 +16,8 @@ use iron::{Iron, Request, Response, IronResult, status};
 use iron::mime;
 use staticfile::Static;
 use mount::Mount;
+
+use khwarizmi::{Expression, Equation};
 
 // The HTTP server handler
 fn send_mainpage(_: &mut Request) -> IronResult<Response> {

@@ -124,6 +124,7 @@ pub fn parse_tokens(input: &str) -> Result<Token, String> {
     }
 }
 
+#[cfg(test)]
 mod tests {
 
     // This macro is an assertion with nicely formatted failure output
