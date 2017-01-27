@@ -109,7 +109,7 @@ pub enum OperatorSymbol {
     int,
     oint,
     sum,
-    product,
+    prod,
     // Functions
     arccos,
     cos,
@@ -179,7 +179,7 @@ impl Symbol {
             "int" => Some(Symbol::Operator(OperatorSymbol::int)),
             "oint" => Some(Symbol::Operator(OperatorSymbol::oint)),
             "sum" => Some(Symbol::Operator(OperatorSymbol::sum)),
-            "product" => Some(Symbol::Operator(OperatorSymbol::product)),
+            "prod" => Some(Symbol::Operator(OperatorSymbol::prod)),
             "arccos" => Some(Symbol::Operator(OperatorSymbol::arccos)),
             "cos" => Some(Symbol::Operator(OperatorSymbol::cos)),
             "csc" => Some(Symbol::Operator(OperatorSymbol::csc)),
