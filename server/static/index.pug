@@ -1,34 +1,21 @@
 doctype html
 html
-  // Load mathjax
   head
+    // mathjax js
     script(type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=MML_CHTML")
-    script(type="text/javascript" src="static/equation-highlight.js")
+    // codemirror  js
+    //script(type="text/javascript" src="https://cdn.rawgit.com/codemirror/CodeMirror/master/lib/codemirror.js")
+    script(type="text/javascript" src="static/codemirror.js")
+    // my js
+    //script(type="text/javascript" src="static/equation-highlight.js")
+    script(type="text/javascript" src="static/dorepl.js")
+    //codemirror css
+    link(rel="stylesheet" type="text/css" href="static/codemirror.css")
+    // my css
     link(rel="stylesheet" type="text/css" href="static/disable-highlight.css")
+    link(rel="stylesheet" type="text/css" href="static/math.css")
   body
-    #formula.disable-highlight
-      math(xmlns='http://www.w3.org/1998/Math/MathML')
-        mrow#asdf1.mathTreeNode
-          mstyle(displaystyle='true')
-            munderover#asdf3.mathTreeNode
-              mo &int;
-              mn#asdf5.mathTreeNode 4
-              mn#asdf6.mathTreeNode 8
-          mfrac#asdf7(linethickness='1').mathTreeNode
-            mn#asdf8.mathTreeNode 1
-            mrow
-              mfrac#asdf10(linethickness='1').mathTreeNode
-                mn#asdf11.mathTreeNode 8
-                mn#asdf12.mathTreeNode 9
-          mrow#asdf31.mathTreeNode
-            mi d
-            mi x
-
-    p Selected things:
-    div#jstext
-
-    button(onclick='sendJSText()') Click me!
-
+    #repl
 
 //- vim: sw=2 sts=2
 //- au BufWritePost * !pug -P index.pug

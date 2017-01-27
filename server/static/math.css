@@ -1,0 +1,13 @@
+/* Disable the blue box that appears around equations when you click on them
+ */
+.MathJax:focus, .mjx-chtml:focus, .MathJax_SVG:focus {
+   outline: none;
+}
+.CodeMirror {
+  border: 1px solid #eee;
+  height: auto;
+}
+
+[mathtreenode][highlighted] {
+    outline: 1px solid green;
+}

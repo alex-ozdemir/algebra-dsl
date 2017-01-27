@@ -62,6 +62,7 @@ fn main() {
 
             let (mut sender, mut receiver) = client.split();
 
+            let mut formula_num = 0;
             for message in receiver.incoming_messages() {
                 let message: Message = message.unwrap();
 
@@ -77,7 +78,9 @@ fn main() {
                     },
                     Type::Text => {
                         println!("Received {}", std::str::from_utf8(&*message.payload).unwrap());
-                        sender.send_message(&Message::text("<math id=\"Moop\" xmlns=\"http://www.w3.org/1998/Math/MathML\"> <mrow class=\"mathTreeNode\" id=\"asdf1\"> <mstyle class=\"mathTreeNode\" id=\"asdf2\" displaystyle=\"true\"> <munderover class=\"mathTreeNode\" id=\"asdf3\"> <mo class=\"mathTreeNode\" id=\"asdf4\">&int;</mo> <mn class=\"mathTreeNode\" id=\"asdf5\">4</mn> <mn class=\"mathTreeNode\" id=\"asdf6\">8</mn> </munderover> </mstyle> <mfrac class=\"mathTreeNode\" id=\"asdf7\" linethickness=\"1\"> <mn class=\"mathTreeNode\" id=\"asdf8\">1</mn> <mrow class=\"mathTreeNode\" id=\"asdf9\"> <mfrac class=\"mathTreeNode\" id=\"asdf10\" linethickness=\"1\"> <mn class=\"mathTreeNode\" id=\"asdf11\">8</mn> <mrow class=\"mathTreeNode\" id=\"asdf12\"> <mfrac class=\"mathTreeNode\" id=\"asdf13\" linethickness=\"1\"> <mrow class=\"mathTreeNode\" id=\"asdf14\"> <msup class=\"mathTreeNode\" id=\"asdf15\"> <mi class=\"mathTreeNode\" id=\"asdf16\">x</mi> <mrow class=\"mathTreeNode\" id=\"asdf17\"> <mn class=\"mathTreeNode\" id=\"asdf18\">2</mn> <mfrac class=\"mathTreeNode\" id=\"asdf19\" linethickness=\"1\"> <mn class=\"mathTreeNode\" id=\"asdf20\">3</mn> <mi class=\"mathTreeNode\" id=\"asdf21\">y</mi> </mfrac> </mrow> </msup> <mi class=\"mathTreeNode\" id=\"asdf22\">y</mi> </mrow> <mrow class=\"mathTreeNode\" id=\"asdf23\"> <msqrt class=\"mathTreeNode\" id=\"asdf24\"> <mrow class=\"mathTreeNode\" id=\"asdf25\"> <mn class=\"mathTreeNode\" id=\"asdf26\">1</mn> <mo class=\"mathTreeNode\" id=\"asdf27\">-</mo> <msup class=\"mathTreeNode\" id=\"asdf28\"> <mi class=\"mathTreeNode\" id=\"asdf29\">y</mi> <mn class=\"mathTreeNode\" id=\"asdf30\">2</mn> </msup> </mrow> </msqrt> </mrow> </mfrac> </mrow> </mfrac> </mrow> </mfrac> <mrow class=\"mathTreeNode\" id=\"asdf31\"> <mi class=\"mathTreeNode\" id=\"asdf32\">d</mi> <mi class=\"mathTreeNode\" id=\"asdf33\">x</mi> </mrow> </mrow> </math>".to_string())).unwrap();
+                        sender.send_message(&Message::text(format!("{}@<math xmlns=\"http://www.w3.org/1998/Math/MathML\"> <mrow mathTreeNode=\"\"> <mrow mathTreeNode=\"0\"> <msup mathTreeNode=\"0,0\"> <mi mathTreeNode=\"0,0,0\">x</mi> <mn mathTreeNode=\"0,0,1\">2</mn> </msup> <mo>+</mo> <mrow mathTreeNode=\"0,1\"> <mn mathTreeNode=\"0,1,0\">3</mn> <mo> &#8290; </mo> <mi mathTreeNode=\"0,1,1\">x</mi> </mrow> <mo>+</mo> <mn mathTreeNode=\"0,1\">4</mn> </mrow> <mo>=</mo> <mn mathTreeNode=\"1\"> 5 </mn> </mrow> </math>", formula_num).to_string())).unwrap();
+
+                        formula_num += 1;
                     },
                     _ => unreachable!(),
                 }
