@@ -1,11 +1,13 @@
 #![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns)]
+#![allow(dead_code)]
 #[macro_use]
 extern crate nom;
 mod parser;
 
 use parser::ParseError;
-
 use std::{fmt, mem};
+use std::string::String;
+
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Equation {
@@ -123,6 +125,100 @@ pub enum Expression {
     Atom(Atom),
 }
 
+impl fmt::Display for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let start = "0";
+        write!(f,"<math xmlns=\"http://www.w3.org/1998/Math/MathML\">");
+        fmt_as_math_ml(&self, f, start);
+        write!(f,"</math>")
+}
+}
+
+fn fmt_as_math_ml(expr: &Expression, f: &mut fmt::Formatter, prev_index: &str) -> Result<(), fmt::Error> {
+    match expr {
+
+        &Expression::Atom(atom) => {let mut base_string = String::from(prev_index);
+            write!(f,"<mrow mathTreeNode=\"{}\">{}</mrow>", base_string, atom)},
+
+        &Expression::Power(ref b,ref p) => {
+            let mut base_string = String::from(prev_index);
+            write!(f,"<mrow mathTreeNode=\"{}\"><msup>",base_string);
+            base_string.push_str(",0");
+            fmt_as_math_ml(b, f, &base_string);
+            let mut base_string = String::from(prev_index);
+            base_string.push_str(",1");
+            fmt_as_math_ml(p, f, &base_string);
+            write!(f,"</msup></mrow>")},
+
+        &Expression::Negation(ref n) => {
+            let mut base_string = String::from(prev_index);
+            write!(f,"<mrow mathTreeNode=\"{}\"><mo>-</mo>", base_string);
+            base_string.push_str(",0");
+            fmt_as_math_ml(n, f, &base_string);
+            write!(f,"</mrow>")},
+
+        &Expression::Division(ref n, ref d) => {
+            let mut base_string = String::from(prev_index);
+            write!(f, "<mrow mathTreeNode=\"{}\"><mfrac>", base_string);
+            base_string.push_str(",0");
+            fmt_as_math_ml(n, f, &base_string);
+            let mut base_string = String::from(prev_index);
+            base_string.push_str(",1");
+            fmt_as_math_ml(d, f, &base_string);
+            write!(f,"</mfrac></mrow>")},
+
+        &Expression::Subscript(ref e, ref s) => {
+            let mut base_string = String::from(prev_index);
+            write!(f, "<mrow mathTreeNode=\"{}\"><msub>", base_string);
+            base_string.push_str(",0");
+            fmt_as_math_ml(e, f, &base_string);
+            let mut base_string = String::from(prev_index);
+            base_string.push_str(",1");
+            fmt_as_math_ml(s, f, &base_string);
+            write!(f,"</msub></mrow>")},
+
+        &Expression::Sum(ref s) => {
+            let mut base_string = String::from(prev_index);
+            write!(f,"<mrow mathTreeNode=\"{}\">", base_string);
+            let len = s.len();
+            let iter = s.iter().enumerate();
+            for (i,e) in iter {
+                let mut base_string = String::from(prev_index);
+                base_string.push_str(",");
+                base_string.push_str(&i.to_string());
+                if i == len - 1 {
+                    fmt_as_math_ml(e, f, &base_string);
+                }
+                else {
+                    fmt_as_math_ml(e, f, &base_string);
+                    write!(f,"<mo>+</mo>");
+                }
+            }
+            write!(f,"</mrow>")},
+
+        &Expression::Product(ref s) => {
+            let mut base_string = String::from(prev_index);
+            write!(f,"<mrow mathTreeNode=\"{}\">", base_string);
+            let len = s.len();
+            let iter = s.iter().enumerate();
+            for (i,e) in iter {
+                let mut base_string = String::from(prev_index);
+                base_string.push_str(",");
+                base_string.push_str(&i.to_string());
+                if i == len - 1 {
+                    fmt_as_math_ml(e, f, &base_string);
+                }
+                else {
+                    fmt_as_math_ml(e, f, &base_string);
+                    write!(f,"<mo>&#8290;</mo>");
+                }
+            }
+            write!(f,"</mrow>")},
+
+        _ => write!(f,"unimplemented")
+    }
+}
+
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Atom {
     PlainVariable(char),
@@ -131,10 +227,14 @@ pub enum Atom {
     Symbol(Symbol),
 }
 
-impl Expression {
-    pub fn fmt_as_math_ml(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        // Tim can write code here
-        unimplemented!()
+impl fmt::Display for Atom {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Atom::PlainVariable(c) => write!(f,"<mi>{}</mi>",c),
+            &Atom::Natural(n) => write!(f,"<mn>{}</mn>",n),
+            &Atom::Floating(r) => write!(f,"<mn>{}</mn>",r),
+            &Atom::Symbol(s) => write!(f,"No idea how to write symbols.")
+        }
     }
 }
 
@@ -307,4 +407,73 @@ impl Symbol {
             _ => None,
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // This macro is an assertion with nicely formatted failure output
+    macro_rules! assert_expected_eq_actual {
+        ($a:expr, $b:expr) => ({
+            let (a, b) = (&$a, &$b);
+            assert!(*a == *b,
+                    "\nExpected `{:?}` is not equal to Actual `{:?}`\
+                     \nAssertion: `assert_expected_eq_actual!({}, {})`",
+                    *a,
+                    *b,
+                    stringify!($a),
+                    stringify!($b));
+        })
+    }
+
+    #[test]
+    fn format_power() {
+        let expr = Expression::Power(box Expression::Atom(Atom::PlainVariable('x')), box Expression::Atom(Atom::PlainVariable('y')));
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><msup><mrow mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow mathTreeNode=\"0,1\"><mi>y</mi></mrow></msup></mrow></math>";
+        let test = format!("{}", expr);
+        assert_expected_eq_actual!(expected, test);
+    }
+
+    #[test]
+    fn format_frac() {
+        let expr = Expression::Division(box Expression::Atom(Atom::PlainVariable('x')), box Expression::Atom(Atom::PlainVariable('y')));
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mfrac><mrow mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow mathTreeNode=\"0,1\"><mi>y</mi></mrow></mfrac></mrow></math>";
+        let test = format!("{}", expr);
+        assert_expected_eq_actual!(expected, test);
+    }
+
+    #[test]
+    fn format_negation() {
+        let expr = Expression::Negation(box Expression::Atom(Atom::PlainVariable('x')));
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mo>-</mo><mrow mathTreeNode=\"0,0\"><mi>x</mi></mrow></mrow></math>";
+        let test = format!("{}", expr);
+        assert_expected_eq_actual!(expected, test);
+    }
+
+    #[test]
+    fn format_sub() {
+        let expr = Expression::Subscript(box Expression::Atom(Atom::PlainVariable('x')), box Expression::Atom(Atom::PlainVariable('y')));
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><msub><mrow mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow mathTreeNode=\"0,1\"><mi>y</mi></mrow></msub></mrow></math>";
+        let test = format!("{}", expr);
+        assert_expected_eq_actual!(expected, test);
+    }
+
+    #[test]
+    fn format_add() {
+        let expr = Expression::Sum(vec![Expression::Atom(Atom::PlainVariable('x')), Expression::Atom(Atom::PlainVariable('y')), Expression::Atom(Atom::PlainVariable('z'))]);
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mrow mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow mathTreeNode=\"0,1\"><mi>y</mi></mrow><mo>+</mo><mrow mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
+        let test = format!("{}", expr);
+        assert_expected_eq_actual!(expected, test);
+    }
+
+    #[test]
+    fn format_prod() {
+        let expr = Expression::Product(vec![Expression::Atom(Atom::PlainVariable('x')), Expression::Atom(Atom::PlainVariable('y')), Expression::Atom(Atom::PlainVariable('z'))]);
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mrow mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow mathTreeNode=\"0,1\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
+        let test = format!("{}", expr);
+        assert_expected_eq_actual!(expected, test);
+    }
+
+
 }

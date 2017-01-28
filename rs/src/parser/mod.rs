@@ -205,7 +205,7 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
             let mut result_list = vec![];
             while let Some(next) = list.pop() {
                 let mut next = match to_known(next) {
-                    Err(ParseError::LoneControlSequence(KnownCS::dfrac)) | 
+                    Err(ParseError::LoneControlSequence(KnownCS::dfrac)) |
                     Err(ParseError::LoneControlSequence(KnownCS::frac)) => {
                         let (first, second) = two_expressions(&mut list)?;
                         PostMac::Frac(box first, box second)
