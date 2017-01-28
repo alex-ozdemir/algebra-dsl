@@ -4,6 +4,7 @@ extern crate iron;
 extern crate router;
 extern crate mount;
 extern crate staticfile;
+
 extern crate khwarizmi;
 
 use std::fs::File;
@@ -17,7 +18,7 @@ use iron::mime;
 use staticfile::Static;
 use mount::Mount;
 
-use khwarizmi::{Expression, Equation};
+use khwarizmi::{Expression, Equation, EquationIdx, AlgebraDSLError};
 
 // The HTTP server handler
 fn send_mainpage(_: &mut Request) -> IronResult<Response> {
@@ -25,6 +26,36 @@ fn send_mainpage(_: &mut Request) -> IronResult<Response> {
     Ok(Response::with((status::Ok,
                        mime::Mime(mime::TopLevel::Text, mime::SubLevel::Html, Vec::new()),
                        File::open(Path::new("static/index.html")).unwrap())))
+}
+
+enum Cmd {
+    Equation(Equation),
+    Make(EquationIdx, Expression),
+}
+
+fn parse_cmd(s:&str) -> Result<Cmd, AlgebraDSLError> {
+    let s: &str = s.trim();
+    if s.chars().next().map(|c| c == '$').unwrap_or(false) {
+        let inner = s.trim_matches('$');
+        println!("Equation: `{}'", inner);
+        Ok(Cmd::Equation(Equation::from_str(inner)?))
+    } else {
+        let sections = s.split('$').collect::<Vec<_>>();
+        println!("Sections: `{:?}'", sections);
+        if sections.len() == 3 {
+            if sections[0].trim() != "make" {
+                println!("command: `{}'", sections[0].trim());
+                Err(AlgebraDSLError::IllFormattedCommand)
+            } else {
+                println!("Make");
+                let idx = EquationIdx::from_str(sections[1].trim())?;
+                println!("Index: {:?}", idx);
+                let expr = Expression::from_str(sections[2].trim())?;
+                println!("Expression: {:#?}", expr);
+                Ok(Cmd::Make(idx, expr))
+            }
+        } else { Err(AlgebraDSLError::IllFormattedCommand) }
+    }
 }
 
 fn main() {
@@ -66,6 +97,7 @@ fn main() {
             let (mut sender, mut receiver) = client.split();
 
             let mut formula_num = 0;
+            let mut equation = None;
             for message in receiver.incoming_messages() {
                 let message: Message = message.unwrap();
 
@@ -80,8 +112,29 @@ fn main() {
                         sender.send_message(&message).unwrap();
                     },
                     Type::Text => {
-                        println!("Received {}", std::str::from_utf8(&*message.payload).unwrap());
-                        sender.send_message(&Message::text(format!("{}@<math xmlns=\"http://www.w3.org/1998/Math/MathML\"> <mrow mathTreeNode=\"\"> <mrow mathTreeNode=\"0\"> <msup mathTreeNode=\"0,0\"> <mi mathTreeNode=\"0,0,0\">x</mi> <mn mathTreeNode=\"0,0,1\">2</mn> </msup> <mo>+</mo> <mrow mathTreeNode=\"0,1\"> <mn mathTreeNode=\"0,1,0\">3</mn> <mo> &#8290; </mo> <mi mathTreeNode=\"0,1,1\">x</mi> </mrow> <mo>+</mo> <mn mathTreeNode=\"0,1\">4</mn> </mrow> <mo>=</mo> <mn mathTreeNode=\"1\"> 5 </mn> </mrow> </math>", formula_num).to_string())).unwrap();
+                        let string = std::str::from_utf8(&*message.payload).unwrap();
+                        println!("Received {}", string);
+                        let response = match parse_cmd(string) {
+                            Ok(Cmd::Equation(eq)) => {
+                                equation = Some(eq);
+                                format!("{}", equation.as_ref().unwrap())
+                            },
+                            Ok(Cmd::Make(idx, expr)) => {
+                                match equation {
+                                    None => format!("Badness: ∞ (make without an expression)"),
+                                    Some(ref mut equation) => {
+                                        if equation.replace_with_expr(idx, expr).is_ok() {
+                                            format!("{}", equation)
+                                        } else {
+                                            format!("Badness: ∞ (invalid index)")
+                                        }
+                                    },
+                                }
+                            },
+                            Err(e) => format!("Badness: ∞ (unrecognized command: {:#?})", e),
+                        };
+                        sender.send_message(&Message::text(format!("{}@{}", formula_num, response))).unwrap();
+                        //sender.send_message(&Message::text(format!("{}@<math xmlns=\"http://www.w3.org/1998/Math/MathML\"> <mrow mathTreeNode=\"\"> <mrow mathTreeNode=\"0\"> <msup mathTreeNode=\"0,0\"> <mi mathTreeNode=\"0,0,0\">x</mi> <mn mathTreeNode=\"0,0,1\">2</mn> </msup> <mo>+</mo> <mrow mathTreeNode=\"0,1\"> <mn mathTreeNode=\"0,1,0\">3</mn> <mo> &#8290; </mo> <mi mathTreeNode=\"0,1,1\">x</mi> </mrow> <mo>+</mo> <mn mathTreeNode=\"0,1\">4</mn> </mrow> <mo>=</mo> <mn mathTreeNode=\"1\"> 5 </mn> </mrow> </math>", formula_num))).unwrap();
 
                         formula_num += 1;
                     },

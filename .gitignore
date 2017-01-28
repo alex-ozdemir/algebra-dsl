@@ -3,3 +3,4 @@
 **/target
 server/static/index.html
 **/Cargo.lock
+**/*.bk

@@ -3,22 +3,25 @@
 use nom::{alpha, digit, sp, IResult};
 use std::str::{self, FromStr};
 
-named!(single_char<char>,
+named!(single_char<char>, preceded!(sp,
     one_of!("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-);
+));
 
 named!(identifier<String>,
-    map!(
-        map_res!(
-            alpha,
-            str::from_utf8
-        ),
-        String::from
+    preceded!(sp,
+        map!(
+            map_res!(
+                alpha,
+                str::from_utf8
+            ),
+            String::from
+        )
     )
 );
 
 named!(control_sequence<String>,
     do_parse!(
+        sp >>
         char!('\\') >>
         cs: identifier >>
         (cs)
@@ -26,12 +29,14 @@ named!(control_sequence<String>,
 );
 
 named!(number<u64>,
-    map_res!(
+    preceded!(sp,
         map_res!(
-            ws!(digit),
-            str::from_utf8
-        ),
-        FromStr::from_str
+            map_res!(
+                digit,
+                str::from_utf8
+            ),
+            FromStr::from_str
+        )
     )
 );
 
@@ -74,7 +79,7 @@ pub enum Token {
 }
 
 named!(special_character<Special>,
-    alt!(
+    preceded!(sp, alt!(
         value!(Special::Tilde, char!('~')) |
         value!(Special::Backtick, char!('`')) |
         value!(Special::Exclamation, char!('!')) |
@@ -100,25 +105,26 @@ named!(special_character<Special>,
         value!(Special::RAngleBracket, char!('>')) |
         value!(Special::Divide, char!('/')) |
         value!(Special::Question, char!('?'))
-    )
+    ))
 );
 
+named!(open<char>, preceded!(sp, char!('{')));
+named!(close<char>, preceded!(sp, char!('}')));
+
 named!(token<Token>,
-    preceded!(sp,
-        alt!(
-            map!(special_character, Token::Special) |
-            map!(control_sequence, Token::ControlSequence) |
-            map!(single_char, Token::Char) |
-            map!(number, Token::Natural) |
-            map!(delimited!(char!('{'), many0!(token), char!('}')), Token::List)
-        )
+    alt!(
+        map!(special_character, Token::Special) |
+        map!(control_sequence, Token::ControlSequence) |
+        map!(single_char, Token::Char) |
+        map!(number, Token::Natural) |
+        map!(delimited!(open, many0!(token), close), Token::List)
     )
 );
 
 named!(tokens<Token>, map!(many0!(token), Token::List));
 
 pub fn parse_tokens(input: &str) -> Result<Token, String> {
-    match tokens(input.as_bytes()) {
+    match tokens(input.trim().as_bytes()) {
         IResult::Done(b"", token) => Ok(token),
         result => Err(format!("{:?}", result)),
     }
@@ -141,7 +147,7 @@ mod tests {
         })
     }
 
-    use nom::{IResult};
+    use nom::IResult;
     use super::*;
 
     #[test]
@@ -187,7 +193,8 @@ mod tests {
     #[test]
     fn test_chars() {
         let input = &b"hi12"[..];
-        let expected = IResult::Done(&b""[..], Token::List(vec![Token::Char('h'),
+        let expected = IResult::Done(&b""[..],
+                                     Token::List(vec![Token::Char('h'),
                                                                 Token::Char('i'),
                                                                 Token::Natural(12)]));
         assert_expected_eq_actual!(tokens(input), expected);
@@ -196,7 +203,8 @@ mod tests {
     #[test]
     fn test_number_sequence() {
         let input = &b"1 3 4"[..];
-        let expected = IResult::Done(&b""[..], Token::List(vec![Token::Natural(1),
+        let expected = IResult::Done(&b""[..],
+                                     Token::List(vec![Token::Natural(1),
                                                                 Token::Natural(3),
                                                                 Token::Natural(4)]));
         assert_expected_eq_actual!(tokens(input), expected);
@@ -212,6 +220,22 @@ mod tests {
                                                        Token::Special(Special::Plus),
                                                        Token::Natural(3)]),
                                       Token::Natural(4)]);
+        let expected = IResult::Done(&b""[..], answer);
+        assert_expected_eq_actual!(tokens(input), expected);
+    }
+
+    #[test]
+    fn test_2() {
+        let input = &b" 5 + \\frac { 6 + 3 } { 4 - 5 }"[..];
+        let answer = Token::List(vec![Token::Natural(5),
+                                      Token::Special(Special::Plus),
+                                      Token::ControlSequence(String::from("frac")),
+                                      Token::List(vec![Token::Natural(6),
+                                                       Token::Special(Special::Plus),
+                                                       Token::Natural(3)]),
+                                      Token::List(vec![Token::Natural(4),
+                                                       Token::Special(Special::Dash),
+                                                       Token::Natural(5)])]);
         let expected = IResult::Done(&b""[..], answer);
         assert_expected_eq_actual!(tokens(input), expected);
     }

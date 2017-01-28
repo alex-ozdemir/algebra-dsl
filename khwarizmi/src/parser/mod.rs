@@ -31,7 +31,7 @@ impl KnownCS {
             "times" => Some(KnownCS::times),
             "sqrt" => Some(KnownCS::sqrt),
             "div" => Some(KnownCS::div),
-            s => Symbol::from_str(s).map(KnownCS::Preserved)
+            s => Symbol::from_str(s).map(KnownCS::Preserved),
         }
     }
 }
@@ -60,13 +60,13 @@ impl Operator {
         match *self {
             Begin => panic!("We should never look left of Begin"),
             End => u8::min_value(),
-            RGroup => u8::min_value()+1,
+            RGroup => u8::min_value() + 1,
             Plus | Minus => 15,
-            Times | Div=> 25,
+            Times | Div => 25,
             Neg => 35,
             Caret => 45,
             Underscore => 55,
-            LGroup => u8::max_value()-1,
+            LGroup => u8::max_value() - 1,
         }
     }
     fn right_precedence(&self) -> u8 {
@@ -74,13 +74,13 @@ impl Operator {
         match *self {
             Begin => u8::min_value(),
             End => panic!("We should never look right of End"),
-            LGroup => u8::min_value()+1,
+            LGroup => u8::min_value() + 1,
             Plus | Minus => 16,
             Times | Div => 26,
             Neg => 34,
             Caret => 44,
             Underscore => 54,
-            RGroup => u8::max_value()-1,
+            RGroup => u8::max_value() - 1,
         }
     }
     fn arity(&self) -> u8 {
@@ -189,7 +189,8 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
         Token::Char(c) => Ok(PostMac::Char(c)),
         Token::Natural(n) => Ok(PostMac::Natural(n)),
         Token::ControlSequence(cs) => {
-            let known_cs = KnownCS::from_str(cs.as_str()).ok_or(ParseError::UnknownControlSequence(cs))?;
+            let known_cs =
+                KnownCS::from_str(cs.as_str()).ok_or(ParseError::UnknownControlSequence(cs))?;
             match known_cs {
                 KnownCS::div => Ok(PostMac::Op(UniOp::Std(Operator::Div))),
                 KnownCS::cdot | KnownCS::times => Ok(PostMac::Op(UniOp::Std(Operator::Times))),
@@ -212,12 +213,12 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                         let argument = one_expression(&mut list)?;
                         PostMac::Sqrt(box argument)
                     }
-                    e@Err(_) => return e,
+                    e @ Err(_) => return e,
                     Ok(x) => x,
                 };
                 let op_expected = result_list.last()
-                                             .map(PostMac::expects_op_after)
-                                             .unwrap_or(false);
+                    .map(PostMac::expects_op_after)
+                    .unwrap_or(false);
                 let implicit_times = op_expected && next.expects_op_before();
                 if implicit_times {
                     result_list.push(PostMac::Op(UniOp::Std(Operator::Times)));
@@ -249,7 +250,10 @@ fn two_expressions(input: &mut Vec<latex::Token>) -> Result<(PostMac, PostMac), 
 
 fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
     match input {
-        PostMac::Sqrt(radical) => Ok(Expression::Power(box parse_operators(*radical)?, box Expression::Atom(Atom::Floating(0.5)))),
+        PostMac::Sqrt(radical) => {
+            Ok(Expression::Power(box parse_operators(*radical)?,
+                                 box Expression::Atom(Atom::Floating(0.5))))
+        }
         PostMac::Char(c) => Ok(Expression::Atom(Atom::PlainVariable(c))),
         PostMac::Standalone(sym) => Ok(Expression::Atom(Atom::Symbol(Symbol::Standalone(sym)))),
         PostMac::Natural(c) => Ok(Expression::Atom(Atom::Natural(c))),
@@ -265,22 +269,26 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
             tokens.push(PostMac::Op(UniOp::Std(Operator::End)));
             tokens.reverse();
             while let Some(token) = tokens.pop() {
-                println!("New Round\n\tOps:   {:?}\n\tExprs: {:?}", operator_stack, expression_stack);
+                println!("New Round\n\tOps:   {:?}\n\tExprs: {:?}",
+                         operator_stack,
+                         expression_stack);
                 match token {
                     PostMac::Op(next_op) => {
-                        while operator_stack.last().unwrap().right_precedence() > next_op.left_precedence() {
+                        while operator_stack.last().unwrap().right_precedence() >
+                              next_op.left_precedence() {
                             let combinator = operator_stack.pop().unwrap();
                             let second = expression_stack.pop().ok_or(ParseError::OperatorError)?;
                             let new_expr = if combinator.arity() == 1 {
                                 combine1(second, combinator)
                             } else {
-                                let first = expression_stack.pop().ok_or(ParseError::OperatorError)?;
+                                let first = expression_stack.pop()
+                                    .ok_or(ParseError::OperatorError)?;
                                 combine2(first, combinator, second)
                             };
                             expression_stack.push(new_expr);
                         }
                         operator_stack.push(next_op);
-                    },
+                    }
                     PostMac::List(mut next_list) => {
                         next_list.reverse();
                         // FIXME(aozdemir): Here, we treat latex {} as grouping operators. This
@@ -291,11 +299,14 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                     }
                     expr => expression_stack.push(parse_operators(expr)?),
                 };
-                if let &[_.., UniOp::Std(Operator::LGroup), UniOp::Std(Operator::RGroup)] = operator_stack.as_slice() {
-                    operator_stack.pop(); operator_stack.pop();
+                if let &[_.., UniOp::Std(Operator::LGroup), UniOp::Std(Operator::RGroup)] =
+                    operator_stack.as_slice() {
+                    operator_stack.pop();
+                    operator_stack.pop();
                 }
             }
-            debug_assert!(&operator_stack[..] == &[UniOp::Std(Operator::Begin), UniOp::Std(Operator::End)]);
+            debug_assert!(&operator_stack[..] ==
+                          &[UniOp::Std(Operator::Begin), UniOp::Std(Operator::End)]);
             if expression_stack.len() == 1 {
                 Ok(expression_stack.pop().unwrap())
             } else {
@@ -331,7 +342,10 @@ fn combine1(expr: Expression, op: UniOp) -> Expression {
     use self::Operator::*;
     match op {
         UniOp::Std(Neg) => Expression::Negation(box expr),
-        UniOp::Symbol(sym) => Expression::Application(box Expression::Atom(Atom::Symbol(Symbol::Operator(sym))), box expr),
+        UniOp::Symbol(sym) => {
+            Expression::Application(box Expression::Atom(Atom::Symbol(Symbol::Operator(sym))),
+                                    box expr)
+        }
         _ => panic!("Combine1 called with non-unary operator"),
     }
 }
@@ -352,12 +366,18 @@ fn combine2(left: Expression, op: UniOp, right: Expression) -> Expression {
 
 pub fn parse_equation(input: &str) -> Result<Equation, ParseError> {
     let mut sides = input.split("=").collect::<Vec<_>>();
+    // println!("Sides: {:?}", sides);
     if sides.len() != 2 {
         return Err(ParseError::WrongNumberOfEqualSigns);
     }
     let right = parse_expr(sides.pop().unwrap())?;
+    // println!("Right: {:?}", right);
     let left = parse_expr(sides.pop().unwrap())?;
-    Ok(Equation{ left: left, right: right })
+    // println!("Left: {:?}", left);
+    Ok(Equation {
+        left: left,
+        right: right,
+    })
 }
 
 pub fn parse_expr(input: &str) -> Result<Expression, ParseError> {
