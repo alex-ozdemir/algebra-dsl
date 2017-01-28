@@ -32,11 +32,29 @@ function createCM() {
     });
     //myCodeMirror.setSize(null, 1);
 
-    //myCodeMirror.on('keyup', function(instance, e) {
-    //    if (e.code == 'Enter') {
-    //        sendToServer(instance);
-    //    }
-    //});
+    currentCM.cmIndex = 0;
+
+    currentCM.on('beforeSelectionChange', function(instance) {
+        if (curSelected !== null) {
+            curSelected.removeAttribute('selected');
+
+            // Put a span inside that has a highlight color and has all of
+            // curSelected's children
+            var newspan = document.createElement('span');
+            newspan.setAttribute('highlighted', currentCM.cmIndex);
+
+            while (curSelected.children.length > 0) {
+                // This (re)moves the child from curSelecte
+                newspan.appendChild(curSelected.children[0]);
+            }
+
+            curSelected.appendChild(newspan);
+
+            currentCM.cmIndex += 1;
+            curSelected = null;
+            lastClickedID = null;
+        }
+    });
 }
 
 var socket = new WebSocket("ws://127.0.0.1:2794", "rust-websocket");
@@ -61,14 +79,37 @@ socket.onmessage = function (event) {
     createCM();
 };
 
-function insertIntoCurrrentEquation(elementToInsert) {
+function insertIntoCurrrentEquation(e) {
 
+    var copyOfElement = e.cloneNode(true);
 
-    var literaltext = '#(' + elementToInsert.getAttribute('mathTreeNode') + ')';
+    copyOfElement.setAttribute('highlighted', currentCM.cmIndex);
+
+    copyOfElement.removeAttribute('selected');
+    var subTreeNodes = copyOfElement.getElementsByTagName("*");
+    for (var i=0; i<subTreeNodes.length; i++) {
+        subTreeNodes[i].removeAttribute('selected');
+        subTreeNodes[i].removeAttribute('highlighted');
+        subTreeNodes[i].removeAttribute('id');
+    }
 
     var toInsert = document.createElement('span');
-    toInsert.className = 'mjx-math mjx-chtml';
-    toInsert.appendChild(elementToInsert.cloneNode(true));
+    toInsert.className = 'mjx-math mjx-chtml mathInEquation';
+    toInsert.appendChild(copyOfElement);
+
+    toInsert.addEventListener("mouseenter", function(ev) {
+        copyOfElement.setAttribute('hoverednode',
+            copyOfElement.getAttribute('highlighted'));
+        e.setAttribute('hoverednode',
+            copyOfElement.getAttribute('highlighted'));
+    });
+
+    toInsert.addEventListener("mouseleave", function(ev) {
+        e.removeAttribute('hoverednode');
+        copyOfElement.removeAttribute('hoverednode');
+    });
+
+    var literaltext = '#(' + copyOfElement.getAttribute('mathtreenode') + ')';
 
     if (!currentCM.somethingSelected()) {
         var place = currentCM.getCursor();
@@ -76,15 +117,15 @@ function insertIntoCurrrentEquation(elementToInsert) {
         currentCM.replaceRange(literaltext, place);
 
         var place2 = currentCM.getCursor();
-        console.log(place);
-        console.log(place2);
         var x = currentCM.markText(place, place2, { replacedWith: toInsert });
         currentCM.setSelection(place, place2);
     } else {
-        var selections = currentCM.listSelections();
-        console.log(selections);
-
+        var oldCurSelected = curSelected;
+        curSelected = null;
         currentCM.replaceSelection(literaltext, 'around');
+        curSelected = oldCurSelected;
+
+        var selections = currentCM.listSelections();
         var anchor = selections[0].anchor;
         var head = selections[0].head;
         var beg;
@@ -98,19 +139,23 @@ function insertIntoCurrrentEquation(elementToInsert) {
         }
         currentCM.markText(beg, end, { replacedWith: toInsert });
     }
+    currentCM.focus();
 }
 
 function removeSelection() {
     if (currentCM.somethingSelected()) {
+        var oldCurSelected = curSelected;
+        curSelected = null;
         currentCM.replaceSelection('');
+        curSelected = oldCurSelected;
     }
 }
 
 var lastClickedID = null;
-var curHighlighted = null;
+var curSelected = null;
 
 function mathTreeNodeNodeAbove(cur, topLevel) {
-    while (!cur.hasAttribute('mathTreeNode')) {
+    while (!cur.hasAttribute('mathtreenode')) {
         if (cur === topLevel) {
             return null;
         }
@@ -130,14 +175,9 @@ function finishTypesetting(where) {
 
 
     element.addEventListener("click", function(event) {
-        //// Remove the other highlighted stuff
-        //var maths = element.getElementsByTagName('*');
-        //for (var i=0; i<maths.length; ++i) {
-        //    maths[i].removeAttribute('highlighted');
-        //}
-
-        if (curHighlighted !== null) {
-            curHighlighted.removeAttribute('highlighted');
+        // Remove the other highlighted stuff
+        if (curSelected !== null) {
+            curSelected.removeAttribute('selected');
         }
 
         var reset = false;
@@ -148,7 +188,7 @@ function finishTypesetting(where) {
             var elementToHighlight = null;
             if (closestAbove.id === lastClickedID) {
                 elementToHighlight = mathTreeNodeNodeAbove(
-                    curHighlighted.parentNode,
+                    curSelected.parentNode,
                     element);
             } else {
                 elementToHighlight = closestAbove;
@@ -156,20 +196,18 @@ function finishTypesetting(where) {
             if (elementToHighlight === null || elementToHighlight.tagName === 'math') {
                 reset = true;
             } else {
-                console.log('moo');
-                elementToHighlight.setAttribute('highlighted', 'true');
+                elementToHighlight.setAttribute('selected', '0');
 
-                // TODO: Put in the formula
                 insertIntoCurrrentEquation(elementToHighlight);
                 lastClickedID = closestAbove.id;
-                curHighlighted = elementToHighlight;
+                curSelected = elementToHighlight;
             }
         }
         if (reset) {
             removeSelection();
 
             lastClickedID = null;
-            curHighlighted = null;
+            curSelected = null;
         }
     }, false);
 

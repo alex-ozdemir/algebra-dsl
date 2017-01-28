@@ -8,6 +8,73 @@
   height: auto;
 }
 
-[mathtreenode][highlighted] {
-    outline: 1px solid green;
+[highlighted] {
+    border: 1px solid;
 }
+
+[highlighted="0"]  { border-color: yellow; outline-color: yellow; }
+[highlighted="1"]  { border-color: purple; outline-color: purple; }
+[highlighted="2"]  { border-color: orange; outline-color: orange; }
+[highlighted="3"]  { border-color: lightblue; outline-color: lightblue; }
+[highlighted="4"]  { border-color: red; outline-color: red; }
+[highlighted="5"]  { border-color: gray; outline-color: gray; }
+[highlighted="6"]  { border-color: green; outline-color: green; }
+[highlighted="7"]  { border-color: blue; outline-color: blue; }
+[highlighted="8"]  { border-color: salmon; outline-color: salmon; }
+[highlighted="9"]  { border-color: violet; outline-color: violet; }
+[highlighted="10"] { border-color: greenyellow; outline-color: greenyellow; }
+
+[hoverednode="0"]  [highlighted="0"],
+[hoverednode="1"]  [highlighted="1"],
+[hoverednode="2"]  [highlighted="2"],
+[hoverednode="3"]  [highlighted="3"],
+[hoverednode="4"]  [highlighted="4"],
+[hoverednode="5"]  [highlighted="5"],
+[hoverednode="6"]  [highlighted="6"],
+[hoverednode="7"]  [highlighted="7"],
+[hoverednode="8"]  [highlighted="8"],
+[hoverednode="9"]  [highlighted="9"],
+[hoverednode="10"] [highlighted="10"] { outline-style: solid; outline-width: 3px; }
+
+[mathtreenode][selected] {
+    outline: 1px solid #706ad8;
+}
+
+
+/*
+[mathtreenode][highlighted~="0"] {
+    outline-color: #9aae35;
+}
+
+[mathtreenode][highlighted~="1"] {
+    outline-color: #b75bbf;
+}
+
+[mathtreenode][highlighted~="2"] {
+    outline-color: #55a65c;
+}
+
+[mathtreenode][highlighted~="3"] {
+    outline-color: #c55d93;
+}
+
+[mathtreenode][highlighted~="4"] {
+    outline-color: #45af9c;
+}
+
+[mathtreenode][highlighted~="5"] {
+    outline-color: #d06c30;
+}
+
+[mathtreenode][highlighted~="6"] {
+    outline-color: #7589c8;
+}
+
+[mathtreenode][highlighted~="7"] {
+    outline-color: #9b8649;
+}
+
+[mathtreenode][highlighted~="8"] {
+    outline-color: #cb595e;
+}
+*/
