@@ -1,10 +1,10 @@
 //! Contains a LaTeX parser of sorts.
 
-use nom::{alpha, digit, sp, IResult};
-use std::str::{self, FromStr};
+use nom::{alpha, sp, IResult};
+use std::str::{self};
 
 named!(single_char<char>, preceded!(sp,
-    one_of!("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    one_of!("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
 ));
 
 named!(identifier<String>,
@@ -25,18 +25,6 @@ named!(control_sequence<String>,
         char!('\\') >>
         cs: identifier >>
         (cs)
-    )
-);
-
-named!(number<u64>,
-    preceded!(sp,
-        map_res!(
-            map_res!(
-                digit,
-                str::from_utf8
-            ),
-            FromStr::from_str
-        )
     )
 );
 
@@ -74,7 +62,6 @@ pub enum Token {
     Special(Special),
     Char(char),
     ControlSequence(String),
-    Natural(u64),
     List(Vec<Token>),
 }
 
@@ -116,7 +103,7 @@ named!(token<Token>,
         map!(special_character, Token::Special) |
         map!(control_sequence, Token::ControlSequence) |
         map!(single_char, Token::Char) |
-        map!(number, Token::Natural) |
+        //map!(number, Token::Natural) |
         map!(delimited!(open, many0!(token), close), Token::List)
     )
 );
@@ -184,19 +171,22 @@ mod tests {
     }
 
     #[test]
-    fn test_number() {
-        let input = &b"134"[..];
-        let expected = IResult::Done(&b""[..], 134);
-        assert_expected_eq_actual!(number(input), expected);
-    }
-
-    #[test]
     fn test_chars() {
-        let input = &b"hi12"[..];
+        let input = &b"hi1"[..];
         let expected = IResult::Done(&b""[..],
                                      Token::List(vec![Token::Char('h'),
                                                                 Token::Char('i'),
-                                                                Token::Natural(12)]));
+                                                                Token::Char('1')]));
+        assert_expected_eq_actual!(tokens(input), expected);
+    }
+
+    #[test]
+    fn test_digit_split() {
+        let input = &b"\\frac12"[..];
+        let answer = Token::List(vec![Token::ControlSequence(String::from("frac")),
+                                      Token::Char('1'),
+                                      Token::Char('2')]);
+        let expected = IResult::Done(&b""[..], answer);
         assert_expected_eq_actual!(tokens(input), expected);
     }
 
@@ -204,22 +194,22 @@ mod tests {
     fn test_number_sequence() {
         let input = &b"1 3 4"[..];
         let expected = IResult::Done(&b""[..],
-                                     Token::List(vec![Token::Natural(1),
-                                                                Token::Natural(3),
-                                                                Token::Natural(4)]));
+                                     Token::List(vec![Token::Char('1'),
+                                                                Token::Char('3'),
+                                                                Token::Char('4')]));
         assert_expected_eq_actual!(tokens(input), expected);
     }
 
     #[test]
     fn test_1() {
         let input = &b"5 + \\frac {6 + 3} 4"[..];
-        let answer = Token::List(vec![Token::Natural(5),
+        let answer = Token::List(vec![Token::Char('5'),
                                       Token::Special(Special::Plus),
                                       Token::ControlSequence(String::from("frac")),
-                                      Token::List(vec![Token::Natural(6),
+                                      Token::List(vec![Token::Char('6'),
                                                        Token::Special(Special::Plus),
-                                                       Token::Natural(3)]),
-                                      Token::Natural(4)]);
+                                                       Token::Char('3')]),
+                                      Token::Char('4')]);
         let expected = IResult::Done(&b""[..], answer);
         assert_expected_eq_actual!(tokens(input), expected);
     }
@@ -227,15 +217,15 @@ mod tests {
     #[test]
     fn test_2() {
         let input = &b" 5 + \\frac { 6 + 3 } { 4 - 5 }"[..];
-        let answer = Token::List(vec![Token::Natural(5),
+        let answer = Token::List(vec![Token::Char('5'),
                                       Token::Special(Special::Plus),
                                       Token::ControlSequence(String::from("frac")),
-                                      Token::List(vec![Token::Natural(6),
+                                      Token::List(vec![Token::Char('6'),
                                                        Token::Special(Special::Plus),
-                                                       Token::Natural(3)]),
-                                      Token::List(vec![Token::Natural(4),
+                                                       Token::Char('3')]),
+                                      Token::List(vec![Token::Char('4'),
                                                        Token::Special(Special::Dash),
-                                                       Token::Natural(5)])]);
+                                                       Token::Char('5')])]);
         let expected = IResult::Done(&b""[..], answer);
         assert_expected_eq_actual!(tokens(input), expected);
     }

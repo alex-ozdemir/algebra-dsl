@@ -158,6 +158,12 @@ impl PostMac {
             &PostMac::Natural(_) => true,
         }
     }
+    fn as_natural(&self) -> u64 {
+        match self {
+            &PostMac::Natural(n) => n,
+            _ => panic!("Called `as_natural` on a non-natural"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -186,8 +192,9 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
         Token::Special(Special::Caret) => Ok(PostMac::Op(UniOp::Std(Operator::Caret))),
         Token::Special(Special::Underscore) => Ok(PostMac::Op(UniOp::Std(Operator::Underscore))),
         Token::Special(x) => Err(ParseError::UnknownSpecialChar(x)),
-        Token::Char(c) => Ok(PostMac::Char(c)),
-        Token::Natural(n) => Ok(PostMac::Natural(n)),
+        Token::Char(c) if c.is_alphabetic() => Ok(PostMac::Char(c)),
+        Token::Char(c) if c.is_numeric() => Ok(PostMac::Natural(c.to_digit(10).unwrap() as u64)),
+        Token::Char(c) => panic!("Unimplmented character `{}'", c),
         Token::ControlSequence(cs) => {
             let known_cs =
                 KnownCS::from_str(cs.as_str()).ok_or(ParseError::UnknownControlSequence(cs))?;
@@ -216,17 +223,29 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                     e @ Err(_) => return e,
                     Ok(x) => x,
                 };
-                let op_expected = result_list.last()
-                    .map(PostMac::expects_op_after)
-                    .unwrap_or(false);
-                let implicit_times = op_expected && next.expects_op_before();
-                if implicit_times {
-                    result_list.push(PostMac::Op(UniOp::Std(Operator::Times)));
+                let two_nats = if let (Some(&PostMac::Natural(_)), &PostMac::Natural(_)) =
+                    (result_list.last(), &next) {
+                    true
+                } else {
+                    false
+                };
+                if two_nats {
+                    let last = result_list.pop().unwrap().as_natural();
+                    let this = next.as_natural();
+                    result_list.push(PostMac::Natural(last * 10 + this));
+                } else {
+                    let op_expected = result_list.last()
+                        .map(PostMac::expects_op_after)
+                        .unwrap_or(false);
+                    let implicit_times = op_expected && next.expects_op_before();
+                    if implicit_times {
+                        result_list.push(PostMac::Op(UniOp::Std(Operator::Times)));
+                    }
+                    if next == PostMac::Op(UniOp::Std(Operator::Minus)) && !op_expected {
+                        next = PostMac::Op(UniOp::Std(Operator::Neg));
+                    }
+                    result_list.push(next);
                 }
-                if next == PostMac::Op(UniOp::Std(Operator::Minus)) && !op_expected {
-                    next = PostMac::Op(UniOp::Std(Operator::Neg));
-                }
-                result_list.push(next);
             }
             match result_list.len() {
                 0 => Err(ParseError::EmptyList),

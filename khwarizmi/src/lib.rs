@@ -16,78 +16,84 @@ pub struct Equation {
     right: Expression,
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub enum Side {
-    Left,
-    Right,
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct EquationIdx {
-    side: Side,
-    expr_idx: ExpressionIdx,
-}
-
-impl EquationIdx {
+impl TreeIdx {
     pub fn from_str(s: &str) -> Result<Self, AlgebraDSLError> {
         if &s[0..2] != "#(" || s.chars().last().unwrap() != ')' {
             return Err(AlgebraDSLError::IllFormattedIndex);
         }
         let s = &s[2..s.len() - 1];
         println!("String: `{}'", s);
-        let mut idxs = s.split(',')
+        let idxs = s.split(',')
             .map(|d| usize::from_str(d).map_err(|_| AlgebraDSLError::IllFormattedIndex));
-        let side = if idxs.next().ok_or(AlgebraDSLError::IllFormattedIndex)?? == 1 {
-            Side::Right
-        } else {
-            Side::Left
-        };
         let mut v = vec![];
         for idx in idxs {
-
             v.push(idx?);
         }
-        Ok(EquationIdx {
-            side: side,
-            expr_idx: v,
-        })
+        Ok(TreeIdx(v))
     }
 }
 
-pub type ExpressionIdx = Vec<usize>;
+
+impl AsRef<[TreeInt]> for TreeIdx {
+    fn as_ref(&self) -> &[TreeInt] {
+        &self.0[..]
+    }
+}
+
+type TreeInt = usize;
+
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct TreeIdx(Vec<TreeInt>);
 
 impl Equation {
-    pub fn get(&self, index: EquationIdx) -> Result<&Expression, AlgebraDSLError> {
-        (match index.side {
-                Side::Left => &self.left,
-                Side::Right => &self.right,
-            })
-            .get(index.expr_idx)
+    pub fn from_str(eq: &str) -> Result<Self, AlgebraDSLError> {
+        parser::parse_equation(eq).map_err(AlgebraDSLError::Parse)
     }
-    pub fn get_mut(&mut self, index: EquationIdx) -> Result<&mut Expression, AlgebraDSLError> {
-        (match index.side {
-                Side::Left => &mut self.left,
-                Side::Right => &mut self.right,
+}
+
+impl Indexable for Equation {
+    fn get(&self, index: &[TreeInt]) -> Result<&Expression, AlgebraDSLError> {
+        if index.len() == 0 {
+            return Err(AlgebraDSLError::InvalidIdx);
+        };
+        (match index[0] {
+                0 => &self.left,
+                1 => &self.right,
+                _ => return Err(AlgebraDSLError::InvalidIdx),
             })
-            .get_mut(index.expr_idx)
+            .get(&index[1..])
     }
-    pub fn replace_with_expr(&mut self,
-                             index: EquationIdx,
-                             expr: Expression)
-                             -> Result<Expression, AlgebraDSLError> {
-        let subtree = self.get_mut(index)?;
+    fn get_mut(&mut self, index: &[TreeInt]) -> Result<&mut Expression, AlgebraDSLError> {
+        if index.len() == 0 {
+            return Err(AlgebraDSLError::InvalidIdx);
+        };
+        (match index[0] {
+                0 => &mut self.left,
+                1 => &mut self.right,
+                _ => return Err(AlgebraDSLError::InvalidIdx),
+            })
+            .get_mut(&index[1..])
+    }
+}
+
+pub trait Indexable: fmt::Display + fmt::Debug {
+    fn get(&self, index: &[TreeInt]) -> Result<&Expression, AlgebraDSLError>;
+    fn get_mut(&mut self, index: &[TreeInt]) -> Result<&mut Expression, AlgebraDSLError>;
+    fn replace_with_expr(&mut self,
+                         index: &TreeIdx,
+                         expr: Expression)
+                         -> Result<Expression, AlgebraDSLError> {
+        let subtree = self.get_mut(index.as_ref())?;
         let old = subtree.take();
         *subtree = expr;
         Ok(old)
     }
-    pub fn replace_with_str(&mut self,
-                            index: EquationIdx,
-                            expr: &str)
-                            -> Result<Expression, AlgebraDSLError> {
+    fn replace_with_str(&mut self,
+                        index: &TreeIdx,
+                        expr: &str)
+                        -> Result<Expression, AlgebraDSLError> {
         self.replace_with_expr(index, Expression::from_str(expr)?)
-    }
-    pub fn from_str(eq: &str) -> Result<Self, AlgebraDSLError> {
-        parser::parse_equation(eq).map_err(AlgebraDSLError::Parse)
     }
 }
 
@@ -98,12 +104,15 @@ impl Expression {
     pub fn take(&mut self) -> Self {
         mem::replace(self, Expression::Atom(Atom::Natural(0)))
     }
-    pub fn get(&self, index: ExpressionIdx) -> Result<&Self, AlgebraDSLError> {
+}
+
+impl Indexable for Expression {
+    fn get(&self, index: &[TreeInt]) -> Result<&Expression, AlgebraDSLError> {
         if index.len() == 0 {
             Ok(self)
         } else {
-            let first = index[index.len() - 1];
-            let rest = index[0..index.len() - 1].iter().cloned().collect::<Vec<usize>>();
+            let first = index[0];
+            let rest = &index[1..];
             match self {
                 &Expression::Negation(ref e) if first == 0 => e.get(rest),
                 &Expression::Sum(ref e) if first < e.len() => e[first].get(rest),
@@ -120,12 +129,12 @@ impl Expression {
             }
         }
     }
-    pub fn get_mut(&mut self, index: ExpressionIdx) -> Result<&mut Self, AlgebraDSLError> {
+    fn get_mut(&mut self, index: &[TreeInt]) -> Result<&mut Expression, AlgebraDSLError> {
         if index.len() == 0 {
             Ok(self)
         } else {
-            let first = index[index.len() - 1];
-            let rest = index[0..index.len() - 1].iter().cloned().collect::<Vec<usize>>();
+            let first = index[0];
+            let rest = &index[1..];
             match self {
                 &mut Expression::Negation(ref mut e) if first == 0 => e.get_mut(rest),
                 &mut Expression::Sum(ref mut e) if first < e.len() => e[first].get_mut(rest),
@@ -262,7 +271,17 @@ fn fmt_as_math_ml(expr: &Expression,
             }
             write!(f, "</mrow>")
         }
-        _ => write!(f, "unimplemented"),
+        &Expression::Application(ref func, ref arg) => {
+            let mut base_string = String::from(prev_index);
+            write!(f, "<mrow mathTreeNode=\"{}\">", base_string)?;
+            base_string.push_str(",0");
+            fmt_as_math_ml(func, f, &base_string)?;
+            let mut base_string = String::from(prev_index);
+            base_string.push_str(",1");
+            write!(f, "<mo>(</mo>")?;
+            fmt_as_math_ml(arg, f, &base_string)?;
+            write!(f, "<mo>)</mo></mrow>")
+        }
     }
 }
 
@@ -382,6 +401,7 @@ pub enum OperatorSymbol {
     max,
     sin,
     tanh,
+    pm,
 }
 
 impl Symbol {
@@ -451,6 +471,7 @@ impl Symbol {
             "max" => Some(Symbol::Operator(OperatorSymbol::max)),
             "sin" => Some(Symbol::Operator(OperatorSymbol::sin)),
             "tanh" => Some(Symbol::Operator(OperatorSymbol::tanh)),
+            "pm" => Some(Symbol::Operator(OperatorSymbol::pm)),
             _ => None,
         }
     }
@@ -520,6 +541,7 @@ impl Symbol {
             &Symbol::Operator(OperatorSymbol::max) => "&max;",
             &Symbol::Operator(OperatorSymbol::sin) => "&sin;",
             &Symbol::Operator(OperatorSymbol::tanh) => "&tanh;",
+            &Symbol::Operator(OperatorSymbol::pm) => "&pm;",
         }
     }
 }

@@ -18,7 +18,7 @@ use iron::mime;
 use staticfile::Static;
 use mount::Mount;
 
-use khwarizmi::{Expression, Equation, EquationIdx, AlgebraDSLError};
+use khwarizmi::{Expression, Equation, TreeIdx, AlgebraDSLError, Indexable};
 
 // The HTTP server handler
 fn send_mainpage(_: &mut Request) -> IronResult<Response> {
@@ -30,31 +30,24 @@ fn send_mainpage(_: &mut Request) -> IronResult<Response> {
 
 enum Cmd {
     Equation(Equation),
-    Make(EquationIdx, Expression),
+    Expression(Expression),
+    Make(TreeIdx, Expression),
 }
 
-fn parse_cmd(s:&str) -> Result<Cmd, AlgebraDSLError> {
+fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
     let s: &str = s.trim();
-    if s.chars().next().map(|c| c == '$').unwrap_or(false) {
-        let inner = s.trim_matches('$');
-        println!("Equation: `{}'", inner);
-        Ok(Cmd::Equation(Equation::from_str(inner)?))
+    if s.len() >= 4 && &s[..4] == "make" {
+        let rest = &s[4..].trim();
+        let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
+        let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
+        let expr = Expression::from_str(&rest[(idx_end + 1)..])?;
+        Ok(Cmd::Make(idx, expr))
     } else {
-        let sections = s.split('$').collect::<Vec<_>>();
-        println!("Sections: `{:?}'", sections);
-        if sections.len() == 3 {
-            if sections[0].trim() != "make" {
-                println!("command: `{}'", sections[0].trim());
-                Err(AlgebraDSLError::IllFormattedCommand)
-            } else {
-                println!("Make");
-                let idx = EquationIdx::from_str(sections[1].trim())?;
-                println!("Index: {:?}", idx);
-                let expr = Expression::from_str(sections[2].trim())?;
-                println!("Expression: {:#?}", expr);
-                Ok(Cmd::Make(idx, expr))
-            }
-        } else { Err(AlgebraDSLError::IllFormattedCommand) }
+        if let Some(eq) = Equation::from_str(s).ok() {
+            Ok(Cmd::Equation(eq))
+        } else {
+            Ok(Cmd::Expression(Expression::from_str(s)?))
+        }
     }
 }
 
@@ -67,7 +60,7 @@ fn main() {
 
         let mut mount = Mount::new();
         mount.mount("/", router)
-             .mount("/static/", Static::new(Path::new("static")));
+            .mount("/static/", Static::new(Path::new("static")));
 
         Iron::new(mount).http("127.0.0.1:8080").unwrap();
     });
@@ -97,7 +90,7 @@ fn main() {
             let (mut sender, mut receiver) = client.split();
 
             let mut formula_num = 0;
-            let mut equation = None;
+            let mut equation: Option<Box<Indexable>> = None;
             for message in receiver.incoming_messages() {
                 let message: Message = message.unwrap();
 
@@ -106,38 +99,45 @@ fn main() {
                         let message = Message::close();
                         sender.send_message(&message).unwrap();
                         return;
-                    },
+                    }
                     Type::Ping => {
                         let message = Message::pong(message.payload);
                         sender.send_message(&message).unwrap();
-                    },
+                    }
                     Type::Text => {
                         let string = std::str::from_utf8(&*message.payload).unwrap();
                         println!("Received {}", string);
                         let response = match parse_cmd(string) {
-                            Ok(Cmd::Equation(eq)) => {
-                                equation = Some(eq);
+                            Ok(Cmd::Expression(ex)) => {
+                                equation = Some(Box::new(ex));
+                                println!("{:#?}", equation.as_ref().unwrap());
+                                println!("{}", equation.as_ref().unwrap());
                                 format!("{}", equation.as_ref().unwrap())
-                            },
+                            }
+                            Ok(Cmd::Equation(eq)) => {
+                                equation = Some(Box::new(eq));
+                                format!("{}", equation.as_ref().unwrap())
+                            }
                             Ok(Cmd::Make(idx, expr)) => {
                                 match equation {
                                     None => format!("Badness: ∞ (make without an expression)"),
                                     Some(ref mut equation) => {
-                                        if equation.replace_with_expr(idx, expr).is_ok() {
+                                        if equation.replace_with_expr(&idx, expr).is_ok() {
                                             format!("{}", equation)
                                         } else {
                                             format!("Badness: ∞ (invalid index)")
                                         }
-                                    },
+                                    }
                                 }
-                            },
+                            }
                             Err(e) => format!("Badness: ∞ (unrecognized command: {:#?})", e),
                         };
-                        sender.send_message(&Message::text(format!("{}@{}", formula_num, response))).unwrap();
-                        //sender.send_message(&Message::text(format!("{}@<math xmlns=\"http://www.w3.org/1998/Math/MathML\"> <mrow mathTreeNode=\"\"> <mrow mathTreeNode=\"0\"> <msup mathTreeNode=\"0,0\"> <mi mathTreeNode=\"0,0,0\">x</mi> <mn mathTreeNode=\"0,0,1\">2</mn> </msup> <mo>+</mo> <mrow mathTreeNode=\"0,1\"> <mn mathTreeNode=\"0,1,0\">3</mn> <mo> &#8290; </mo> <mi mathTreeNode=\"0,1,1\">x</mi> </mrow> <mo>+</mo> <mn mathTreeNode=\"0,1\">4</mn> </mrow> <mo>=</mo> <mn mathTreeNode=\"1\"> 5 </mn> </mrow> </math>", formula_num))).unwrap();
+                        sender.send_message(&Message::text(format!("{}@{}", formula_num, response)))
+                            .unwrap();
+                        // sender.send_message(&Message::text(format!("{}@<math xmlns=\"http://www.w3.org/1998/Math/MathML\"> <mrow mathTreeNode=\"\"> <mrow mathTreeNode=\"0\"> <msup mathTreeNode=\"0,0\"> <mi mathTreeNode=\"0,0,0\">x</mi> <mn mathTreeNode=\"0,0,1\">2</mn> </msup> <mo>+</mo> <mrow mathTreeNode=\"0,1\"> <mn mathTreeNode=\"0,1,0\">3</mn> <mo> &#8290; </mo> <mi mathTreeNode=\"0,1,1\">x</mi> </mrow> <mo>+</mo> <mn mathTreeNode=\"0,1\">4</mn> </mrow> <mo>=</mo> <mn mathTreeNode=\"1\"> 5 </mn> </mrow> </math>", formula_num))).unwrap();
 
                         formula_num += 1;
-                    },
+                    }
                     _ => unreachable!(),
                 }
             }
