@@ -187,7 +187,9 @@ impl fmt::Display for Equation {
 
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt_as_math_ml(&self, f, "0")
+        write!(f, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
+        fmt_as_math_ml(&self, f, "0")?;
+        write!(f, "</math>")
     }
 }
 
@@ -568,9 +570,9 @@ mod tests {
     fn format_power() {
         let expr = Expression::Power(box Expression::Atom(Atom::PlainVariable('x')),
                                      box Expression::Atom(Atom::PlainVariable('y')));
-        let expected = "<mrow mathTreeNode=\"0\"><msup><mrow \
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><msup><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
-                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></msup></mrow>";
+                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></msup></mrow></math>";
         let test = format!("{}", expr);
         assert_expected_eq_actual!(expected, test);
     }
@@ -579,9 +581,9 @@ mod tests {
     fn format_frac() {
         let expr = Expression::Division(box Expression::Atom(Atom::PlainVariable('x')),
                                         box Expression::Atom(Atom::PlainVariable('y')));
-        let expected = "<mrow mathTreeNode=\"0\"><mfrac><mrow \
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mfrac><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
-                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></mfrac></mrow>";
+                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></mfrac></mrow></math>";
         let test = format!("{}", expr);
         assert_expected_eq_actual!(expected, test);
     }
@@ -589,8 +591,8 @@ mod tests {
     #[test]
     fn format_negation() {
         let expr = Expression::Negation(box Expression::Atom(Atom::PlainVariable('x')));
-        let expected = "<mrow mathTreeNode=\"0\"><mo>-</mo><mrow \
-                        mathTreeNode=\"0,0\"><mi>x</mi></mrow></mrow>";
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mo>-</mo><mrow \
+                        mathTreeNode=\"0,0\"><mi>x</mi></mrow></mrow></math>";
         let test = format!("{}", expr);
         assert_expected_eq_actual!(expected, test);
     }
@@ -599,9 +601,9 @@ mod tests {
     fn format_sub() {
         let expr = Expression::Subscript(box Expression::Atom(Atom::PlainVariable('x')),
                                          box Expression::Atom(Atom::PlainVariable('y')));
-        let expected = "<mrow mathTreeNode=\"0\"><msub><mrow \
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><msub><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
-                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></msub></mrow>";
+                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></msub></mrow></math>";
         let test = format!("{}", expr);
         assert_expected_eq_actual!(expected, test);
     }
@@ -611,10 +613,10 @@ mod tests {
         let expr = Expression::Sum(vec![Expression::Atom(Atom::PlainVariable('x')),
                                         Expression::Atom(Atom::PlainVariable('y')),
                                         Expression::Atom(Atom::PlainVariable('z'))]);
-        let expected = "<mrow mathTreeNode=\"0\"><mrow \
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
                         mathTreeNode=\"0,1\"><mi>y</mi></mrow><mo>+</mo><mrow \
-                        mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow>";
+                        mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
         let test = format!("{}", expr);
         assert_expected_eq_actual!(expected, test);
     }
@@ -624,10 +626,10 @@ mod tests {
         let expr = Expression::Product(vec![Expression::Atom(Atom::PlainVariable('x')),
                                             Expression::Atom(Atom::PlainVariable('y')),
                                             Expression::Atom(Atom::PlainVariable('z'))]);
-        let expected = "<mrow mathTreeNode=\"0\"><mrow \
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
                         mathTreeNode=\"0,1\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow \
-                        mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow>";
+                        mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
         let test = format!("{}", expr);
         assert_expected_eq_actual!(expected, test);
     }

@@ -1,7 +1,7 @@
 //! Contains a LaTeX parser of sorts.
 
 use nom::{alpha, sp, IResult};
-use std::str::{self};
+use std::str;
 
 named!(single_char<char>, preceded!(sp,
     one_of!("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
