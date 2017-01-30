@@ -28,26 +28,41 @@ fn send_mainpage(_: &mut Request) -> IronResult<Response> {
                        File::open(Path::new("static/index.html")).unwrap())))
 }
 
+enum Op {
+    Plus,
+    Times,
+}
+
 enum Cmd {
     Equation(Equation),
     Expression(Expression),
     Make(TreeIdx, Expression),
+    Map(Op, Expression),
 }
 
 fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
     let s: &str = s.trim();
-    if s.len() >= 4 && &s[..4] == "make" {
+    if s.starts_with("make") {
         let rest = &s[4..].trim();
         let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
         let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
         let expr = Expression::from_str(&rest[(idx_end + 1)..])?;
-        Ok(Cmd::Make(idx, expr))
+        return Ok(Cmd::Make(idx, expr));
+    }
+    if s.starts_with("+") {
+        let rest = &s[1..].trim();
+        let expr = Expression::from_str(rest)?;
+        return Ok(Cmd::Map(Op::Plus, expr));
+    }
+    if s.starts_with("*") {
+        let rest = &s[1..].trim();
+        let expr = Expression::from_str(rest)?;
+        return Ok(Cmd::Map(Op::Times, expr));
+    }
+    if let Some(eq) = Equation::from_str(s).ok() {
+        Ok(Cmd::Equation(eq))
     } else {
-        if let Some(eq) = Equation::from_str(s).ok() {
-            Ok(Cmd::Equation(eq))
-        } else {
-            Ok(Cmd::Expression(Expression::from_str(s)?))
-        }
+        Ok(Cmd::Expression(Expression::from_str(s)?))
     }
 }
 
@@ -107,36 +122,65 @@ fn main() {
                     Type::Text => {
                         let string = std::str::from_utf8(&*message.payload).unwrap();
                         println!("Received {}", string);
-                        let response = match parse_cmd(string) {
+                        let error = match parse_cmd(string) {
                             Ok(Cmd::Expression(ex)) => {
                                 equation = Some(Box::new(ex));
-                                println!("{:#?}", equation.as_ref().unwrap());
-                                println!("{}", equation.as_ref().unwrap());
-                                format!("{}", equation.as_ref().unwrap())
+                                None
                             }
                             Ok(Cmd::Equation(eq)) => {
                                 equation = Some(Box::new(eq));
-                                format!("{}", equation.as_ref().unwrap())
+                                None
                             }
                             Ok(Cmd::Make(idx, expr)) => {
                                 match equation {
-                                    None => format!("Badness: ∞ (make without an expression)"),
+                                    None => Some("make without an expression".to_string()),
                                     Some(ref mut equation) => {
                                         if equation.replace_with_expr(&idx, expr).is_ok() {
-                                            format!("{}", equation)
+                                            None
                                         } else {
-                                            format!("Badness: ∞ (invalid index)")
+                                            Some("invalid index".to_string())
                                         }
                                     }
                                 }
                             }
-                            Err(e) => format!("Badness: ∞ (unrecognized command: {:#?})", e),
+                            Ok(Cmd::Map(Op::Times, expr)) => {
+                                match equation.as_mut().and_then(|i| i.as_equation()) {
+                                    Some(eq) => {
+                                        eq.times_to_both(expr);
+                                        None
+                                    }
+                                    None => {
+                                        Some("cannot multiply both side of an *expression* by \
+                                              something"
+                                            .to_string())
+                                    }
+                                }
+                            }
+                            Ok(Cmd::Map(Op::Plus, expr)) => {
+                                match equation.as_mut().and_then(|i| i.as_equation()) {
+                                    Some(eq) => {
+                                        eq.plus_to_both(expr);
+                                        None
+                                    }
+                                    None => {
+                                        Some("cannot multiply both side of an *expression* by \
+                                              something"
+                                            .to_string())
+                                    }
+                                }
+                            }
+                            Err(e) => Some(format!("unrecognized command: {:#?}", e)),
                         };
-                        sender.send_message(&Message::text(format!("{}@{}", formula_num, response)))
-                            .unwrap();
+                        let msg = error.map_or_else(|| {
+                                                        let eq = equation.as_ref().unwrap();
+                                                        println!("Equation: {:#?} {}", eq, eq);
+                                                        formula_num += 1;
+                                                        format!("{}@{}", formula_num - 1, eq)
+                                                    },
+                                                    |err| format!("Badness: ∞ ({})", err));
+                        sender.send_message(&Message::text(msg)).unwrap();
                         // sender.send_message(&Message::text(format!("{}@<math xmlns=\"http://www.w3.org/1998/Math/MathML\"> <mrow mathTreeNode=\"\"> <mrow mathTreeNode=\"0\"> <msup mathTreeNode=\"0,0\"> <mi mathTreeNode=\"0,0,0\">x</mi> <mn mathTreeNode=\"0,0,1\">2</mn> </msup> <mo>+</mo> <mrow mathTreeNode=\"0,1\"> <mn mathTreeNode=\"0,1,0\">3</mn> <mo> &#8290; </mo> <mi mathTreeNode=\"0,1,1\">x</mi> </mrow> <mo>+</mo> <mn mathTreeNode=\"0,1\">4</mn> </mrow> <mo>=</mo> <mn mathTreeNode=\"1\"> 5 </mn> </mrow> </math>", formula_num))).unwrap();
 
-                        formula_num += 1;
                     }
                     _ => unreachable!(),
                 }

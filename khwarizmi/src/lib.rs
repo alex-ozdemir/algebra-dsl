@@ -9,6 +9,7 @@ use std::{fmt, mem};
 use std::str::FromStr;
 use std::string::String;
 
+const NULL_EXPRESSION: Expression = Expression::Atom(Atom::Natural(0));
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Equation {
@@ -50,6 +51,15 @@ impl Equation {
     pub fn from_str(eq: &str) -> Result<Self, AlgebraDSLError> {
         parser::parse_equation(eq).map_err(AlgebraDSLError::Parse)
     }
+    pub fn plus_to_both(&mut self, expr: Expression) {
+        self.left = mem::replace(&mut self.left, NULL_EXPRESSION).inflate_addition(expr.clone());
+        self.right = mem::replace(&mut self.right, NULL_EXPRESSION).inflate_addition(expr);
+    }
+    pub fn times_to_both(&mut self, expr: Expression) {
+        self.left = mem::replace(&mut self.left, NULL_EXPRESSION)
+            .inflate_multiplication(expr.clone());
+        self.right = mem::replace(&mut self.right, NULL_EXPRESSION).inflate_multiplication(expr);
+    }
 }
 
 impl Indexable for Equation {
@@ -75,6 +85,9 @@ impl Indexable for Equation {
             })
             .get_mut(&index[1..])
     }
+    fn as_equation(&mut self) -> Option<&mut Equation> {
+        Some(self)
+    }
 }
 
 pub trait Indexable: fmt::Display + fmt::Debug {
@@ -95,6 +108,9 @@ pub trait Indexable: fmt::Display + fmt::Debug {
                         -> Result<Expression, AlgebraDSLError> {
         self.replace_with_expr(index, Expression::from_str(expr)?)
     }
+    fn as_equation(&mut self) -> Option<&mut Equation> {
+        None
+    }
 }
 
 impl Expression {
@@ -103,6 +119,24 @@ impl Expression {
     }
     pub fn take(&mut self) -> Self {
         mem::replace(self, Expression::Atom(Atom::Natural(0)))
+    }
+    pub fn inflate_addition(self, expr: Expression) -> Self {
+        match self {
+            Expression::Sum(mut summands) => {
+                summands.push(expr);
+                Expression::Sum(summands)
+            }
+            not_sum => Expression::Sum(vec![not_sum, expr]),
+        }
+    }
+    pub fn inflate_multiplication(self, expr: Expression) -> Self {
+        match self {
+            Expression::Product(mut args) => {
+                args.push(expr);
+                Expression::Product(args)
+            }
+            not_prod => Expression::Product(vec![not_prod, expr]),
+        }
     }
 }
 
@@ -144,7 +178,7 @@ impl Indexable for Expression {
                 &mut Expression::Power(ref mut base, _) if first == 0 => base.get_mut(rest),
                 &mut Expression::Power(_, ref mut power) if first == 1 => power.get_mut(rest),
                 &mut Expression::Subscript(ref mut base, _) if first == 0 => base.get_mut(rest),
-                &mut Expression::Subscript(_, ref mut script) if first == 1 => script.get_mut(rest),
+                &mut Expression::Subscript(_, ref mut pow) if first == 1 => pow.get_mut(rest),
                 &mut Expression::Application(ref mut func, _) if first == 0 => func.get_mut(rest),
                 &mut Expression::Application(_, ref mut arg) if first == 1 => arg.get_mut(rest),
                 _ => Err(AlgebraDSLError::InvalidIdx),
@@ -570,7 +604,8 @@ mod tests {
     fn format_power() {
         let expr = Expression::Power(box Expression::Atom(Atom::PlainVariable('x')),
                                      box Expression::Atom(Atom::PlainVariable('y')));
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><msup><mrow \
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
+                        mathTreeNode=\"0\"><msup><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
                         mathTreeNode=\"0,1\"><mi>y</mi></mrow></msup></mrow></math>";
         let test = format!("{}", expr);
@@ -581,7 +616,8 @@ mod tests {
     fn format_frac() {
         let expr = Expression::Division(box Expression::Atom(Atom::PlainVariable('x')),
                                         box Expression::Atom(Atom::PlainVariable('y')));
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mfrac><mrow \
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
+                        mathTreeNode=\"0\"><mfrac><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
                         mathTreeNode=\"0,1\"><mi>y</mi></mrow></mfrac></mrow></math>";
         let test = format!("{}", expr);
@@ -591,7 +627,8 @@ mod tests {
     #[test]
     fn format_negation() {
         let expr = Expression::Negation(box Expression::Atom(Atom::PlainVariable('x')));
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mo>-</mo><mrow \
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
+                        mathTreeNode=\"0\"><mo>-</mo><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow></mrow></math>";
         let test = format!("{}", expr);
         assert_expected_eq_actual!(expected, test);
@@ -601,7 +638,8 @@ mod tests {
     fn format_sub() {
         let expr = Expression::Subscript(box Expression::Atom(Atom::PlainVariable('x')),
                                          box Expression::Atom(Atom::PlainVariable('y')));
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><msub><mrow \
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
+                        mathTreeNode=\"0\"><msub><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
                         mathTreeNode=\"0,1\"><mi>y</mi></mrow></msub></mrow></math>";
         let test = format!("{}", expr);
@@ -613,7 +651,8 @@ mod tests {
         let expr = Expression::Sum(vec![Expression::Atom(Atom::PlainVariable('x')),
                                         Expression::Atom(Atom::PlainVariable('y')),
                                         Expression::Atom(Atom::PlainVariable('z'))]);
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mrow \
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
+                        mathTreeNode=\"0\"><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
                         mathTreeNode=\"0,1\"><mi>y</mi></mrow><mo>+</mo><mrow \
                         mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
@@ -626,7 +665,8 @@ mod tests {
         let expr = Expression::Product(vec![Expression::Atom(Atom::PlainVariable('x')),
                                             Expression::Atom(Atom::PlainVariable('y')),
                                             Expression::Atom(Atom::PlainVariable('z'))]);
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mrow \
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
+                        mathTreeNode=\"0\"><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
                         mathTreeNode=\"0,1\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow \
                         mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
