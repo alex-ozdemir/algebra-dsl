@@ -19,21 +19,20 @@ pub struct Equation {
 
 impl TreeIdx {
     pub fn from_str(s: &str) -> Result<Self, AlgebraDSLError> {
-        if &s[0..2] != "#(" || s.chars().last().unwrap() != ')' {
-            return Err(AlgebraDSLError::IllFormattedIndex);
+        if !(s.starts_with("#(") && s.ends_with(")")) {
+            Err(AlgebraDSLError::IllFormattedIndex)
+        } else {
+            let s = &s[2..s.len() - 1];
+            let idxs = s.split(',')
+                .map(|d| usize::from_str(d).map_err(|_| AlgebraDSLError::IllFormattedIndex));
+            let mut v = vec![];
+            for idx in idxs {
+                v.push(idx?);
+            }
+            Ok(TreeIdx(v))
         }
-        let s = &s[2..s.len() - 1];
-        println!("String: `{}'", s);
-        let idxs = s.split(',')
-            .map(|d| usize::from_str(d).map_err(|_| AlgebraDSLError::IllFormattedIndex));
-        let mut v = vec![];
-        for idx in idxs {
-            v.push(idx?);
-        }
-        Ok(TreeIdx(v))
     }
 }
-
 
 impl AsRef<[TreeInt]> for TreeIdx {
     fn as_ref(&self) -> &[TreeInt] {
@@ -72,7 +71,7 @@ impl Indexable for Equation {
                 1 => &self.right,
                 _ => return Err(AlgebraDSLError::InvalidIdx),
             })
-            .get(&index[1..])
+            .get(index)
     }
     fn get_mut(&mut self, index: &[TreeInt]) -> Result<&mut Expression, AlgebraDSLError> {
         if index.len() == 0 {
@@ -83,7 +82,7 @@ impl Indexable for Equation {
                 1 => &mut self.right,
                 _ => return Err(AlgebraDSLError::InvalidIdx),
             })
-            .get_mut(&index[1..])
+            .get_mut(index)
     }
     fn as_equation(&mut self) -> Option<&mut Equation> {
         Some(self)
@@ -138,52 +137,102 @@ impl Expression {
             not_prod => Expression::Product(vec![not_prod, expr]),
         }
     }
-}
-
-impl Indexable for Expression {
-    fn get(&self, index: &[TreeInt]) -> Result<&Expression, AlgebraDSLError> {
+    fn get_no_strip(&self, index: &[TreeInt]) -> Result<&Expression, AlgebraDSLError> {
         if index.len() == 0 {
             Ok(self)
         } else {
             let first = index[0];
             let rest = &index[1..];
             match self {
-                &Expression::Negation(ref e) if first == 0 => e.get(rest),
-                &Expression::Sum(ref e) if first < e.len() => e[first].get(rest),
-                &Expression::Product(ref e) if first < e.len() => e[first].get(rest),
-                &Expression::Division(ref top, _) if first == 0 => top.get(rest),
-                &Expression::Division(_, ref bot) if first == 1 => bot.get(rest),
-                &Expression::Power(ref base, _) if first == 0 => base.get(rest),
-                &Expression::Power(_, ref power) if first == 1 => power.get(rest),
-                &Expression::Subscript(ref base, _) if first == 0 => base.get(rest),
-                &Expression::Subscript(_, ref script) if first == 1 => script.get(rest),
-                &Expression::Application(ref func, _) if first == 0 => func.get(rest),
-                &Expression::Application(_, ref arg) if first == 1 => arg.get(rest),
+                &Expression::Negation(ref e) if first == 0 => e.get_no_strip(rest),
+                &Expression::Sum(ref e) if first < e.len() => e[first].get_no_strip(rest),
+                &Expression::Product(ref e) if first < e.len() => e[first].get_no_strip(rest),
+                &Expression::Division(ref top, _) if first == 0 => top.get_no_strip(rest),
+                &Expression::Division(_, ref bot) if first == 1 => bot.get_no_strip(rest),
+                &Expression::Power(ref base, _) if first == 0 => base.get_no_strip(rest),
+                &Expression::Power(_, ref power) if first == 1 => power.get_no_strip(rest),
+                &Expression::Subscript(ref base, _) if first == 0 => base.get_no_strip(rest),
+                &Expression::Subscript(_, ref script) if first == 1 => script.get_no_strip(rest),
+                &Expression::Application(ref func, _) if first == 0 => func.get_no_strip(rest),
+                &Expression::Application(_, ref arg) if first == 1 => arg.get_no_strip(rest),
+                &Expression::LimitOp(_, ref sub, _, _) if first == 0 => {
+                    sub.as_ref()
+                        .ok_or(AlgebraDSLError::InvalidIdx)
+                        .and_then(|s| s.get_no_strip(rest))
+                }
+                &Expression::LimitOp(_, _, ref sup, _) if first == 1 => {
+                    sup.as_ref()
+                        .ok_or(AlgebraDSLError::InvalidIdx)
+                        .and_then(|s| s.get_no_strip(rest))
+                }
+                &Expression::LimitOp(_, _, _, ref exp) if first == 2 => exp.get_no_strip(rest),
                 _ => Err(AlgebraDSLError::InvalidIdx),
             }
         }
     }
-    fn get_mut(&mut self, index: &[TreeInt]) -> Result<&mut Expression, AlgebraDSLError> {
+    fn get_mut_no_strip(&mut self, index: &[TreeInt]) -> Result<&mut Expression, AlgebraDSLError> {
         if index.len() == 0 {
             Ok(self)
         } else {
             let first = index[0];
             let rest = &index[1..];
             match self {
-                &mut Expression::Negation(ref mut e) if first == 0 => e.get_mut(rest),
-                &mut Expression::Sum(ref mut e) if first < e.len() => e[first].get_mut(rest),
-                &mut Expression::Product(ref mut e) if first < e.len() => e[first].get_mut(rest),
-                &mut Expression::Division(ref mut top, _) if first == 0 => top.get_mut(rest),
-                &mut Expression::Division(_, ref mut bot) if first == 1 => bot.get_mut(rest),
-                &mut Expression::Power(ref mut base, _) if first == 0 => base.get_mut(rest),
-                &mut Expression::Power(_, ref mut power) if first == 1 => power.get_mut(rest),
-                &mut Expression::Subscript(ref mut base, _) if first == 0 => base.get_mut(rest),
-                &mut Expression::Subscript(_, ref mut pow) if first == 1 => pow.get_mut(rest),
-                &mut Expression::Application(ref mut func, _) if first == 0 => func.get_mut(rest),
-                &mut Expression::Application(_, ref mut arg) if first == 1 => arg.get_mut(rest),
+                &mut Expression::Negation(ref mut e) if first == 0 => e.get_mut_no_strip(rest),
+                &mut Expression::Sum(ref mut e) if first < e.len() => {
+                    e[first].get_mut_no_strip(rest)
+                }
+                &mut Expression::Product(ref mut e) if first < e.len() => {
+                    e[first].get_mut_no_strip(rest)
+                }
+                &mut Expression::Division(ref mut top, _) if first == 0 => {
+                    top.get_mut_no_strip(rest)
+                }
+                &mut Expression::Division(_, ref mut bot) if first == 1 => {
+                    bot.get_mut_no_strip(rest)
+                }
+                &mut Expression::Power(ref mut base, _) if first == 0 => {
+                    base.get_mut_no_strip(rest)
+                }
+                &mut Expression::Power(_, ref mut power) if first == 1 => {
+                    power.get_mut_no_strip(rest)
+                }
+                &mut Expression::Subscript(ref mut base, _) if first == 0 => {
+                    base.get_mut_no_strip(rest)
+                }
+                &mut Expression::Subscript(_, ref mut pow) if first == 1 => {
+                    pow.get_mut_no_strip(rest)
+                }
+                &mut Expression::Application(ref mut func, _) if first == 0 => {
+                    func.get_mut_no_strip(rest)
+                }
+                &mut Expression::Application(_, ref mut arg) if first == 1 => {
+                    arg.get_mut_no_strip(rest)
+                }
+                &mut Expression::LimitOp(_, ref mut sub, _, _) if first == 0 => {
+                    sub.as_mut()
+                        .ok_or(AlgebraDSLError::InvalidIdx)
+                        .and_then(|s| s.get_mut_no_strip(rest))
+                }
+                &mut Expression::LimitOp(_, _, ref mut sup, _) if first == 1 => {
+                    sup.as_mut()
+                        .ok_or(AlgebraDSLError::InvalidIdx)
+                        .and_then(|s| s.get_mut_no_strip(rest))
+                }
+                &mut Expression::LimitOp(_, _, _, ref mut exp) if first == 2 => {
+                    exp.get_mut_no_strip(rest)
+                }
                 _ => Err(AlgebraDSLError::InvalidIdx),
             }
         }
+    }
+}
+
+impl Indexable for Expression {
+    fn get(&self, index: &[TreeInt]) -> Result<&Expression, AlgebraDSLError> {
+        self.get_no_strip(&index[1..])
+    }
+    fn get_mut(&mut self, index: &[TreeInt]) -> Result<&mut Expression, AlgebraDSLError> {
+        self.get_mut_no_strip(&index[1..])
     }
 }
 
@@ -204,6 +253,8 @@ pub enum Expression {
     Division(Box<Expression>, Box<Expression>),
     Power(Box<Expression>, Box<Expression>),
     Subscript(Box<Expression>, Box<Expression>),
+    /// Operator, Sub, Super, Operand
+    LimitOp(OperatorSymbol, Option<Box<Expression>>, Option<Box<Expression>>, Box<Expression>),
     Application(Box<Expression>, Box<Expression>),
     /// An indivisible unit, like a variable or numeric literal
     Atom(Atom),
@@ -232,7 +283,6 @@ fn fmt_as_math_ml(expr: &Expression,
                   prev_index: &str)
                   -> Result<(), fmt::Error> {
     match expr {
-
         &Expression::Atom(atom) => {
             write!(f, "<mrow mathTreeNode=\"{}\">{}</mrow>", prev_index, atom)
         }
@@ -317,6 +367,29 @@ fn fmt_as_math_ml(expr: &Expression,
             write!(f, "<mo>(</mo>")?;
             fmt_as_math_ml(arg, f, &base_string)?;
             write!(f, "<mo>)</mo></mrow>")
+        }
+        &Expression::LimitOp(ref op, ref sub, ref sup, ref expr) => {
+            let mut base_string = String::from(prev_index);
+            let orig_len = base_string.len();
+            write!(f, "<mrow mathTreeNode=\"{}\"><munderover>", base_string)?;
+            write!(f, "<mo>{}</mo>", op.as_math_ml())?;
+
+            base_string.push_str(",0");
+            if let &Some(ref s) = sub {
+                fmt_as_math_ml(&*s, f, &base_string)?;
+            }
+            base_string.truncate(orig_len);
+
+            base_string.push_str(",1");
+            if let &Some(ref s) = sup {
+                fmt_as_math_ml(&*s, f, &base_string)?;
+            }
+            base_string.truncate(orig_len);
+
+            write!(f, "</munderover>")?;
+            base_string.push_str(",2");
+            fmt_as_math_ml(expr, f, &base_string)?;
+            write!(f, "</mrow>")
         }
     }
 }
@@ -440,6 +513,85 @@ pub enum OperatorSymbol {
     pm,
 }
 
+impl OperatorSymbol {
+    fn as_math_ml(&self) -> &'static str {
+        match self {
+            &OperatorSymbol::int => "&int;",
+            &OperatorSymbol::oint => "&oint;",
+            &OperatorSymbol::sum => "&sum;",
+            &OperatorSymbol::prod => "&prod;",
+            &OperatorSymbol::arccos => "&arccos;",
+            &OperatorSymbol::cos => "&cos;",
+            &OperatorSymbol::csc => "&csc;",
+            &OperatorSymbol::exp => "&exp;",
+            &OperatorSymbol::limsup => "&limsup;",
+            &OperatorSymbol::min => "&min;",
+            &OperatorSymbol::sinh => "&sinh;",
+            &OperatorSymbol::arcsin => "&arcsin;",
+            &OperatorSymbol::cosh => "&cosh;",
+            &OperatorSymbol::gcd => "&gcd;",
+            &OperatorSymbol::lg => "&lg;",
+            &OperatorSymbol::ln => "&ln;",
+            &OperatorSymbol::sup => "&sup;",
+            &OperatorSymbol::arctan => "&arctan;",
+            &OperatorSymbol::cot => "&cot;",
+            &OperatorSymbol::det => "&det;",
+            &OperatorSymbol::lim => "&lim;",
+            &OperatorSymbol::log => "&log;",
+            &OperatorSymbol::sec => "&sec;",
+            &OperatorSymbol::tan => "&tan;",
+            &OperatorSymbol::coth => "&coth;",
+            &OperatorSymbol::inf => "&inf;",
+            &OperatorSymbol::liminf => "&liminf;",
+            &OperatorSymbol::max => "&max;",
+            &OperatorSymbol::sin => "&sin;",
+            &OperatorSymbol::tanh => "&tanh;",
+            &OperatorSymbol::pm => "&pm;",
+        }
+    }
+}
+
+impl StandaloneSymbol {
+    fn as_math_ml(&self) -> &'static str {
+        match self {
+            &StandaloneSymbol::alpha => "&alpha;",
+            &StandaloneSymbol::beta => "&beta;",
+            &StandaloneSymbol::gamma => "&gamma;",
+            &StandaloneSymbol::delta => "&delta;",
+            &StandaloneSymbol::epsilon => "&epsilon;",
+            &StandaloneSymbol::zeta => "&zeta;",
+            &StandaloneSymbol::eta => "&eta;",
+            &StandaloneSymbol::theta => "&theta;",
+            &StandaloneSymbol::iota => "&iota;",
+            &StandaloneSymbol::kappa => "&kappa;",
+            &StandaloneSymbol::lambda => "&lambda;",
+            &StandaloneSymbol::mu => "&mu;",
+            &StandaloneSymbol::nu => "&nu;",
+            &StandaloneSymbol::omicron => "&omicron;",
+            &StandaloneSymbol::pi => "&pi;",
+            &StandaloneSymbol::rho => "&rho;",
+            &StandaloneSymbol::sigma => "&sigma;",
+            &StandaloneSymbol::tau => "&tau;",
+            &StandaloneSymbol::upsilon => "&upsilon;",
+            &StandaloneSymbol::phi => "&phi;",
+            &StandaloneSymbol::chi => "&chi;",
+            &StandaloneSymbol::psi => "&psi;",
+            &StandaloneSymbol::omega => "&omega;",
+            &StandaloneSymbol::Gamma => "&Gamma;",
+            &StandaloneSymbol::Delta => "&Delta;",
+            &StandaloneSymbol::Theta => "&Theta;",
+            &StandaloneSymbol::Lambda => "&Lambda;",
+            &StandaloneSymbol::Pi => "&Pi;",
+            &StandaloneSymbol::Sigma => "&Sigma;",
+            &StandaloneSymbol::Upsilon => "&Upsilon;",
+            &StandaloneSymbol::Phi => "&Phi;",
+            &StandaloneSymbol::Psi => "&Psi;",
+            &StandaloneSymbol::Omega => "&Omega;",
+            &StandaloneSymbol::partial => "&partial;",
+        }
+    }
+}
+
 impl Symbol {
     fn from_str(s: &str) -> Option<Self> {
         match s {
@@ -513,71 +665,8 @@ impl Symbol {
     }
     fn as_math_ml(&self) -> &'static str {
         match self {
-            &Symbol::Standalone(StandaloneSymbol::alpha) => "&alpha;",
-            &Symbol::Standalone(StandaloneSymbol::beta) => "&beta;",
-            &Symbol::Standalone(StandaloneSymbol::gamma) => "&gamma;",
-            &Symbol::Standalone(StandaloneSymbol::delta) => "&delta;",
-            &Symbol::Standalone(StandaloneSymbol::epsilon) => "&epsilon;",
-            &Symbol::Standalone(StandaloneSymbol::zeta) => "&zeta;",
-            &Symbol::Standalone(StandaloneSymbol::eta) => "&eta;",
-            &Symbol::Standalone(StandaloneSymbol::theta) => "&theta;",
-            &Symbol::Standalone(StandaloneSymbol::iota) => "&iota;",
-            &Symbol::Standalone(StandaloneSymbol::kappa) => "&kappa;",
-            &Symbol::Standalone(StandaloneSymbol::lambda) => "&lambda;",
-            &Symbol::Standalone(StandaloneSymbol::mu) => "&mu;",
-            &Symbol::Standalone(StandaloneSymbol::nu) => "&nu;",
-            &Symbol::Standalone(StandaloneSymbol::omicron) => "&omicron;",
-            &Symbol::Standalone(StandaloneSymbol::pi) => "&pi;",
-            &Symbol::Standalone(StandaloneSymbol::rho) => "&rho;",
-            &Symbol::Standalone(StandaloneSymbol::sigma) => "&sigma;",
-            &Symbol::Standalone(StandaloneSymbol::tau) => "&tau;",
-            &Symbol::Standalone(StandaloneSymbol::upsilon) => "&upsilon;",
-            &Symbol::Standalone(StandaloneSymbol::phi) => "&phi;",
-            &Symbol::Standalone(StandaloneSymbol::chi) => "&chi;",
-            &Symbol::Standalone(StandaloneSymbol::psi) => "&psi;",
-            &Symbol::Standalone(StandaloneSymbol::omega) => "&omega;",
-            &Symbol::Standalone(StandaloneSymbol::Gamma) => "&Gamma;",
-            &Symbol::Standalone(StandaloneSymbol::Delta) => "&Delta;",
-            &Symbol::Standalone(StandaloneSymbol::Theta) => "&Theta;",
-            &Symbol::Standalone(StandaloneSymbol::Lambda) => "&Lambda;",
-            &Symbol::Standalone(StandaloneSymbol::Pi) => "&Pi;",
-            &Symbol::Standalone(StandaloneSymbol::Sigma) => "&Sigma;",
-            &Symbol::Standalone(StandaloneSymbol::Upsilon) => "&Upsilon;",
-            &Symbol::Standalone(StandaloneSymbol::Phi) => "&Phi;",
-            &Symbol::Standalone(StandaloneSymbol::Psi) => "&Psi;",
-            &Symbol::Standalone(StandaloneSymbol::Omega) => "&Omega;",
-            &Symbol::Standalone(StandaloneSymbol::partial) => "&partial;",
-            &Symbol::Operator(OperatorSymbol::int) => "&int;",
-            &Symbol::Operator(OperatorSymbol::oint) => "&oint;",
-            &Symbol::Operator(OperatorSymbol::sum) => "&sum;",
-            &Symbol::Operator(OperatorSymbol::prod) => "&prod;",
-            &Symbol::Operator(OperatorSymbol::arccos) => "&arccos;",
-            &Symbol::Operator(OperatorSymbol::cos) => "&cos;",
-            &Symbol::Operator(OperatorSymbol::csc) => "&csc;",
-            &Symbol::Operator(OperatorSymbol::exp) => "&exp;",
-            &Symbol::Operator(OperatorSymbol::limsup) => "&limsup;",
-            &Symbol::Operator(OperatorSymbol::min) => "&min;",
-            &Symbol::Operator(OperatorSymbol::sinh) => "&sinh;",
-            &Symbol::Operator(OperatorSymbol::arcsin) => "&arcsin;",
-            &Symbol::Operator(OperatorSymbol::cosh) => "&cosh;",
-            &Symbol::Operator(OperatorSymbol::gcd) => "&gcd;",
-            &Symbol::Operator(OperatorSymbol::lg) => "&lg;",
-            &Symbol::Operator(OperatorSymbol::ln) => "&ln;",
-            &Symbol::Operator(OperatorSymbol::sup) => "&sup;",
-            &Symbol::Operator(OperatorSymbol::arctan) => "&arctan;",
-            &Symbol::Operator(OperatorSymbol::cot) => "&cot;",
-            &Symbol::Operator(OperatorSymbol::det) => "&det;",
-            &Symbol::Operator(OperatorSymbol::lim) => "&lim;",
-            &Symbol::Operator(OperatorSymbol::log) => "&log;",
-            &Symbol::Operator(OperatorSymbol::sec) => "&sec;",
-            &Symbol::Operator(OperatorSymbol::tan) => "&tan;",
-            &Symbol::Operator(OperatorSymbol::coth) => "&coth;",
-            &Symbol::Operator(OperatorSymbol::inf) => "&inf;",
-            &Symbol::Operator(OperatorSymbol::liminf) => "&liminf;",
-            &Symbol::Operator(OperatorSymbol::max) => "&max;",
-            &Symbol::Operator(OperatorSymbol::sin) => "&sin;",
-            &Symbol::Operator(OperatorSymbol::tanh) => "&tanh;",
-            &Symbol::Operator(OperatorSymbol::pm) => "&pm;",
+            &Symbol::Standalone(ref sym) => sym.as_math_ml(),
+            &Symbol::Operator(ref sym) => sym.as_math_ml(),
         }
     }
 }
@@ -610,6 +699,10 @@ mod tests {
                         mathTreeNode=\"0,1\"><mi>y</mi></mrow></msup></mrow></math>";
         let test = format!("{}", expr);
         assert_expected_eq_actual!(expected, test);
+        let r = expr.get(TreeIdx(vec![0,1]).as_ref());
+        let rr = &Expression::Atom(Atom::PlainVariable('y'));
+        let e = Ok(rr);
+        assert_expected_eq_actual!(e, r);
     }
 
     #[test]

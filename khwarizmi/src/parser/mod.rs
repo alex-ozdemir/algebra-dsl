@@ -107,26 +107,26 @@ pub enum PostMac {
 #[derive(PartialEq, Eq, Debug)]
 pub enum UniOp {
     Std(Operator),
-    Symbol(OperatorSymbol),
+    LimitOp(OperatorSymbol, Option<Box<PostMac>>, Option<Box<PostMac>>),
 }
 
 impl UniOp {
     fn arity(&self) -> u8 {
         match self {
             &UniOp::Std(op) => op.arity(),
-            &UniOp::Symbol(_) => 1,
+            &UniOp::LimitOp(_, _, _) => 1,
         }
     }
     fn left_precedence(&self) -> u8 {
         match self {
             &UniOp::Std(op) => op.left_precedence(),
-            &UniOp::Symbol(_) => 20,
+            &UniOp::LimitOp(_, _, _) => 20,
         }
     }
     fn right_precedence(&self) -> u8 {
         match self {
             &UniOp::Std(op) => op.right_precedence(),
-            &UniOp::Symbol(_) => 19,
+            &UniOp::LimitOp(_, _, _) => 19,
         }
     }
 }
@@ -177,6 +177,8 @@ pub enum ParseError {
     OperatorError,
     LatexError(String),
     WrongNumberOfEqualSigns,
+    DoubleUnderscore,
+    DoubleCaret,
 }
 
 pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
@@ -202,7 +204,9 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                 KnownCS::div => Ok(PostMac::Op(UniOp::Std(Operator::Div))),
                 KnownCS::cdot | KnownCS::times => Ok(PostMac::Op(UniOp::Std(Operator::Times))),
                 KnownCS::Preserved(Symbol::Standalone(sym)) => Ok(PostMac::Standalone(sym)),
-                KnownCS::Preserved(Symbol::Operator(sym)) => Ok(PostMac::Op(UniOp::Symbol(sym))),
+                KnownCS::Preserved(Symbol::Operator(sym)) => {
+                    Ok(PostMac::Op(UniOp::LimitOp(sym, None, None)))
+                }
                 x => Err(ParseError::LoneControlSequence(x)),
             }
         }
@@ -221,8 +225,36 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                         PostMac::Sqrt(box argument)
                     }
                     e @ Err(_) => return e,
+                    Ok(underscore @ PostMac::Op(UniOp::Std(Operator::Underscore))) => {
+                        let last = result_list.pop();
+                        if let Some(PostMac::Op(UniOp::LimitOp(op, l, u))) = last {
+                            if l.is_some() {
+                                return Err(ParseError::DoubleUnderscore);
+                            }
+                            let argument = one_expression(&mut list)?;
+                            PostMac::Op(UniOp::LimitOp(op, Some(box argument), u))
+                        } else {
+                            last.map(|l| result_list.push(l));
+                            underscore
+                        }
+                    }
+                    Ok(caret @ PostMac::Op(UniOp::Std(Operator::Caret))) => {
+                        let last = result_list.pop();
+                        if let Some(PostMac::Op(UniOp::LimitOp(op, l, u))) = last {
+                            if u.is_some() {
+                                return Err(ParseError::DoubleCaret);
+                            }
+                            let argument = one_expression(&mut list)?;
+                            PostMac::Op(UniOp::LimitOp(op, l, Some(box argument)))
+                        } else {
+                            last.map(|l| result_list.push(l));
+                            caret
+                        }
+                    }
                     Ok(x) => x,
                 };
+
+                // If there are two adjacent 'natural number' tokens, merge them
                 let two_nats = if let (Some(&PostMac::Natural(_)), &PostMac::Natural(_)) =
                     (result_list.last(), &next) {
                     true
@@ -234,6 +266,8 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                     let this = next.as_natural();
                     result_list.push(PostMac::Natural(last * 10 + this));
                 } else {
+
+                    // Potentially insert multiplication
                     let op_expected = result_list.last()
                         .map(PostMac::expects_op_after)
                         .unwrap_or(false);
@@ -298,7 +332,7 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                             let combinator = operator_stack.pop().unwrap();
                             let second = expression_stack.pop().ok_or(ParseError::OperatorError)?;
                             let new_expr = if combinator.arity() == 1 {
-                                combine1(second, combinator)
+                                combine1(second, combinator)?
                             } else {
                                 let first = expression_stack.pop()
                                     .ok_or(ParseError::OperatorError)?;
@@ -357,16 +391,26 @@ macro_rules! combine_associative {
     };
 }
 
-fn combine1(expr: Expression, op: UniOp) -> Expression {
+fn combine1(expr: Expression, op: UniOp) -> Result<Expression, ParseError> {
     use self::Operator::*;
-    match op {
+    Ok(match op {
         UniOp::Std(Neg) => Expression::Negation(box expr),
-        UniOp::Symbol(sym) => {
-            Expression::Application(box Expression::Atom(Atom::Symbol(Symbol::Operator(sym))),
-                                    box expr)
+        UniOp::LimitOp(sym, sub, sup) => {
+            let sub_expr = match sub { // I don't use map because `?` doesn't work in || {}
+                Some(box sub) => Some(parse_operators(sub)?),
+                None => None,
+            };
+            let sup_expr = match sup { // I don't use map because `?` doesn't work in || {}
+                Some(box sup) => Some(parse_operators(sup)?),
+                None => None,
+            };
+            Expression::LimitOp(sym,
+                                sub_expr.map(Box::new),
+                                sup_expr.map(Box::new),
+                                box expr)
         }
         _ => panic!("Combine1 called with non-unary operator"),
-    }
+    })
 }
 
 fn combine2(left: Expression, op: UniOp, right: Expression) -> Expression {

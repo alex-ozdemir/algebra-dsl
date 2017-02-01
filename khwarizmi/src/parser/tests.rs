@@ -205,8 +205,10 @@ fn sqrt() {
 
 #[test]
 fn sin() {
-    let expected = Ex::Application(box Ex::Atom(At::Symbol(Symbol::Operator(OperatorSymbol::sin))),
-                                   box Ex::Atom(At::PlainVariable('x')));
+    let expected = Ex::LimitOp(OperatorSymbol::sin,
+                               None,
+                               None,
+                               box Ex::Atom(Atom::PlainVariable('x')));
     assert_expected_eq_actual!(Ok(expected), parse_expr("\\sin x"));
 }
 
@@ -216,6 +218,17 @@ fn sin_with_power() {
     let expected = Ex::Application(box Ex::Atom(At::Symbol(Symbol::Operator(OperatorSymbol::sin))),
                                    box Ex::Atom(At::PlainVariable('x')));
     assert_expected_eq_actual!(Ok(expected), parse_expr("\\sin^2 x"));
+}
+
+#[test]
+fn integral_with_bounds() {
+    let expected = Ex::LimitOp(OperatorSymbol::int,
+                               Some(box Ex::Atom(At::Natural(0))),
+                               Some(box Ex::Atom(At::Natural(2))),
+                               box Ex::Product(vec![Ex::Atom(At::PlainVariable('x')),
+                                                    Ex::Atom(At::PlainVariable('d')),
+                                                    Ex::Atom(At::PlainVariable('x'))]));
+    assert_expected_eq_actual!(Ok(expected), parse_expr("\\int_0^2 x dx"));
 }
 
 #[test]
