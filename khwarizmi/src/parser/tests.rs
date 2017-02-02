@@ -240,3 +240,11 @@ fn powers_and_fracs() {
                                               box Ex::Atom(At::Natural(4))));
     assert_expected_eq_actual!(Ok(expected), parse_expr("(x + \\frac12)^{3/4}"));
 }
+
+#[test]
+fn error_on_unmatch() {
+    let expected = Err(ParseError::UnmatchGrouping(UniOp::Std(Operator::LGroup)));
+    assert_expected_eq_actual!(expected, parse_expr("( a"));
+    let expected = Err(ParseError::UnmatchGrouping(UniOp::Std(Operator::RGroup)));
+    assert_expected_eq_actual!(expected, parse_expr("a )"));
+}
