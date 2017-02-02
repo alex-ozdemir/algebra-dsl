@@ -135,7 +135,7 @@ fn main() {
                                 match equation {
                                     None => Some("make without an expression".to_string()),
                                     Some(ref mut equation) => {
-                                        if equation.replace_with_expr(&idx, expr).is_ok() {
+                                        if equation.replace(&idx, expr).is_ok() {
                                             None
                                         } else {
                                             Some("invalid index".to_string())
