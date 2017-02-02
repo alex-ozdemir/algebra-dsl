@@ -128,7 +128,7 @@ pub struct SiblingIndices<'a> {
 }
 
 impl<'a> SiblingIndices<'a> {
-    fn from_indices(indices: &'a [TreeIdx]) -> Result<SiblingIndices<'a>, AlgebraDSLError> {
+    pub fn from_indices(indices: &'a [TreeIdx]) -> Result<SiblingIndices<'a>, AlgebraDSLError> {
         if indices.len() < 2 || indices.iter().map(|i| i.as_ref().len()).min().unwrap() == 0 {
             return Err(AlgebraDSLError::InvalidSiblingIndices);
         }
