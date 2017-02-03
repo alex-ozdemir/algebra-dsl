@@ -263,9 +263,9 @@ pub enum Expression {
 impl fmt::Display for Equation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
-        fmt_as_math_ml(&self.left, f, "0")?;
+        fmt_as_math_ml(&self.left, f, "0",0)?;
         write!(f, "<mo>=</mo>")?;
-        fmt_as_math_ml(&self.right, f, "1")?;
+        fmt_as_math_ml(&self.right, f, "1",0)?;
         write!(f, "</math>")
     }
 }
@@ -273,58 +273,75 @@ impl fmt::Display for Equation {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
-        fmt_as_math_ml(&self, f, "0")?;
+        fmt_as_math_ml(&self, f, "0",0)?;
         write!(f, "</math>")
+    }
+}
+
+fn precedence(expr: &Expression) -> u8 {
+    match expr {
+        &Expression::Atom(_) => u8::max_value(),
+        &Expression::Application(_,_) => u8::max_value(),
+        &Expression::LimitOp(_,_,_,_) => 60,
+        &Expression::Subscript(_,_) => u8::min_value(),
+        &Expression::Power(_,_) => 45,
+        &Expression::Division(_,_) => u8::min_value(),
+        &Expression::Product(_) => 25,
+        &Expression::Sum(_) => 15,
+        &Expression::Negation(_) => 15,
     }
 }
 
 fn fmt_as_math_ml(expr: &Expression,
                   f: &mut fmt::Formatter,
-                  prev_index: &str)
+                  prev_index: &str, prev_precedence: u8)
                   -> Result<(), fmt::Error> {
+    let prec = precedence(expr);
+    write!(f, "<mrow mathTreeNode=\"{}\">", prev_index);
+    if prec <= prev_precedence {
+        write!(f,"<mo form=\"prefix\">(</mo>");
+    }
     match expr {
         &Expression::Atom(atom) => {
-            write!(f, "<mrow mathTreeNode=\"{}\">{}</mrow>", prev_index, atom)
+            write!(f, "{}", atom)?;
         }
         &Expression::Power(ref b, ref p) => {
             let mut base_string = String::from(prev_index);
-            write!(f, "<mrow mathTreeNode=\"{}\"><msup>", base_string)?;
+            write!(f, "<msup>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(b, f, &base_string)?;
+            fmt_as_math_ml(b, f, &base_string, prec)?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
-            fmt_as_math_ml(p, f, &base_string)?;
-            write!(f, "</msup></mrow>")
+            fmt_as_math_ml(p, f, &base_string, prec)?;
+            write!(f, "</msup>")?;
         }
         &Expression::Negation(ref n) => {
             let mut base_string = String::from(prev_index);
-            write!(f, "<mrow mathTreeNode=\"{}\"><mo>-</mo>", base_string)?;
+            write!(f, "<mo>-</mo>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(n, f, &base_string)?;
-            write!(f, "</mrow>")
+            fmt_as_math_ml(n, f, &base_string, prec)?;
         }
         &Expression::Division(ref n, ref d) => {
             let mut base_string = String::from(prev_index);
-            write!(f, "<mrow mathTreeNode=\"{}\"><mfrac>", base_string)?;
+            write!(f, "<mfrac>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(n, f, &base_string)?;
+            fmt_as_math_ml(n, f, &base_string, prec)?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
-            fmt_as_math_ml(d, f, &base_string)?;
-            write!(f, "</mfrac></mrow>")
+            fmt_as_math_ml(d, f, &base_string, prec)?;
+            write!(f, "</mfrac>")?;
         }
         &Expression::Subscript(ref e, ref s) => {
             let mut base_string = String::from(prev_index);
-            write!(f, "<mrow mathTreeNode=\"{}\"><msub>", base_string)?;
+            write!(f, "<msub>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(e, f, &base_string)?;
+            fmt_as_math_ml(e, f, &base_string, prec)?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
-            fmt_as_math_ml(s, f, &base_string)?;
-            write!(f, "</msub></mrow>")
+            fmt_as_math_ml(s, f, &base_string, prec)?;
+            write!(f, "</msub>")?;
         }
         &Expression::Sum(ref s) => {
-            write!(f, "<mrow mathTreeNode=\"{}\">", prev_index)?;
             let len = s.len();
             let iter = s.iter().enumerate();
             for (i, e) in iter {
@@ -332,16 +349,14 @@ fn fmt_as_math_ml(expr: &Expression,
                 base_string.push_str(",");
                 base_string.push_str(&i.to_string());
                 if i == len - 1 {
-                    fmt_as_math_ml(e, f, &base_string)?;
+                    fmt_as_math_ml(e, f, &base_string, prec)?;
                 } else {
-                    fmt_as_math_ml(e, f, &base_string)?;
+                    fmt_as_math_ml(e, f, &base_string, prec)?;
                     write!(f, "<mo>+</mo>")?;
                 }
             }
-            write!(f, "</mrow>")
         }
         &Expression::Product(ref s) => {
-            write!(f, "<mrow mathTreeNode=\"{}\">", prev_index)?;
             let len = s.len();
             let iter = s.iter().enumerate();
             for (i, e) in iter {
@@ -349,49 +364,50 @@ fn fmt_as_math_ml(expr: &Expression,
                 base_string.push_str(",");
                 base_string.push_str(&i.to_string());
                 if i == len - 1 {
-                    fmt_as_math_ml(e, f, &base_string)?;
+                    fmt_as_math_ml(e, f, &base_string, prec)?;
                 } else {
-                    fmt_as_math_ml(e, f, &base_string)?;
+                    fmt_as_math_ml(e, f, &base_string, prec)?;
                     write!(f, "<mo>&#8290;</mo>")?;
                 }
             }
-            write!(f, "</mrow>")
         }
         &Expression::Application(ref func, ref arg) => {
             let mut base_string = String::from(prev_index);
-            write!(f, "<mrow mathTreeNode=\"{}\">", base_string)?;
             base_string.push_str(",0");
-            fmt_as_math_ml(func, f, &base_string)?;
+            fmt_as_math_ml(func, f, &base_string, prec)?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
             write!(f, "<mo>(</mo>")?;
-            fmt_as_math_ml(arg, f, &base_string)?;
-            write!(f, "<mo>)</mo></mrow>")
+            fmt_as_math_ml(arg, f, &base_string, prec)?;
+            write!(f, "<mo>)</mo>")?;
         }
         &Expression::LimitOp(ref op, ref sub, ref sup, ref expr) => {
             let mut base_string = String::from(prev_index);
             let orig_len = base_string.len();
-            write!(f, "<mrow mathTreeNode=\"{}\"><munderover>", base_string)?;
+            write!(f, "<munderover>")?;
             write!(f, "<mo>{}</mo>", op.as_math_ml())?;
 
             base_string.push_str(",0");
             if let &Some(ref s) = sub {
-                fmt_as_math_ml(&*s, f, &base_string)?;
+                fmt_as_math_ml(&*s, f, &base_string, prec)?;
             }
             base_string.truncate(orig_len);
 
             base_string.push_str(",1");
             if let &Some(ref s) = sup {
-                fmt_as_math_ml(&*s, f, &base_string)?;
+                fmt_as_math_ml(&*s, f, &base_string, prec)?;
             }
             base_string.truncate(orig_len);
 
             write!(f, "</munderover>")?;
             base_string.push_str(",2");
-            fmt_as_math_ml(expr, f, &base_string)?;
-            write!(f, "</mrow>")
+            fmt_as_math_ml(expr, f, &base_string, prec)?;
         }
     }
+    if prec <= prev_precedence {
+        write!(f,"<mo form=\"postfix\">)</mo>");
+    }
+    write!(f,"</mrow>")
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
