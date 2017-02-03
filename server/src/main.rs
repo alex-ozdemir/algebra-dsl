@@ -1,6 +1,5 @@
 extern crate websocket;
 extern crate iron;
-#[macro_use(router)]
 extern crate router;
 extern crate mount;
 extern crate staticfile;
@@ -38,13 +37,19 @@ enum Cmd {
     Expression(Expression),
     Make(Vec<TreeIdx>, Expression),
     Map(Op, Expression),
+    Output(Vec<usize>),
+}
+
+enum Return<'a> {
+    Equation(Box<Indexable>),
+    LaTeXStr(&'a str),
 }
 
 fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
     let s: &str = s.trim();
-    if s.starts_with("make") {
+    if s.starts_with("make ") {
         let mut indices = Vec::new();
-        let mut rest: &str = &s[4..].trim();
+        let mut rest: &str = &s[5..].trim();
         while rest.starts_with("#") {
             let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
             let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
@@ -53,6 +58,20 @@ fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
         }
         let expr = Expression::from_str(rest)?;
         return Ok(Cmd::Make(indices, expr));
+    }
+    if s.starts_with("output ") {
+        let mut indices = Vec::new();
+        let mut rest: &str = &s[7..].trim();
+        loop {
+            use std::str::FromStr;
+            if let Some(comma_idx) = rest.find(',') {
+                indices.push(usize::from_str(&rest[..comma_idx]));
+                rest = rest[comma_idx+1..].trim();
+            } else {
+                indices.push(usize::from_str(rest));
+                break;
+            }
+        }
     }
     if s.starts_with("+") {
         let rest = &s[1..].trim();
@@ -127,78 +146,53 @@ fn main() {
                     Type::Text => {
                         let string = std::str::from_utf8(&*message.payload).unwrap();
                         println!("Received {}", string);
-                        let error = match parse_cmd(string) {
+                        let output = match parse_cmd(string) {
                             Ok(Cmd::Expression(ex)) => {
-                                equation = Some(Box::new(ex));
-                                None
+                                Ok(Return::Equation(Box::new(ex)))
                             }
                             Ok(Cmd::Equation(eq)) => {
-                                equation = Some(Box::new(eq));
-                                None
+                                Ok(Return::Equation(Box::new(eq)))
                             }
                             Ok(Cmd::Make(mut indices, expr)) => {
                                 match (equation.as_mut(), indices.len()) {
-                                    (None, _) => Some("make without an expression".to_string()),
-                                    (Some(ref mut equation), 1) => {
-                                        let idx = indices.pop().expect("unreachable");
-                                        if equation.replace(&idx, expr).is_ok() {
-                                            None
-                                        } else {
-                                            Some("invalid index".to_string())
-                                        }
+                                    (None, _) => Err("make without an expression".to_string()),
+                                    (Some(equation), 1) => {
+                                        indices.pop().ok_or(AlgebraDSLError::InvalidIdx).map(|idx|
+                                            Return::Equation(equation.clone().replace(
+                                                &idx, expr).ok_or(AlgebraDSLError::InvalidIdx)))
                                     },
-                                    (Some(ref mut equation), n) if n > 1 => {
-                                        match SiblingIndices::from_indices(indices.as_slice()) {
-                                            Err(e) => Some(format!("{:?}", e)),
-                                            Ok(sibs) => {
-                                                if equation.replace_siblings(sibs, expr).is_ok() {
-                                                    None
-                                                } else {
-                                                    Some("invalid index".to_string())
-                                                }
-                                            },
-                                        }
+                                    (Some(equation), n) if n > 1 => {
+                                        SiblingIndices::from_indices(indices.as_slice()).map(|sibs|
+                                            Return::Equation(equation.clone().replace_siblings(
+                                                sibs, expr).ok_or(AlgebraDSLError::InvalidIdx)))
                                     },
-                                    _ => Some("invalid indices".to_string()),
+                                    _ => Err(AlgebraDSLError::InvalidIdx),
                                 }
                             }
                             Ok(Cmd::Map(Op::Times, expr)) => {
-                                match equation.as_mut().and_then(|i| i.as_equation()) {
-                                    Some(eq) => {
-                                        eq.times_to_both(expr);
-                                        None
-                                    }
-                                    None => {
-                                        Some("cannot multiply both side of an *expression* by \
-                                              something"
-                                            .to_string())
-                                    }
-                                }
+                                equation.as_mut().and_then(|i| i.as_equation())
+                                    .ok_or(AlgebraDSLError::MapExpression).map(|eq|
+                                        Return::Equation(eq.clone().times_to_both(expr)))
                             }
                             Ok(Cmd::Map(Op::Plus, expr)) => {
-                                match equation.as_mut().and_then(|i| i.as_equation()) {
-                                    Some(eq) => {
-                                        eq.plus_to_both(expr);
-                                        None
-                                    }
-                                    None => {
-                                        Some("cannot add something to both side of an *expression*"
-                                            .to_string())
-                                    }
-                                }
+
+                                equation.as_mut().and_then(|i| i.as_equation())
+                                    .ok_or(AlgebraDSLError::MapExpression).map(|eq|
+                                        Return::Equation(eq.clone().plus_to_both(expr)))
+                            }
+                            Ok(Cmd::Output(eqn_nums)) => {
+                                Return::LaTeXStr("moo!")
                             }
                             Err(e) => Some(format!("unrecognized command: {:#?}", e)),
                         };
-                        let msg = error.map_or_else(|| {
-                                                        let eq = equation.as_ref().unwrap();
-                                                        formula_num += 1;
-                                                        format!("{}@{}", formula_num - 1, eq)
-                                                    },
-                                                    |err| format!("Badness: ∞ ({})", err));
+                        let msg = match output {
+                            Ok(Return::Equation(e)) => format!("{}@Eqn@{}", formula_num, e),
+                            Ok(Return::LaTeXStr(s)) => format!("{}@Latex@{}", formula_num, s),
+                            Err(e) => format!("{}@Err@Error: {}", formula_num, e),
+                        };
+                        formula_num += 1;
                         println!("Output: {:#?}", msg);
                         sender.send_message(&Message::text(msg)).unwrap();
-                        // sender.send_message(&Message::text(format!("{}@<math xmlns=\"http://www.w3.org/1998/Math/MathML\"> <mrow mathTreeNode=\"\"> <mrow mathTreeNode=\"0\"> <msup mathTreeNode=\"0,0\"> <mi mathTreeNode=\"0,0,0\">x</mi> <mn mathTreeNode=\"0,0,1\">2</mn> </msup> <mo>+</mo> <mrow mathTreeNode=\"0,1\"> <mn mathTreeNode=\"0,1,0\">3</mn> <mo> &#8290; </mo> <mi mathTreeNode=\"0,1,1\">x</mi> </mrow> <mo>+</mo> <mn mathTreeNode=\"0,1\">4</mn> </mrow> <mo>=</mo> <mn mathTreeNode=\"1\"> 5 </mn> </mrow> </math>", formula_num))).unwrap();
-
                     }
                     _ => unreachable!(),
                 }

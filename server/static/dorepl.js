@@ -20,10 +20,6 @@ window.onload = function() {
 
 var currentCM = null;
 function createCM() {
-    if (currentCM) {
-        currentCM.setOption('readOnly', true);
-    }
-
     currentCM = CodeMirror(document.getElementById('repl'), {
         autofocus: true,
         extraKeys: {
@@ -44,7 +40,7 @@ function createCM() {
             newspan.setAttribute('highlighted', currentCM.cmIndex);
 
             while (curSelected.children.length > 0) {
-                // This (re)moves the child from curSelecte
+                // This (re)moves the child from curSelected
                 newspan.appendChild(curSelected.children[0]);
             }
 
@@ -60,33 +56,52 @@ function createCM() {
 var socket = new WebSocket("ws://127.0.0.1:2794", "rust-websocket");
 
 function sendToServer(cmBox) {
+    currentCM.setOption('readOnly', true);
     socket.send(cmBox.getValue());
 }
 
 socket.onmessage = function (event) {
     var data = event.data;
 
-    if (data.slice(0,7) === "Badness") {
-        // Handle Error
+    var atIdx = data.indexOf('@');
+    if (atIdx === -1) {
+        console.log("Server sent bad data: No @ symbol");
+        return;
+    }
+    var formulaNum = data.substr(0, atIdx);
+    var rest = data.substr(atIdx+1);
 
-        var div = document.createElement('div');
-        div.id = 'formula' + data;
-        div.innerHTML = data;
-        div.className += ' disable-highlight algebra-dsl-error output';
-        document.getElementById('repl').appendChild(div);
-    } else {
+    var atIdx = rest.indexOf('@');
+    if (atIdx === -1) {
+        console.log("Server sent bad data: Only one @ symbol");
+        return;
+    }
+    var isOK = rest.substr(0, atIdx);
+    var rest = rest.substr(atIdx+1);
+
+    var fullDiv = document.createElement('div');
+    fullDiv.className = 'output';
+
+    var checkbox = document.createElement('input');
+    checkbox.setAttribute('type', 'checkbox');
+
+    fullDiv.appendChild(checkbox);
+
+    var eqnDiv = document.createElement('div');
+    eqnDiv.id = 'formula'+formulaNum;
+    eqnDiv.className += ' disable-highlight output';
+    eqnDiv.innerHTML = rest;
+
+    fullDiv.appendChild(eqnDiv);
+    document.getElementById('repl').appendChild(fullDiv);
+
+    if (isOK === 'OK') {
         // Handle Actual Formula
-
-        var parts = data.split('@');
-
-        var div = document.createElement('div');
-        div.id = 'formula'+parts[0];
-        div.innerHTML = parts[1];
-        div.className += ' disable-highlight output';
-        document.getElementById('repl').appendChild(div);
-
-        MathJax.Hub.Queue(["Typeset", MathJax.Hub, div.id]);
-        MathJax.Hub.Queue([finishTypesetting, div.id]);
+        MathJax.Hub.Queue(["Typeset", MathJax.Hub, eqnDiv.id]);
+        MathJax.Hub.Queue([onFinishTypesetting, eqnDiv.id]);
+    } else {
+        eqnDiv.className += ' algebra-dsl-error';
+        checkbox.disabled = true;
     }
 
     createCM();
@@ -122,7 +137,7 @@ function insertIntoCurrrentEquation(e) {
         copyOfElement.removeAttribute('hoverednode');
     });
 
-    var literaltext = '#(' + copyOfElement.getAttribute('mathtreenode') + ')';
+    var literaltext = '#(mtn:' + copyOfElement.getAttribute('mathtreenode') + ')';
 
     if (!currentCM.somethingSelected()) {
         var place = currentCM.getCursor();
@@ -177,7 +192,7 @@ function mathTreeNodeNodeAbove(cur, topLevel) {
     return cur;
 }
 
-function finishTypesetting(where) {
+function onFinishTypesetting(where) {
     var element = document.getElementById(where);
 
     // Remove any leftover MathML
@@ -224,4 +239,24 @@ function finishTypesetting(where) {
         }
     }, false);
 
+}
+
+function sendOutputLatex() {
+
+    var tosend = "output ";
+
+    var cns = document.getElementById('repl').childNodes;
+    for (var i=0; i<cns.length; i++) {
+        if (cns[i].className == 'output') {
+            var checkbox = cns[i].childNodes[0];
+            if (checkbox.checked) {
+                tosend += Math.floor(i/2) + ', ';
+            }
+        }
+    }
+
+    // Chop off the last 2 characters (", ")
+    tosend = tosend.substr(0, tosend.length-2);
+
+    socket.send(tosend);
 }

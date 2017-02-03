@@ -16,6 +16,8 @@ html
     link(rel="stylesheet" type="text/css" href="static/math.css")
   body
     #repl
+    label
+      button(onclick="sendOutputLatex()") Get Selected LaTeX Code
 
 //- vim: sw=2 sts=2
 //- au BufWritePost * !pug -P index.pug

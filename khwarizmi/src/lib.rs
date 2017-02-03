@@ -20,10 +20,10 @@ pub struct Equation {
 
 impl TreeIdx {
     pub fn from_str(s: &str) -> Result<Self, AlgebraDSLError> {
-        if !(s.starts_with("#(") && s.ends_with(")")) {
+        if !(s.starts_with("#(mtn:") && s.ends_with(")")) {
             Err(AlgebraDSLError::IllFormattedIndex)
         } else {
-            let s = &s[2..s.len() - 1];
+            let s = &s[6..s.len() - 1];
             let mut idxs = s.split(',')
                 .map(|d| usize::from_str(d).map_err(|_| AlgebraDSLError::IllFormattedIndex));
             // Pop the first index, because every expression/equation is in the trivial 0 idx
@@ -357,6 +357,7 @@ pub enum AlgebraDSLError {
     IllFormattedCommand,
     InvalidDelete,
     InvalidSiblingIndices,
+    MapExpression,
 }
 
 #[derive(PartialEq, Debug, Clone)]
