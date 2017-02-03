@@ -116,9 +116,6 @@ impl Indexable for Equation {
             _ => Err(AlgebraDSLError::InvalidIdx),
         }
     }
-    fn as_equation(&mut self) -> Option<&mut Equation> {
-        Some(self)
-    }
 }
 
 pub struct SiblingIndices<'a> {
@@ -207,9 +204,6 @@ pub trait Indexable: fmt::Display + fmt::Debug {
                         expr: &str)
                         -> Result<Expression, AlgebraDSLError> {
         self.replace(index, Expression::from_str(expr)?)
-    }
-    fn as_equation(&mut self) -> Option<&mut Equation> {
-        None
     }
 
     /// Looks at the expression indicated by `index` and merges it with any associative children of
@@ -358,6 +352,8 @@ pub enum AlgebraDSLError {
     InvalidDelete,
     InvalidSiblingIndices,
     MapExpression,
+    MakeNeedsExpression,
+    UnrecognizedCmd,
 }
 
 #[derive(PartialEq, Debug, Clone)]

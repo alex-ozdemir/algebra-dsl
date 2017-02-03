@@ -76,7 +76,7 @@ socket.onmessage = function (event) {
         console.log("Server sent bad data: Only one @ symbol");
         return;
     }
-    var isOK = rest.substr(0, atIdx);
+    var type = rest.substr(0, atIdx);
     var rest = rest.substr(atIdx+1);
 
     var fullDiv = document.createElement('div');
@@ -95,10 +95,12 @@ socket.onmessage = function (event) {
     fullDiv.appendChild(eqnDiv);
     document.getElementById('repl').appendChild(fullDiv);
 
-    if (isOK === 'OK') {
+    if (type === 'Eqn') {
         // Handle Actual Formula
         MathJax.Hub.Queue(["Typeset", MathJax.Hub, eqnDiv.id]);
         MathJax.Hub.Queue([onFinishTypesetting, eqnDiv.id]);
+    } else if (type === 'LaTeX') {
+        // moo
     } else {
         eqnDiv.className += ' algebra-dsl-error';
         checkbox.disabled = true;

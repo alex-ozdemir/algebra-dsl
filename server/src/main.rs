@@ -6,6 +6,7 @@ extern crate staticfile;
 
 extern crate khwarizmi;
 
+use std::fmt;
 use std::fs::File;
 use std::path::Path;
 use std::thread;
@@ -17,7 +18,7 @@ use iron::mime;
 use staticfile::Static;
 use mount::Mount;
 
-use khwarizmi::{Expression, Equation, TreeIdx, AlgebraDSLError, Indexable, SiblingIndices};
+use khwarizmi::{Expression, Equation, TreeIdx, AlgebraDSLError, Indexable, SiblingIndices, TreeIdxRef};
 
 // The HTTP server handler
 fn send_mainpage(_: &mut Request) -> IronResult<Response> {
@@ -27,22 +28,90 @@ fn send_mainpage(_: &mut Request) -> IronResult<Response> {
                        File::open(Path::new("static/index.html")).unwrap())))
 }
 
+#[derive(Debug, PartialEq, Clone)]
 enum Op {
     Plus,
     Times,
 }
 
+#[derive(Debug, PartialEq, Clone)]
 enum Cmd {
-    Equation(Equation),
-    Expression(Expression),
+    New(EqOrExpr),
     Make(Vec<TreeIdx>, Expression),
     Map(Op, Expression),
     Output(Vec<usize>),
 }
 
-enum Return<'a> {
-    Equation(Box<Indexable>),
-    LaTeXStr(&'a str),
+impl Cmd {
+    fn execute(self, e: &Option<EqOrExpr>) -> Result<Return, AlgebraDSLError> {
+        match (self, e.as_ref()) {
+            (Cmd::New(e), _) => Ok(Return::EqOrExpr(e)),
+            (Cmd::Make(mut indices, new_expr), Some(old_expr)) => {
+                let mut expr = old_expr.clone();
+                if indices.len() == 1 {
+                    let idx = indices.pop().expect("unreachable");
+                    expr.replace(&idx, new_expr)?;
+                    Ok(Return::EqOrExpr(expr))
+                } else {
+                    if indices.len() > 1 {
+                        let sibs = SiblingIndices::from_indices(indices.as_slice())?;
+                        expr.replace_siblings(sibs, new_expr)?;
+                        Ok(Return::EqOrExpr(expr))
+                    } else {
+                        Err(AlgebraDSLError::InvalidIdx)
+                    }
+                }
+            },
+            (Cmd::Make(_, _), None) => Err(AlgebraDSLError::MakeNeedsExpression),
+            (Cmd::Map(op, new_expr), Some(e)) => {
+                if let &EqOrExpr::Eq(ref e) = e {
+                    let mut eq = e.clone();
+                    match op {
+                        Op::Times => eq.times_to_both(new_expr),
+                        Op::Plus => eq.plus_to_both(new_expr),
+                    }
+                    Ok(Return::EqOrExpr(EqOrExpr::Eq(eq)))
+                } else { Err(AlgebraDSLError::MapExpression) }
+            },
+            (Cmd::Map(_, _), _) => Err(AlgebraDSLError::MapExpression),
+            (Cmd::Output(_), _) => Ok(Return::LaTeXStr("moo!".to_string())),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum EqOrExpr {
+    Eq(Equation),
+    Ex(Expression),
+}
+
+impl fmt::Display for EqOrExpr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &EqOrExpr::Eq(ref eq) => write!(f, "{}", eq),
+            &EqOrExpr::Ex(ref ex) => write!(f, "{}", ex),
+        }
+    }
+}
+
+impl Indexable for EqOrExpr {
+    fn get(&self, index: TreeIdxRef) -> Result<&Expression, AlgebraDSLError> {
+        match self {
+            &EqOrExpr::Eq(ref eq) => eq.get(index),
+            &EqOrExpr::Ex(ref ex) => ex.get(index),
+        }
+    }
+    fn get_mut(&mut self, index: TreeIdxRef) -> Result<&mut Expression, AlgebraDSLError> {
+        match self {
+            &mut EqOrExpr::Eq(ref mut eq) => eq.get_mut(index),
+            &mut EqOrExpr::Ex(ref mut ex) => ex.get_mut(index),
+        }
+    }
+}
+
+enum Return {
+    EqOrExpr(EqOrExpr),
+    LaTeXStr(String),
 }
 
 fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
@@ -65,13 +134,14 @@ fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
         loop {
             use std::str::FromStr;
             if let Some(comma_idx) = rest.find(',') {
-                indices.push(usize::from_str(&rest[..comma_idx]));
+                indices.push(usize::from_str(&rest[..comma_idx]).unwrap());
                 rest = rest[comma_idx+1..].trim();
             } else {
-                indices.push(usize::from_str(rest));
+                indices.push(usize::from_str(rest).unwrap());
                 break;
             }
         }
+        return Ok(Cmd::Output(indices));
     }
     if s.starts_with("+") {
         let rest = &s[1..].trim();
@@ -84,9 +154,9 @@ fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
         return Ok(Cmd::Map(Op::Times, expr));
     }
     if let Some(eq) = Equation::from_str(s).ok() {
-        Ok(Cmd::Equation(eq))
+        Ok(Cmd::New(EqOrExpr::Eq(eq)))
     } else {
-        Ok(Cmd::Expression(Expression::from_str(s)?))
+        Ok(Cmd::New(EqOrExpr::Ex(Expression::from_str(s)?)))
     }
 }
 
@@ -129,7 +199,8 @@ fn main() {
             let (mut sender, mut receiver) = client.split();
 
             let mut formula_num = 0;
-            let mut equation: Option<Box<Indexable>> = None;
+            let mut history = vec![];
+            let mut equation: Option<EqOrExpr> = None;
             for message in receiver.incoming_messages() {
                 let message: Message = message.unwrap();
 
@@ -147,48 +218,18 @@ fn main() {
                         let string = std::str::from_utf8(&*message.payload).unwrap();
                         println!("Received {}", string);
                         let output = match parse_cmd(string) {
-                            Ok(Cmd::Expression(ex)) => {
-                                Ok(Return::Equation(Box::new(ex)))
-                            }
-                            Ok(Cmd::Equation(eq)) => {
-                                Ok(Return::Equation(Box::new(eq)))
-                            }
-                            Ok(Cmd::Make(mut indices, expr)) => {
-                                match (equation.as_mut(), indices.len()) {
-                                    (None, _) => Err("make without an expression".to_string()),
-                                    (Some(equation), 1) => {
-                                        indices.pop().ok_or(AlgebraDSLError::InvalidIdx).map(|idx|
-                                            Return::Equation(equation.clone().replace(
-                                                &idx, expr).ok_or(AlgebraDSLError::InvalidIdx)))
-                                    },
-                                    (Some(equation), n) if n > 1 => {
-                                        SiblingIndices::from_indices(indices.as_slice()).map(|sibs|
-                                            Return::Equation(equation.clone().replace_siblings(
-                                                sibs, expr).ok_or(AlgebraDSLError::InvalidIdx)))
-                                    },
-                                    _ => Err(AlgebraDSLError::InvalidIdx),
-                                }
-                            }
-                            Ok(Cmd::Map(Op::Times, expr)) => {
-                                equation.as_mut().and_then(|i| i.as_equation())
-                                    .ok_or(AlgebraDSLError::MapExpression).map(|eq|
-                                        Return::Equation(eq.clone().times_to_both(expr)))
-                            }
-                            Ok(Cmd::Map(Op::Plus, expr)) => {
-
-                                equation.as_mut().and_then(|i| i.as_equation())
-                                    .ok_or(AlgebraDSLError::MapExpression).map(|eq|
-                                        Return::Equation(eq.clone().plus_to_both(expr)))
-                            }
-                            Ok(Cmd::Output(eqn_nums)) => {
-                                Return::LaTeXStr("moo!")
-                            }
-                            Err(e) => Some(format!("unrecognized command: {:#?}", e)),
+                            Ok(cmd) => cmd.execute(&equation),
+                            Err(e) => Err(e),
                         };
                         let msg = match output {
-                            Ok(Return::Equation(e)) => format!("{}@Eqn@{}", formula_num, e),
-                            Ok(Return::LaTeXStr(s)) => format!("{}@Latex@{}", formula_num, s),
-                            Err(e) => format!("{}@Err@Error: {}", formula_num, e),
+                            Ok(Return::EqOrExpr(e)) => {
+                                equation.take().map(|e| history.push(e));
+                                let s = format!("{}@Eqn@{}", formula_num, e);
+                                equation = Some(e);
+                                s
+                            },
+                            Ok(Return::LaTeXStr(s)) => format!("{}@LaTeX@{}", formula_num, s),
+                            Err(e) => format!("{}@Err@Error: {:?}", formula_num, e),
                         };
                         formula_num += 1;
                         println!("Output: {:#?}", msg);
