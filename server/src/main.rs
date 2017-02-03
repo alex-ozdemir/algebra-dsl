@@ -18,7 +18,7 @@ use iron::mime;
 use staticfile::Static;
 use mount::Mount;
 
-use khwarizmi::{Expression, Equation, TreeIdx, AlgebraDSLError, Indexable};
+use khwarizmi::{Expression, Equation, TreeIdx, AlgebraDSLError, Indexable, SiblingIndices};
 
 // The HTTP server handler
 fn send_mainpage(_: &mut Request) -> IronResult<Response> {
@@ -36,18 +36,23 @@ enum Op {
 enum Cmd {
     Equation(Equation),
     Expression(Expression),
-    Make(TreeIdx, Expression),
+    Make(Vec<TreeIdx>, Expression),
     Map(Op, Expression),
 }
 
 fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
     let s: &str = s.trim();
     if s.starts_with("make") {
-        let rest = &s[4..].trim();
-        let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
-        let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
-        let expr = Expression::from_str(&rest[(idx_end + 1)..])?;
-        return Ok(Cmd::Make(idx, expr));
+        let mut indices = Vec::new();
+        let mut rest: &str = &s[4..].trim();
+        while rest.starts_with("#") {
+            let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
+            let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
+            indices.push(idx);
+            rest = &rest[(idx_end + 1)..];
+        }
+        let expr = Expression::from_str(rest)?;
+        return Ok(Cmd::Make(indices, expr));
     }
     if s.starts_with("+") {
         let rest = &s[1..].trim();
@@ -131,16 +136,30 @@ fn main() {
                                 equation = Some(Box::new(eq));
                                 None
                             }
-                            Ok(Cmd::Make(idx, expr)) => {
-                                match equation {
-                                    None => Some("make without an expression".to_string()),
-                                    Some(ref mut equation) => {
-                                        if equation.replace_with_expr(&idx, expr).is_ok() {
+                            Ok(Cmd::Make(mut indices, expr)) => {
+                                match (equation.as_mut(), indices.len()) {
+                                    (None, _) => Some("make without an expression".to_string()),
+                                    (Some(ref mut equation), 1) => {
+                                        let idx = indices.pop().expect("unreachable");
+                                        if equation.replace(&idx, expr).is_ok() {
                                             None
                                         } else {
                                             Some("invalid index".to_string())
                                         }
-                                    }
+                                    },
+                                    (Some(ref mut equation), n) if n > 1 => {
+                                        match SiblingIndices::from_indices(indices.as_slice()) {
+                                            Err(e) => Some(format!("{:?}", e)),
+                                            Ok(sibs) => {
+                                                if equation.replace_siblings(sibs, expr).is_ok() {
+                                                    None
+                                                } else {
+                                                    Some("invalid index".to_string())
+                                                }
+                                            },
+                                        }
+                                    },
+                                    _ => Some("invalid indices".to_string()),
                                 }
                             }
                             Ok(Cmd::Map(Op::Times, expr)) => {
@@ -163,8 +182,7 @@ fn main() {
                                         None
                                     }
                                     None => {
-                                        Some("cannot multiply both side of an *expression* by \
-                                              something"
+                                        Some("cannot add something to both side of an *expression*"
                                             .to_string())
                                     }
                                 }
@@ -173,11 +191,11 @@ fn main() {
                         };
                         let msg = error.map_or_else(|| {
                                                         let eq = equation.as_ref().unwrap();
-                                                        println!("Equation: {:#?} {}", eq, eq);
                                                         formula_num += 1;
                                                         format!("{}@{}", formula_num - 1, eq)
                                                     },
                                                     |err| format!("Badness: ∞ ({})", err));
+                        println!("Output: {:#?}", msg);
                         sender.send_message(&Message::text(msg)).unwrap();
                         // sender.send_message(&Message::text(format!("{}@<math xmlns=\"http://www.w3.org/1998/Math/MathML\"> <mrow mathTreeNode=\"\"> <mrow mathTreeNode=\"0\"> <msup mathTreeNode=\"0,0\"> <mi mathTreeNode=\"0,0,0\">x</mi> <mn mathTreeNode=\"0,0,1\">2</mn> </msup> <mo>+</mo> <mrow mathTreeNode=\"0,1\"> <mn mathTreeNode=\"0,1,0\">3</mn> <mo> &#8290; </mo> <mi mathTreeNode=\"0,1,1\">x</mi> </mrow> <mo>+</mo> <mn mathTreeNode=\"0,1\">4</mn> </mrow> <mo>=</mo> <mn mathTreeNode=\"1\"> 5 </mn> </mrow> </math>", formula_num))).unwrap();
 

@@ -65,16 +65,29 @@ function sendToServer(cmBox) {
 
 socket.onmessage = function (event) {
     var data = event.data;
-    var parts = data.split('@');
 
-    var div = document.createElement('div');
-    div.id = 'formula'+parts[0];
-    div.innerHTML = parts[1];
-    div.className += ' disable-highlight';
-    document.getElementById('repl').appendChild(div);
+    if (data.slice(0,7) === "Badness") {
+        // Handle Error
 
-    MathJax.Hub.Queue(["Typeset", MathJax.Hub, div.id]);
-    MathJax.Hub.Queue([finishTypesetting, div.id]);
+        var div = document.createElement('div');
+        div.id = 'formula' + data;
+        div.innerHTML = data;
+        div.className += ' disable-highlight algebra-dsl-error output';
+        document.getElementById('repl').appendChild(div);
+    } else {
+        // Handle Actual Formula
+
+        var parts = data.split('@');
+
+        var div = document.createElement('div');
+        div.id = 'formula'+parts[0];
+        div.innerHTML = parts[1];
+        div.className += ' disable-highlight output';
+        document.getElementById('repl').appendChild(div);
+
+        MathJax.Hub.Queue(["Typeset", MathJax.Hub, div.id]);
+        MathJax.Hub.Queue([finishTypesetting, div.id]);
+    }
 
     createCM();
 };

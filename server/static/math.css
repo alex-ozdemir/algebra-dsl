@@ -40,6 +40,15 @@
     outline: 1px solid #706ad8;
 }
 
+.output {
+  padding: 0.1em;
+  margin: 0.3em;
+}
+
+.algebra-dsl-error {
+  border: 1px solid red;
+  background-color: #fd8;
+}
 
 /*
 [mathtreenode][highlighted~="0"] {

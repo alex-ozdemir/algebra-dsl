@@ -83,17 +83,17 @@ impl Operator {
             RGroup => u8::max_value() - 1,
         }
     }
-    fn arity(&self) -> u8 {
+    fn arity(&self) -> Option<u8> {
         use self::Operator::*;
         match *self {
-            Begin | End | LGroup | RGroup => panic!("No arity for these"),
-            Plus | Minus | Times | Div | Caret | Underscore => 2,
-            Neg => 1,
+            Begin | End | LGroup | RGroup => None,
+            Plus | Minus | Times | Div | Caret | Underscore => Some(2),
+            Neg => Some(1),
         }
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum PostMac {
     Frac(Box<PostMac>, Box<PostMac>),
     Sqrt(Box<PostMac>),
@@ -104,17 +104,17 @@ pub enum PostMac {
     Natural(u64),
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum UniOp {
     Std(Operator),
     LimitOp(OperatorSymbol, Option<Box<PostMac>>, Option<Box<PostMac>>),
 }
 
 impl UniOp {
-    fn arity(&self) -> u8 {
+    fn arity(&self) -> Option<u8> {
         match self {
             &UniOp::Std(op) => op.arity(),
-            &UniOp::LimitOp(_, _, _) => 1,
+            &UniOp::LimitOp(_, _, _) => Some(1),
         }
     }
     fn left_precedence(&self) -> u8 {
@@ -178,6 +178,7 @@ pub enum ParseError {
     LatexError(String),
     WrongNumberOfEqualSigns,
     DoubleUnderscore,
+    UnmatchGrouping(UniOp),
     DoubleCaret,
 }
 
@@ -331,7 +332,7 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                               next_op.left_precedence() {
                             let combinator = operator_stack.pop().unwrap();
                             let second = expression_stack.pop().ok_or(ParseError::OperatorError)?;
-                            let new_expr = if combinator.arity() == 1 {
+                            let new_expr = if combinator.arity().ok_or_else(|| ParseError::UnmatchGrouping(combinator.clone()))? == 1 {
                                 combine1(second, combinator)?
                             } else {
                                 let first = expression_stack.pop()
