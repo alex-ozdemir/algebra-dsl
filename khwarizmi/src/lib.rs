@@ -354,6 +354,7 @@ pub enum AlgebraDSLError {
     MapExpression,
     MakeNeedsExpression,
     UnrecognizedCmd,
+    InternalError,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -376,9 +377,9 @@ impl fmt::Display for Equation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
         write!(f, "<mrow mathTreeNode=\"0\">")?;
-        fmt_as_math_ml(&self.left, f, "0,0")?;
+        fmt_as_math_ml(&self.left, f, "0,0", 0)?;
         write!(f, "<mo>=</mo>")?;
-        fmt_as_math_ml(&self.right, f, "0,1")?;
+        fmt_as_math_ml(&self.right, f, "0,1", 0)?;
         write!(f, "</mrow>")?;
         write!(f, "</math>")
     }
@@ -389,6 +390,43 @@ impl fmt::Display for Expression {
         write!(f, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
         fmt_as_math_ml(&self, f, "0",0)?;
         write!(f, "</math>")
+    }
+}
+
+pub struct LatexWriter(String);
+
+impl LatexWriter {
+    pub fn new() -> LatexWriter {
+        LatexWriter("\\[\n".to_string())
+    }
+
+    pub fn add_math(&mut self, e: &EqOrExpr) -> fmt::Result {
+        use std::fmt::Write;
+
+        struct DisplaysAsLatex<'a>(&'a EqOrExpr);
+        impl<'a> fmt::Display for DisplaysAsLatex<'a> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                match self.0 {
+                    &EqOrExpr::Eq(ref eq) => {
+                        fmt_as_latex(&eq.left, f, 0)?;
+                        write!(f, " = ")?;
+                        fmt_as_latex(&eq.right, f, 0)?;
+                    },
+                    &EqOrExpr::Ex(ref ex) => {
+                        fmt_as_latex(&ex, f, 0)?;
+                    },
+                }
+                write!(f, " \\\\\n")
+            }
+        }
+        write!(self.0, "{}\n", DisplaysAsLatex(e))
+    }
+
+    pub fn finish_str(mut self) -> Result<String, fmt::Error> {
+        use std::fmt::Write;
+
+        write!(self.0, "\\]")?;
+        Ok(self.0)
     }
 }
 
@@ -411,9 +449,9 @@ fn fmt_as_math_ml(expr: &Expression,
                   prev_index: &str, prev_precedence: u8)
                   -> Result<(), fmt::Error> {
     let prec = precedence(expr);
-    write!(f, "<mrow mathTreeNode=\"{}\">", prev_index);
+    write!(f, "<mrow mathTreeNode=\"{}\">", prev_index)?;
     if prec <= prev_precedence {
-        write!(f,"<mo form=\"prefix\">(</mo>");
+        write!(f,"<mo form=\"prefix\">(</mo>")?;
     }
     match expr {
         &Expression::Atom(atom) => {
@@ -519,9 +557,88 @@ fn fmt_as_math_ml(expr: &Expression,
         }
     }
     if prec <= prev_precedence {
-        write!(f,"<mo form=\"postfix\">)</mo>");
+        write!(f,"<mo form=\"postfix\">)</mo>")?;
     }
     write!(f,"</mrow>")
+}
+
+fn fmt_as_latex(expr: &Expression, f: &mut fmt::Formatter, prev_precedence: u8)
+                  -> Result<(), fmt::Error> {
+    let prec = precedence(expr);
+    if prec <= prev_precedence {
+        write!(f,"\\left(")?;
+    }
+    match expr {
+        &Expression::Atom(atom) => {
+            match &atom {
+                &Atom::PlainVariable(c) => write!(f, "{}", c)?,
+                &Atom::Natural(n) => write!(f, "{}", n)?,
+                &Atom::Floating(r) => write!(f, "{}", r)?,
+                &Atom::Symbol(sym) => write!(f, "{} ", sym.as_latex())?,
+            }
+        }
+        &Expression::Power(ref b, ref p) => {
+            fmt_as_latex(b, f, prec)?;
+            write!(f, "^{{")?;
+            fmt_as_latex(p, f, 0)?; // TODO: Is this 0 ok?
+            write!(f, "}}")?;
+        }
+        &Expression::Negation(ref n) => {
+            write!(f, "-")?;
+            fmt_as_latex(n, f, prec)?;
+        }
+        &Expression::Division(ref n, ref d) => {
+            write!(f, "\\frac{{")?;
+            fmt_as_latex(n, f, prec)?;
+            write!(f, "}}{{")?;
+            fmt_as_latex(d, f, prec)?;
+            write!(f, "}}")?;
+        }
+        &Expression::Subscript(ref e, ref s) => {
+            fmt_as_latex(e, f, prec)?;
+            write!(f, "_{{")?;
+            fmt_as_latex(s, f, prec)?;
+            write!(f, "}}")?;
+        }
+        &Expression::Sum(ref s) => {
+            let first = true;
+            for e in s {
+                if !first {
+                    write!(f, "+")?;
+                }
+                fmt_as_latex(e, f, prec)?;
+            }
+        }
+        &Expression::Product(ref s) => {
+            for e in s {
+                fmt_as_latex(e, f, prec)?;
+            }
+        }
+        &Expression::Application(ref func, ref arg) => {
+            fmt_as_latex(func, f, prec)?;
+            write!(f, "(")?;
+            fmt_as_latex(arg, f, prec)?;
+            write!(f, ")")?;
+        }
+        &Expression::LimitOp(ref op, ref sub, ref sup, ref expr) => {
+            write!(f, "{}", op.as_latex())?;
+            if let &Some(ref s) = sub {
+                write!(f, "_{{")?;
+                fmt_as_latex(s, f, prec)?;
+                write!(f, "}}")?;
+            }
+            if let &Some(ref s) = sup {
+                write!(f, "^{{")?;
+                fmt_as_latex(s, f, prec)?;
+                write!(f, "}}")?;
+            }
+            fmt_as_latex(expr, f, prec)?;
+        }
+    }
+    if prec <= prev_precedence {
+        write!(f,"\\right)")?;
+    }
+    Ok(())
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -679,6 +796,41 @@ impl OperatorSymbol {
             &OperatorSymbol::pm => "&pm;",
         }
     }
+    fn as_latex(&self) -> &'static str {
+        match self {
+            &OperatorSymbol::int => "\\int",
+            &OperatorSymbol::oint => "\\oint",
+            &OperatorSymbol::sum => "\\sum",
+            &OperatorSymbol::prod => "\\prod",
+            &OperatorSymbol::arccos => "\\arccos",
+            &OperatorSymbol::cos => "\\cos",
+            &OperatorSymbol::csc => "\\csc",
+            &OperatorSymbol::exp => "\\exp",
+            &OperatorSymbol::limsup => "\\limsup",
+            &OperatorSymbol::min => "\\min",
+            &OperatorSymbol::sinh => "\\sinh",
+            &OperatorSymbol::arcsin => "\\arcsin",
+            &OperatorSymbol::cosh => "\\cosh",
+            &OperatorSymbol::gcd => "\\gcd",
+            &OperatorSymbol::lg => "\\lg",
+            &OperatorSymbol::ln => "\\ln",
+            &OperatorSymbol::sup => "\\sup",
+            &OperatorSymbol::arctan => "\\arctan",
+            &OperatorSymbol::cot => "\\cot",
+            &OperatorSymbol::det => "\\det",
+            &OperatorSymbol::lim => "\\lim",
+            &OperatorSymbol::log => "\\log",
+            &OperatorSymbol::sec => "\\sec",
+            &OperatorSymbol::tan => "\\tan",
+            &OperatorSymbol::coth => "\\coth",
+            &OperatorSymbol::inf => "\\inf",
+            &OperatorSymbol::liminf => "\\liminf",
+            &OperatorSymbol::max => "\\max",
+            &OperatorSymbol::sin => "\\sin",
+            &OperatorSymbol::tanh => "\\tanh",
+            &OperatorSymbol::pm => "\\pm",
+        }
+    }
 }
 
 impl StandaloneSymbol {
@@ -718,6 +870,44 @@ impl StandaloneSymbol {
             &StandaloneSymbol::Psi => "&Psi;",
             &StandaloneSymbol::Omega => "&Omega;",
             &StandaloneSymbol::partial => "&partial;",
+        }
+    }
+    fn as_latex(&self) -> &'static str {
+        match self {
+            &StandaloneSymbol::alpha => "\\alpha",
+            &StandaloneSymbol::beta => "\\beta",
+            &StandaloneSymbol::gamma => "\\gamma",
+            &StandaloneSymbol::delta => "\\delta",
+            &StandaloneSymbol::epsilon => "\\epsilon",
+            &StandaloneSymbol::zeta => "\\zeta",
+            &StandaloneSymbol::eta => "\\eta",
+            &StandaloneSymbol::theta => "\\theta",
+            &StandaloneSymbol::iota => "\\iota",
+            &StandaloneSymbol::kappa => "\\kappa",
+            &StandaloneSymbol::lambda => "\\lambda",
+            &StandaloneSymbol::mu => "\\mu",
+            &StandaloneSymbol::nu => "\\nu",
+            &StandaloneSymbol::omicron => "\\omicron",
+            &StandaloneSymbol::pi => "\\pi",
+            &StandaloneSymbol::rho => "\\rho",
+            &StandaloneSymbol::sigma => "\\sigma",
+            &StandaloneSymbol::tau => "\\tau",
+            &StandaloneSymbol::upsilon => "\\upsilon",
+            &StandaloneSymbol::phi => "\\phi",
+            &StandaloneSymbol::chi => "\\chi",
+            &StandaloneSymbol::psi => "\\psi",
+            &StandaloneSymbol::omega => "\\omega",
+            &StandaloneSymbol::Gamma => "\\Gamma",
+            &StandaloneSymbol::Delta => "\\Delta",
+            &StandaloneSymbol::Theta => "\\Theta",
+            &StandaloneSymbol::Lambda => "\\Lambda",
+            &StandaloneSymbol::Pi => "\\Pi",
+            &StandaloneSymbol::Sigma => "\\Sigma",
+            &StandaloneSymbol::Upsilon => "\\Upsilon",
+            &StandaloneSymbol::Phi => "\\Phi",
+            &StandaloneSymbol::Psi => "\\Psi",
+            &StandaloneSymbol::Omega => "\\Omega",
+            &StandaloneSymbol::partial => "\\partial",
         }
     }
 }
@@ -799,7 +989,44 @@ impl Symbol {
             &Symbol::Operator(ref sym) => sym.as_math_ml(),
         }
     }
+    fn as_latex(&self) -> &'static str {
+        match self {
+            &Symbol::Standalone(ref sym) => sym.as_latex(),
+            &Symbol::Operator(ref sym) => sym.as_latex(),
+        }
+    }
 }
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum EqOrExpr {
+    Eq(Equation),
+    Ex(Expression),
+}
+
+impl fmt::Display for EqOrExpr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &EqOrExpr::Eq(ref eq) => write!(f, "{}", eq),
+            &EqOrExpr::Ex(ref ex) => write!(f, "{}", ex),
+        }
+    }
+}
+
+impl Indexable for EqOrExpr {
+    fn get(&self, index: TreeIdxRef) -> Result<&Expression, AlgebraDSLError> {
+        match self {
+            &EqOrExpr::Eq(ref eq) => eq.get(index),
+            &EqOrExpr::Ex(ref ex) => ex.get(index),
+        }
+    }
+    fn get_mut(&mut self, index: TreeIdxRef) -> Result<&mut Expression, AlgebraDSLError> {
+        match self {
+            &mut EqOrExpr::Eq(ref mut eq) => eq.get_mut(index),
+            &mut EqOrExpr::Ex(ref mut ex) => ex.get_mut(index),
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -937,3 +1164,4 @@ mod tests {
     }
 
 }
+

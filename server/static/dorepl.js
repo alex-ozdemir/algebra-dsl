@@ -57,6 +57,7 @@ var socket = new WebSocket("ws://127.0.0.1:2794", "rust-websocket");
 
 function sendToServer(cmBox) {
     currentCM.setOption('readOnly', true);
+    console.log("sending box, value is " + cmBox.getValue());
     socket.send(cmBox.getValue());
 }
 
@@ -89,19 +90,21 @@ socket.onmessage = function (event) {
 
     var eqnDiv = document.createElement('div');
     eqnDiv.id = 'formula'+formulaNum;
-    eqnDiv.className += ' disable-highlight output';
+    eqnDiv.className += ' output';
     eqnDiv.innerHTML = rest;
 
     fullDiv.appendChild(eqnDiv);
     document.getElementById('repl').appendChild(fullDiv);
 
-    if (type === 'Eqn') {
+    if (type === 'Math') {
+        eqnDiv.className += ' disable-highlight';
         // Handle Actual Formula
         MathJax.Hub.Queue(["Typeset", MathJax.Hub, eqnDiv.id]);
         MathJax.Hub.Queue([onFinishTypesetting, eqnDiv.id]);
     } else if (type === 'LaTeX') {
+        checkbox.disabled = true;
         // moo
-    } else {
+    } else if (type === 'Err') {
         eqnDiv.className += ' algebra-dsl-error';
         checkbox.disabled = true;
     }
@@ -248,17 +251,20 @@ function sendOutputLatex() {
     var tosend = "output ";
 
     var cns = document.getElementById('repl').childNodes;
+    var first = true;
     for (var i=0; i<cns.length; i++) {
         if (cns[i].className == 'output') {
             var checkbox = cns[i].childNodes[0];
             if (checkbox.checked) {
-                tosend += Math.floor(i/2) + ', ';
+                if (!first) {
+                    tosend += ', ';
+                }
+                tosend += '' + Math.floor(i/2);
+                first = false;
             }
         }
     }
 
-    // Chop off the last 2 characters (", ")
-    tosend = tosend.substr(0, tosend.length-2);
-
+    console.log("In output latex, sending " + tosend);
     socket.send(tosend);
 }
