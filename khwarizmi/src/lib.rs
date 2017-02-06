@@ -533,22 +533,53 @@ fn fmt_as_math_ml(expr: &Expression,
             fmt_as_math_ml(arg, f, &base_string, prec)?;
             write!(f, "<mo>)</mo>")?;
         }
-        &Expression::LimitOp(ref op, ref sub, ref sup, ref expr) => {
+        &Expression::LimitOp(ref op, None, None, ref expr) => {
+            let mut base_string = String::from(prev_index);
+            write!(f, "{}", op.as_math_ml())?;
+
+            base_string.push_str(",2");
+            fmt_as_math_ml(expr, f, &base_string, prec)?;
+        }
+        &Expression::LimitOp(ref op, Some(ref sub), None, ref expr) => {
+            let mut base_string = String::from(prev_index);
+            let orig_len = base_string.len();
+            write!(f, "<munder>")?;
+            write!(f, "{}", op.as_math_ml())?;
+
+            base_string.push_str(",0");
+            fmt_as_math_ml(sub, f, &base_string, prec)?;
+            base_string.truncate(orig_len);
+
+            write!(f, "</munder>")?;
+            base_string.push_str(",2");
+            fmt_as_math_ml(expr, f, &base_string, prec)?;
+        }
+        &Expression::LimitOp(ref op, None, Some(ref sup), ref expr) => {
+            let mut base_string = String::from(prev_index);
+            let orig_len = base_string.len();
+            write!(f, "<mover>")?;
+            write!(f, "{}", op.as_math_ml())?;
+
+            base_string.push_str(",1");
+            fmt_as_math_ml(sup, f, &base_string, prec)?;
+            base_string.truncate(orig_len);
+
+            write!(f, "</mover>")?;
+            base_string.push_str(",2");
+            fmt_as_math_ml(expr, f, &base_string, prec)?;
+        }
+        &Expression::LimitOp(ref op, Some(ref sub), Some(ref sup), ref expr) => {
             let mut base_string = String::from(prev_index);
             let orig_len = base_string.len();
             write!(f, "<munderover>")?;
-            write!(f, "<mo>{}</mo>", op.as_math_ml())?;
+            write!(f, "{}", op.as_math_ml())?;
 
             base_string.push_str(",0");
-            if let &Some(ref s) = sub {
-                fmt_as_math_ml(&*s, f, &base_string, prec)?;
-            }
+            fmt_as_math_ml(sub, f, &base_string, prec)?;
             base_string.truncate(orig_len);
 
             base_string.push_str(",1");
-            if let &Some(ref s) = sup {
-                fmt_as_math_ml(&*s, f, &base_string, prec)?;
-            }
+            fmt_as_math_ml(sup, f, &base_string, prec)?;
             base_string.truncate(orig_len);
 
             write!(f, "</munderover>")?;
@@ -763,37 +794,37 @@ pub enum OperatorSymbol {
 impl OperatorSymbol {
     fn as_math_ml(&self) -> &'static str {
         match self {
-            &OperatorSymbol::int => "&int;",
-            &OperatorSymbol::oint => "&oint;",
-            &OperatorSymbol::sum => "&sum;",
-            &OperatorSymbol::prod => "&prod;",
-            &OperatorSymbol::arccos => "&arccos;",
-            &OperatorSymbol::cos => "&cos;",
-            &OperatorSymbol::csc => "&csc;",
-            &OperatorSymbol::exp => "&exp;",
-            &OperatorSymbol::limsup => "&limsup;",
-            &OperatorSymbol::min => "&min;",
-            &OperatorSymbol::sinh => "&sinh;",
-            &OperatorSymbol::arcsin => "&arcsin;",
-            &OperatorSymbol::cosh => "&cosh;",
-            &OperatorSymbol::gcd => "&gcd;",
-            &OperatorSymbol::lg => "&lg;",
-            &OperatorSymbol::ln => "&ln;",
-            &OperatorSymbol::sup => "&sup;",
-            &OperatorSymbol::arctan => "&arctan;",
-            &OperatorSymbol::cot => "&cot;",
-            &OperatorSymbol::det => "&det;",
-            &OperatorSymbol::lim => "&lim;",
-            &OperatorSymbol::log => "&log;",
-            &OperatorSymbol::sec => "&sec;",
-            &OperatorSymbol::tan => "&tan;",
-            &OperatorSymbol::coth => "&coth;",
-            &OperatorSymbol::inf => "&inf;",
-            &OperatorSymbol::liminf => "&liminf;",
-            &OperatorSymbol::max => "&max;",
-            &OperatorSymbol::sin => "&sin;",
-            &OperatorSymbol::tanh => "&tanh;",
-            &OperatorSymbol::pm => "&pm;",
+            &OperatorSymbol::int => "<mo>&int;</mo>",
+            &OperatorSymbol::oint => "<mo>&oint;</mo>",
+            &OperatorSymbol::sum => "<mo>&sum;</mo>",
+            &OperatorSymbol::prod => "<mo>&prod;</mo>",
+            &OperatorSymbol::arccos => "<mi>arccos</mi>",
+            &OperatorSymbol::cos => "<mi>cos</mi>",
+            &OperatorSymbol::csc => "<mi>csc</mi>",
+            &OperatorSymbol::exp => "<mi>exp</mi>",
+            &OperatorSymbol::limsup => "<mi>limsup</mi>",
+            &OperatorSymbol::min => "<mi>min</mi>",
+            &OperatorSymbol::sinh => "<mi>sinh</mi>",
+            &OperatorSymbol::arcsin => "<mi>arcsin</mi>",
+            &OperatorSymbol::cosh => "<mi>cosh</mi>",
+            &OperatorSymbol::gcd => "<mi>gcd</mi>",
+            &OperatorSymbol::lg => "<mi>lg</mi>",
+            &OperatorSymbol::ln => "<mi>ln</mi>",
+            &OperatorSymbol::sup => "<mi>sup</mi>",
+            &OperatorSymbol::arctan => "<mi>arctan</mi>",
+            &OperatorSymbol::cot => "<mi>cot</mi>",
+            &OperatorSymbol::det => "<mi>det</mi>",
+            &OperatorSymbol::lim => "<mi>lim</mi>",
+            &OperatorSymbol::log => "<mi>log</mi>",
+            &OperatorSymbol::sec => "<mi>sec</mi>",
+            &OperatorSymbol::tan => "<mi>tan</mi>",
+            &OperatorSymbol::coth => "<mi>coth</mi>",
+            &OperatorSymbol::inf => "<mi>inf</mi>",
+            &OperatorSymbol::liminf => "<mi>liminf</mi>",
+            &OperatorSymbol::max => "<mi>max</mi>",
+            &OperatorSymbol::sin => "<mi>sin</mi>",
+            &OperatorSymbol::tanh => "<mi>tanh</mi>",
+            &OperatorSymbol::pm => "<mi>pm</mi>",
         }
     }
     fn as_latex(&self) -> &'static str {
