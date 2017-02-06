@@ -111,9 +111,9 @@ enum Return {
 
 fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
     let s: &str = s.trim_left();
-    if s.starts_with("make ") {
+    if s.starts_with("make") {
         let mut indices = Vec::new();
-        let mut rest: &str = &s[5..].trim();
+        let mut rest: &str = &s[4..].trim();
         while rest.starts_with("#") {
             let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
             let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
@@ -121,27 +121,25 @@ fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
             rest = &rest[(idx_end + 1)..].trim();
         }
         let expr = Expression::from_str(rest)?;
-        return Ok(Cmd::Make(indices, expr));
-    }
-    if s.starts_with("delete ") {
+        Ok(Cmd::Make(indices, expr))
+    } else if s.starts_with("delete") {
         let mut indices = Vec::new();
-        let mut rest: &str = &s[7..].trim();
+        let mut rest: &str = &s[6..].trim();
         while rest.starts_with("#") {
             let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
             let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
             indices.push(idx);
             rest = &rest[(idx_end + 1)..].trim();
         }
-        return if rest.trim().len() > 0 {
+        if rest.trim().len() > 0 {
             println!("Rest isn't empty, it's {}", rest);
             Err(AlgebraDSLError::IllFormattedCommand)
         } else  {
             Ok(Cmd::Delete(indices))
         }
-    }
-    if s.starts_with("output ") {
+    } else if s.starts_with("output") {
         let mut indices = Vec::new();
-        let mut rest: &str = &s[7..].trim();
+        let mut rest: &str = &s[6..].trim();
         loop {
             use std::str::FromStr;
             if let Some(comma_idx) = rest.find(',') {
@@ -153,32 +151,32 @@ fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
                 break;
             }
         }
-        return Ok(Cmd::Output(indices));
-    }
-    if s.starts_with("+") {
+        Ok(Cmd::Output(indices))
+    } else if s.starts_with("+") {
         let rest = &s[1..].trim();
         let expr = Expression::from_str(rest)?;
-        return Ok(Cmd::Map(Op::Plus, expr));
-    }
-    if s.starts_with("-") {
+        Ok(Cmd::Map(Op::Plus, expr))
+    } else if s.starts_with("-") {
         let rest = &s[1..].trim();
         let expr = Expression::from_str(rest)?;
-        return Ok(Cmd::Map(Op::Minus, expr));
-    }
-    if s.starts_with("/") {
+        Ok(Cmd::Map(Op::Minus, expr))
+    } else if s.starts_with("/") {
         let rest = &s[1..].trim();
         let expr = Expression::from_str(rest)?;
-        return Ok(Cmd::Map(Op::Div, expr));
-    }
-    if s.starts_with("*") {
+        Ok(Cmd::Map(Op::Div, expr))
+    } else if s.starts_with("*") {
         let rest = &s[1..].trim();
         let expr = Expression::from_str(rest)?;
-        return Ok(Cmd::Map(Op::Times, expr));
-    }
-    if let Some(eq) = Equation::from_str(s).ok() {
-        Ok(Cmd::New(EqOrExpr::Eq(eq)))
+        Ok(Cmd::Map(Op::Times, expr))
+    } else if s.starts_with("$") {
+        let rest = &s[1..].trim();
+        if let Some(eq) = Equation::from_str(rest).ok() {
+            Ok(Cmd::New(EqOrExpr::Eq(eq)))
+        } else {
+            Ok(Cmd::New(EqOrExpr::Ex(Expression::from_str(rest)?)))
+        }
     } else {
-        Ok(Cmd::New(EqOrExpr::Ex(Expression::from_str(s)?)))
+        Err(AlgebraDSLError::UnrecognizedCmd)
     }
 }
 
