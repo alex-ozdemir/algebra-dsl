@@ -191,11 +191,11 @@ fn main() {
         mount.mount("/", router)
             .mount("/static/", Static::new(Path::new("static")));
 
-        Iron::new(mount).http("127.0.0.1:8080").unwrap();
+        Iron::new(mount).http("0.0.0.0:8080").unwrap();
     });
 
     // Start listening for WebSocket connections
-    let ws_server = Server::bind("127.0.0.1:2794").unwrap();
+    let ws_server = Server::bind("0.0.0.0:2794").unwrap();
 
     for connection in ws_server {
         // Spawn a new thread for each connection.
