@@ -406,7 +406,7 @@ pub struct LatexWriter(String);
 
 impl LatexWriter {
     pub fn new() -> LatexWriter {
-        LatexWriter("\\[\n".to_string())
+        LatexWriter("\\begin{{align*}}\n".to_string())
     }
 
     pub fn add_math(&mut self, e: &EqOrExpr) -> fmt::Result {
@@ -435,7 +435,7 @@ impl LatexWriter {
     pub fn finish_str(mut self) -> Result<String, fmt::Error> {
         use std::fmt::Write;
 
-        write!(self.0, "\\]")?;
+        write!(self.0, "\\end{{align*}}")?;
         Ok(self.0)
     }
 }
@@ -642,11 +642,12 @@ fn fmt_as_latex(expr: &Expression, f: &mut fmt::Formatter, prev_precedence: u8)
             write!(f, "}}")?;
         }
         &Expression::Sum(ref s) => {
-            let first = true;
+            let mut first = true;
             for e in s {
                 if !first {
                     write!(f, "+")?;
                 }
+                first = false;
                 fmt_as_latex(e, f, prec)?;
             }
         }
