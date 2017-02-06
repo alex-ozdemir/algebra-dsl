@@ -560,17 +560,48 @@ impl LatexWriter {
     }
 }
 
+//precedence used to compare current expression precedence to last expression precedence
 fn precedence(expr: &Expression) -> u8 {
     match expr {
-        &Expression::Atom(_) => u8::max_value(),
-        &Expression::Application(_, _) => u8::max_value(),
-        &Expression::LimitOp(_, _, _, _) => 60,
-        &Expression::Subscript(_, _) => u8::min_value(),
-        &Expression::Power(_, _) => 45,
-        &Expression::Division(_, _) => u8::min_value(),
-        &Expression::Product(_) => 25,
-        &Expression::Sum(_) => 15,
-        &Expression::Negation(_) => 15,
+        &Expression::Atom(_) => u8::max_value()-1,
+        &Expression::Application(_,_) => u8::max_value(),
+        &Expression::LimitOp(_,_,_,_) => 0,
+        &Expression::Subscript(_,_) => 5,
+        &Expression::Power(_,_) => 4,
+        &Expression::Division(_,_) => 1,
+        &Expression::Product(_) => 2,
+        &Expression::Sum(_) => 1,
+        &Expression::Negation(_) => 0,
+    }
+}
+
+//normal propagated precedence (left if alt is used)
+fn precedence_prop(expr: &Expression) -> u8 {
+    match expr {
+        &Expression::Atom(_) => u8::max_value()-1,
+        &Expression::Application(_,_) => u8::max_value(),
+        &Expression::LimitOp(_,_,_,_) => 0,
+        &Expression::Subscript(_,_) => 0,
+        &Expression::Power(_,_) => 4,
+        &Expression::Division(_,_) => 0,
+        &Expression::Product(_) => 2,
+        &Expression::Sum(_) => 1,
+        &Expression::Negation(_) => 0,
+    }
+}
+
+//Right Precedence when needed
+fn precedence_alt(expr: &Expression) -> u8 {
+    match expr {
+        &Expression::Atom(_) => u8::max_value()-1,
+        &Expression::Application(_,_) => u8::max_value(),
+        &Expression::LimitOp(_,_,_,_) => 0,
+        &Expression::Subscript(_,_) => 0,
+        &Expression::Power(_,_) => 2,
+        &Expression::Division(_,_) => 0,
+        &Expression::Product(_) => 2,
+        &Expression::Sum(_) => 1,
+        &Expression::Negation(_) => 0,
     }
 }
 
@@ -581,8 +612,8 @@ fn fmt_as_math_ml(expr: &Expression,
                   -> Result<(), fmt::Error> {
     let prec = precedence(expr);
     write!(f, "<mrow mathTreeNode=\"{}\">", prev_index)?;
-    if prec <= prev_precedence {
-        write!(f, "<mo form=\"prefix\">(</mo>")?;
+    if prec < prev_precedence {
+        write!(f,"<mo form=\"prefix\">(</mo>")?;
     }
     match expr {
         &Expression::Atom(atom) => {
@@ -592,36 +623,36 @@ fn fmt_as_math_ml(expr: &Expression,
             let mut base_string = String::from(prev_index);
             write!(f, "<msup>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(b, f, &base_string, prec)?;
+            fmt_as_math_ml(b, f, &base_string, precedence_prop(expr))?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
-            fmt_as_math_ml(p, f, &base_string, prec)?;
+            fmt_as_math_ml(p, f, &base_string, precedence_alt(expr))?;
             write!(f, "</msup>")?;
         }
         &Expression::Negation(ref n) => {
             let mut base_string = String::from(prev_index);
             write!(f, "<mo>-</mo>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(n, f, &base_string, prec)?;
+            fmt_as_math_ml(n, f, &base_string, precedence_prop(expr))?;
         }
         &Expression::Division(ref n, ref d) => {
             let mut base_string = String::from(prev_index);
             write!(f, "<mfrac>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(n, f, &base_string, prec)?;
+            fmt_as_math_ml(n, f, &base_string, precedence_prop(expr))?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
-            fmt_as_math_ml(d, f, &base_string, prec)?;
+            fmt_as_math_ml(d, f, &base_string, precedence_prop(expr))?;
             write!(f, "</mfrac>")?;
         }
         &Expression::Subscript(ref e, ref s) => {
             let mut base_string = String::from(prev_index);
             write!(f, "<msub>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(e, f, &base_string, prec)?;
+            fmt_as_math_ml(e, f, &base_string, precedence_prop(expr))?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
-            fmt_as_math_ml(s, f, &base_string, prec)?;
+            fmt_as_math_ml(s, f, &base_string, precedence_alt(expr))?;
             write!(f, "</msub>")?;
         }
         &Expression::Sum(ref s) => {
@@ -632,9 +663,9 @@ fn fmt_as_math_ml(expr: &Expression,
                 base_string.push_str(",");
                 base_string.push_str(&i.to_string());
                 if i == len - 1 {
-                    fmt_as_math_ml(e, f, &base_string, prec)?;
+                    fmt_as_math_ml(e, f, &base_string, precedence_prop(expr))?;
                 } else {
-                    fmt_as_math_ml(e, f, &base_string, prec)?;
+                    fmt_as_math_ml(e, f, &base_string, precedence_prop(expr))?;
                     write!(f, "<mo>+</mo>")?;
                 }
             }
@@ -647,9 +678,9 @@ fn fmt_as_math_ml(expr: &Expression,
                 base_string.push_str(",");
                 base_string.push_str(&i.to_string());
                 if i == len - 1 {
-                    fmt_as_math_ml(e, f, &base_string, prec)?;
+                    fmt_as_math_ml(e, f, &base_string, precedence_prop(expr))?;
                 } else {
-                    fmt_as_math_ml(e, f, &base_string, prec)?;
+                    fmt_as_math_ml(e, f, &base_string, precedence_prop(expr))?;
                     write!(f, "<mo>&#8290;</mo>")?;
                 }
             }
@@ -657,12 +688,10 @@ fn fmt_as_math_ml(expr: &Expression,
         &Expression::Application(ref func, ref arg) => {
             let mut base_string = String::from(prev_index);
             base_string.push_str(",0");
-            fmt_as_math_ml(func, f, &base_string, prec)?;
+            fmt_as_math_ml(func, f, &base_string, precedence_prop(expr))?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
-            write!(f, "<mo>(</mo>")?;
-            fmt_as_math_ml(arg, f, &base_string, prec)?;
-            write!(f, "<mo>)</mo>")?;
+            fmt_as_math_ml(arg, f, &base_string, precedence_alt(expr))?;
         }
         &Expression::LimitOp(ref op, None, None, ref expr) => {
             let mut base_string = String::from(prev_index);
@@ -706,20 +735,24 @@ fn fmt_as_math_ml(expr: &Expression,
             write!(f, "{}", op.as_math_ml())?;
 
             base_string.push_str(",0");
-            fmt_as_math_ml(sub, f, &base_string, prec)?;
+
+            fmt_as_math_ml(sub, f, &base_string, precedence_prop(expr))?;
+
             base_string.truncate(orig_len);
 
             base_string.push_str(",1");
-            fmt_as_math_ml(sup, f, &base_string, prec)?;
+
+            fmt_as_math_ml(sup, f, &base_string, precedence_prop(expr))?;
+
             base_string.truncate(orig_len);
 
             write!(f, "</munderover>")?;
             base_string.push_str(",2");
-            fmt_as_math_ml(expr, f, &base_string, prec)?;
+            fmt_as_math_ml(expr, f, &base_string, precedence_prop(expr))?;
         }
     }
-    if prec <= prev_precedence {
-        write!(f, "<mo form=\"postfix\">)</mo>")?;
+    if prec < prev_precedence {
+        write!(f,"<mo form=\"postfix\">)</mo>")?;
     }
     write!(f, "</mrow>")
 }
@@ -1304,6 +1337,23 @@ mod tests {
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
                         mathTreeNode=\"0,1\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow \
                         mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
+        let test = format!("{}", expr);
+        assert_expected_eq_actual!(expected, test);
+    }
+
+    #[test]
+    fn format_prod_add() {
+        let expr = Ex::Product(vec![
+            Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('x')), Ex::Atom(Atom::PlainVariable('y'))]),
+            Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('z')), Ex::Atom(Atom::PlainVariable('a'))])]);
+        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
+                        mathTreeNode=\"0\"><mrow \
+                        mathTreeNode=\"0,0\"><mo form=\"prefix\">(</mo><mrow \
+                        mathTreeNode=\"0,0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
+                        mathTreeNode=\"0,0,1\"><mi>y</mi></mrow><mo form=\"postfix\">)</mo></mrow><mo>&#8290;</mo><mrow \
+                        mathTreeNode=\"0,1\"><mo form=\"prefix\">(</mo><mrow \
+                        mathTreeNode=\"0,1,0\"><mi>z</mi></mrow><mo>+</mo><mrow \
+                        mathTreeNode=\"0,1,1\"><mi>a</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
         let test = format!("{}", expr);
         assert_expected_eq_actual!(expected, test);
     }
