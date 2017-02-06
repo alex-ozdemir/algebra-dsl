@@ -126,7 +126,7 @@ pub struct SiblingIndices<'a> {
 
 impl<'a> SiblingIndices<'a> {
     pub fn from_indices(indices: &'a [TreeIdx]) -> Result<SiblingIndices<'a>, AlgebraDSLError> {
-        if indices.len() < 2 || indices.iter().map(|i| i.as_ref().len()).min().unwrap() == 0 {
+        if indices.len() < 1 || indices.iter().map(|i| i.as_ref().len()).min().unwrap() == 0 {
             return Err(AlgebraDSLError::InvalidSiblingIndices);
         }
         let first_parent = indices[0].as_ref().parent();
@@ -165,22 +165,20 @@ pub trait Indexable: fmt::Display + fmt::Debug {
         index.as_ref().parent().map(|idx| self.maybe_assoc_merge_with_parent(idx));
         Ok(old)
     }
-    fn delete(&mut self, index: &TreeIdx) -> Result<Expression, AlgebraDSLError> {
-        if let Some(parent_index) = index.as_ref().parent() {
-            let child_index = index.as_ref().last().unwrap();
-            match self.get_mut(parent_index)? {
-                &mut Expression::Sum(ref mut args) |
-                &mut Expression::Product(ref mut args) => {
-                    if child_index < args.len() {
-                        Ok(args.remove(child_index))
-                    } else {
-                        Err(AlgebraDSLError::InvalidDelete)
-                    }
+    fn delete(&mut self, indices: SiblingIndices) -> Result<(), AlgebraDSLError> {
+        match self.get_mut(indices.parent_idx)? {
+            &mut Expression::Sum(ref mut args) |
+            &mut Expression::Product(ref mut args) => {
+                if args.len() == indices.children.len() {
+                    return Err(AlgebraDSLError::InvalidDelete);
                 }
-                _ => Err(AlgebraDSLError::InvalidDelete),
+
+                for idx in indices.children.iter().rev() {
+                    args.remove(*idx);
+                }
+                Ok(())
             }
-        } else {
-            Err(AlgebraDSLError::InvalidDelete)
+            _ => Err(AlgebraDSLError::InvalidSiblingIndices),
         }
     }
     fn replace_siblings(&mut self,
@@ -352,7 +350,7 @@ pub enum AlgebraDSLError {
     InvalidDelete,
     InvalidSiblingIndices,
     MapExpression,
-    MakeNeedsExpression,
+    NeedsExpression,
     UnrecognizedCmd,
     InternalError,
 }
@@ -406,6 +404,7 @@ impl LatexWriter {
         struct DisplaysAsLatex<'a>(&'a EqOrExpr);
         impl<'a> fmt::Display for DisplaysAsLatex<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "  ")?;
                 match self.0 {
                     &EqOrExpr::Eq(ref eq) => {
                         fmt_as_latex(&eq.left, f, 0)?;

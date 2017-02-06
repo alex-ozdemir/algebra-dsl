@@ -38,6 +38,7 @@ enum Op {
 enum Cmd {
     New(EqOrExpr),
     Make(Vec<TreeIdx>, Expression),
+    Delete(Vec<TreeIdx>),
     Map(Op, Expression),
     Output(Vec<usize>),
 }
@@ -65,7 +66,13 @@ impl Cmd {
                     }
                 }
             }
-            (Cmd::Make(_, _), None) => Err(AlgebraDSLError::MakeNeedsExpression),
+            (Cmd::Make(_, _), None) => Err(AlgebraDSLError::NeedsExpression),
+            (Cmd::Delete(indices), Some(old_expr)) => {
+                let mut expr = old_expr.clone();
+                expr.delete(SiblingIndices::from_indices(indices.as_slice())?)?;
+                Ok(Return::EqOrExpr(expr))
+            },
+            (Cmd::Delete(_), None) => Err(AlgebraDSLError::NeedsExpression),
             (Cmd::Map(op, new_expr), Some(e)) => {
                 if let &EqOrExpr::Eq(ref e) = e {
                     let mut eq = e.clone();
@@ -107,10 +114,26 @@ fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
             let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
             let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
             indices.push(idx);
-            rest = &rest[(idx_end + 1)..];
+            rest = &rest[(idx_end + 1)..].trim();
         }
         let expr = Expression::from_str(rest)?;
         return Ok(Cmd::Make(indices, expr));
+    }
+    if s.starts_with("delete ") {
+        let mut indices = Vec::new();
+        let mut rest: &str = &s[7..].trim();
+        while rest.starts_with("#") {
+            let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
+            let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
+            indices.push(idx);
+            rest = &rest[(idx_end + 1)..].trim();
+        }
+        return if rest.trim().len() > 0 {
+            println!("Rest isn't empty, it's {}", rest);
+            Err(AlgebraDSLError::IllFormattedCommand)
+        } else  {
+            Ok(Cmd::Delete(indices))
+        }
     }
     if s.starts_with("output ") {
         let mut indices = Vec::new();
