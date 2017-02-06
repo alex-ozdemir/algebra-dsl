@@ -53,11 +53,10 @@ function createCM() {
     });
 }
 
-var socket = new WebSocket("ws://127.0.0.1:2794", "rust-websocket");
+var socket = new WebSocket("ws://" + location.hostname + ':2794', "rust-websocket");
 
 function sendToServer(cmBox) {
     currentCM.setOption('readOnly', true);
-    console.log("sending box, value is " + cmBox.getValue());
     socket.send(cmBox.getValue());
 }
 
@@ -82,31 +81,39 @@ socket.onmessage = function (event) {
 
     var fullDiv = document.createElement('div');
     fullDiv.className = 'output';
+    fullDiv.id = 'output'+formulaNum;
 
-    var checkbox = document.createElement('input');
-    checkbox.setAttribute('type', 'checkbox');
-
-    fullDiv.appendChild(checkbox);
-
-    var eqnDiv = document.createElement('div');
-    eqnDiv.id = 'formula'+formulaNum;
-    eqnDiv.className += ' output';
-    eqnDiv.innerHTML = rest;
-
-    fullDiv.appendChild(eqnDiv);
     document.getElementById('repl').appendChild(fullDiv);
 
     if (type === 'Math') {
-        eqnDiv.className += ' disable-highlight';
+        for (var i=0; i<formulaNum; i++) {
+            document.getElementById('output'+i).removeEventListener("click", clickMathCallback);
+        }
+
+        var checkbox = document.createElement('input');
+        checkbox.setAttribute('type', 'checkbox');
+
+        fullDiv.appendChild(checkbox);
+
+        var eqnDiv = document.createElement('div');
+        eqnDiv.id = 'formula'+formulaNum;
+        eqnDiv.className += ' output disable-highlight';
+        eqnDiv.innerHTML = rest;
+
+        fullDiv.appendChild(eqnDiv);
+
         // Handle Actual Formula
         MathJax.Hub.Queue(["Typeset", MathJax.Hub, eqnDiv.id]);
-        MathJax.Hub.Queue([onFinishTypesetting, eqnDiv.id]);
+        MathJax.Hub.Queue([onFinishTypesetting, fullDiv.id]);
     } else if (type === 'LaTeX') {
-        checkbox.disabled = true;
+
+        var CM = CodeMirror(fullDiv, {readOnly: 'nocursor'});
+
+        CM.setValue(rest);
         // moo
     } else if (type === 'Err') {
-        eqnDiv.className += ' algebra-dsl-error';
-        checkbox.disabled = true;
+        fullDiv.className += ' algebra-dsl-error';
+        fullDiv.innerHTML = rest;
     }
 
     createCM();
@@ -197,6 +204,43 @@ function mathTreeNodeNodeAbove(cur, topLevel) {
     return cur;
 }
 
+function clickMathCallback(event) {
+    // Remove the other highlighted stuff
+    if (curSelected !== null) {
+        curSelected.removeAttribute('selected');
+    }
+
+    var reset = false;
+    var closestAbove = mathTreeNodeNodeAbove(event.target, this);
+    if (closestAbove === null) {
+        reset = true;
+    } else {
+        var elementToHighlight = null;
+        if (closestAbove.id === lastClickedID) {
+            elementToHighlight = mathTreeNodeNodeAbove(
+                curSelected.parentNode,
+                this);
+        } else {
+            elementToHighlight = closestAbove;
+        }
+        if (elementToHighlight === null || elementToHighlight.tagName === 'math') {
+            reset = true;
+        } else {
+            elementToHighlight.setAttribute('selected', '0');
+
+            insertIntoCurrrentEquation(elementToHighlight);
+            lastClickedID = closestAbove.id;
+            curSelected = elementToHighlight;
+        }
+    }
+    if (reset) {
+        removeSelection();
+
+        lastClickedID = null;
+        curSelected = null;
+    }
+}
+
 function onFinishTypesetting(where) {
     var element = document.getElementById(where);
 
@@ -206,47 +250,12 @@ function onFinishTypesetting(where) {
         maths.item(0).remove();
     }
 
-
-    element.addEventListener("click", function(event) {
-        // Remove the other highlighted stuff
-        if (curSelected !== null) {
-            curSelected.removeAttribute('selected');
-        }
-
-        var reset = false;
-        var closestAbove = mathTreeNodeNodeAbove(event.target, element);
-        if (closestAbove === null) {
-            reset = true;
-        } else {
-            var elementToHighlight = null;
-            if (closestAbove.id === lastClickedID) {
-                elementToHighlight = mathTreeNodeNodeAbove(
-                    curSelected.parentNode,
-                    element);
-            } else {
-                elementToHighlight = closestAbove;
-            }
-            if (elementToHighlight === null || elementToHighlight.tagName === 'math') {
-                reset = true;
-            } else {
-                elementToHighlight.setAttribute('selected', '0');
-
-                insertIntoCurrrentEquation(elementToHighlight);
-                lastClickedID = closestAbove.id;
-                curSelected = elementToHighlight;
-            }
-        }
-        if (reset) {
-            removeSelection();
-
-            lastClickedID = null;
-            curSelected = null;
-        }
-    }, false);
+    element.addEventListener("click", clickMathCallback, false);
 
 }
 
 function sendOutputLatex() {
+
 
     var tosend = "output ";
 
@@ -265,6 +274,7 @@ function sendOutputLatex() {
         }
     }
 
-    console.log("In output latex, sending " + tosend);
-    socket.send(tosend);
+    currentCM.setValue(tosend);
+
+    sendToServer(currentCM);
 }

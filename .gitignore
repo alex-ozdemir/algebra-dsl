@@ -1,6 +1,5 @@
 **/.DS_Store
 .*.swp
 **/target
-server/static/index.html
 **/Cargo.lock
 **/*.bk

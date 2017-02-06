@@ -409,7 +409,7 @@ impl LatexWriter {
                 match self.0 {
                     &EqOrExpr::Eq(ref eq) => {
                         fmt_as_latex(&eq.left, f, 0)?;
-                        write!(f, " = ")?;
+                        write!(f, " &= ")?;
                         fmt_as_latex(&eq.right, f, 0)?;
                     },
                     &EqOrExpr::Ex(ref ex) => {
@@ -419,7 +419,7 @@ impl LatexWriter {
                 write!(f, " \\\\\n")
             }
         }
-        write!(self.0, "{}\n", DisplaysAsLatex(e))
+        write!(self.0, "{}", DisplaysAsLatex(e))
     }
 
     pub fn finish_str(mut self) -> Result<String, fmt::Error> {

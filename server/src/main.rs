@@ -17,8 +17,8 @@ use iron::mime;
 use staticfile::Static;
 use mount::Mount;
 
-use khwarizmi::{Expression, Equation, TreeIdx, AlgebraDSLError, Indexable,
-                SiblingIndices, EqOrExpr, LatexWriter};
+use khwarizmi::{Expression, Equation, TreeIdx, AlgebraDSLError, Indexable, SiblingIndices,
+                EqOrExpr, LatexWriter};
 
 // The HTTP server handler
 fn send_mainpage(_: &mut Request) -> IronResult<Response> {
@@ -43,8 +43,10 @@ enum Cmd {
 }
 
 impl Cmd {
-    fn execute(self, e: Option<&EqOrExpr>, history: &Vec<Option<EqOrExpr>>)
-            -> Result<Return, AlgebraDSLError> {
+    fn execute(self,
+               e: Option<&EqOrExpr>,
+               history: &Vec<Option<EqOrExpr>>)
+               -> Result<Return, AlgebraDSLError> {
         match (self, e) {
             (Cmd::New(e), _) => Ok(Return::EqOrExpr(e)),
             (Cmd::Make(mut indices, new_expr), Some(old_expr)) => {
@@ -62,7 +64,7 @@ impl Cmd {
                         Err(AlgebraDSLError::InvalidIdx)
                     }
                 }
-            },
+            }
             (Cmd::Make(_, _), None) => Err(AlgebraDSLError::MakeNeedsExpression),
             (Cmd::Map(op, new_expr), Some(e)) => {
                 if let &EqOrExpr::Eq(ref e) = e {
@@ -72,42 +74,24 @@ impl Cmd {
                         Op::Plus => eq.plus_to_both(new_expr),
                     }
                     Ok(Return::EqOrExpr(EqOrExpr::Eq(eq)))
-                } else { Err(AlgebraDSLError::MapExpression) }
-            },
+                } else {
+                    Err(AlgebraDSLError::MapExpression)
+                }
+            }
             (Cmd::Map(_, _), _) => Err(AlgebraDSLError::MapExpression),
             (Cmd::Output(math_idxs_to_output), _) => {
                 let mut latex_writer = LatexWriter::new();
                 for idx in math_idxs_to_output {
-                    let thiseq = &history[idx];
-                    let b = thiseq.as_ref().ok_or(AlgebraDSLError::InvalidIdx)?;
-                    let c = latex_writer.add_math(b);
-                    c.map_err(|_|AlgebraDSLError::InternalError)?;
-                    //latex_writer.add_math(&history[idx].as_ref().ok_or(AlgebraDSLError::InvalidIdx)?)
-                        //.map_err(|_|AlgebraDSLError::InternalError)?;
+                    latex_writer.add_math(history[idx].as_ref()
+                            .ok_or(AlgebraDSLError::InvalidIdx)?)
+                        .map_err(|_| AlgebraDSLError::InternalError)?;
                 }
                 Ok(Return::LaTeXStr(latex_writer.finish_str()
-                        .map_err(|_|AlgebraDSLError::InternalError)?))
+                    .map_err(|_| AlgebraDSLError::InternalError)?))
             }
         }
     }
 }
-
-//struct EqOrExprAsLatex<'a>(&'a EqOrExpr);
-//
-//impl EqOrExpr {
-//    fn disp_as_latex(&self) -> EqOrExprAsLatex {
-//        EqOrExprAsLatex(self)
-//    }
-//}
-//
-//impl<'a> fmt::Display for EqOrExprAsLatex<'a> {
-//    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//        match self.0 {
-//            &EqOrExpr::Eq(ref eq) => write!(f, "{}", eq),
-//            &EqOrExpr::Ex(ref ex) => write!(f, "{}", ex),
-//        }
-//    }
-//}
 
 enum Return {
     EqOrExpr(EqOrExpr),
@@ -136,10 +120,9 @@ fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
             if let Some(comma_idx) = rest.find(',') {
                 indices.push(usize::from_str(&rest[..comma_idx])
                              .map_err(|_|AlgebraDSLError::InvalidIdx)?);
-                rest = rest[comma_idx+1..].trim();
+                rest = rest[comma_idx + 1..].trim();
             } else {
-                indices.push(usize::from_str(rest)
-                             .map_err(|_|AlgebraDSLError::InvalidIdx)?);
+                indices.push(usize::from_str(rest).map_err(|_| AlgebraDSLError::InvalidIdx)?);
                 break;
             }
         }
@@ -201,7 +184,7 @@ fn main() {
             let (mut sender, mut receiver) = client.split();
 
             let mut formula_num = 0;
-            let mut history : Vec<Option<EqOrExpr>> = vec![];
+            let mut history: Vec<Option<EqOrExpr>> = vec![];
             for message in receiver.incoming_messages() {
                 let message: Message = message.unwrap();
 
@@ -219,8 +202,14 @@ fn main() {
                         let string = std::str::from_utf8(&*message.payload).unwrap();
                         println!("Received {}", string);
                         let output = match parse_cmd(string) {
-                            Ok(cmd) =>
-                                cmd.execute(history.last().and_then(|x|x.as_ref()), &history),
+                            Ok(cmd) => {
+                                cmd.execute(history.iter()
+                                                .rev()
+                                                .filter(|ref x| x.is_some())
+                                                .next()
+                                                .and_then(Option::as_ref),
+                                            &history)
+                            }
                             Err(e) => Err(e),
                         };
                         let msg = match output {
@@ -228,9 +217,15 @@ fn main() {
                                 let s = format!("{}@Math@{}", formula_num, e);
                                 history.push(Some(e));
                                 s
-                            },
-                            Ok(Return::LaTeXStr(s)) => format!("{}@LaTeX@{}", formula_num, s),
-                            Err(e) => format!("{}@Err@Error: {:?}", formula_num, e),
+                            }
+                            Ok(Return::LaTeXStr(s)) => {
+                                history.push(None);
+                                format!("{}@LaTeX@{}", formula_num, s)
+                            }
+                            Err(e) => {
+                                history.push(None);
+                                format!("{}@Err@Error: {:?}", formula_num, e)
+                            }
                         };
 
                         formula_num += 1;
