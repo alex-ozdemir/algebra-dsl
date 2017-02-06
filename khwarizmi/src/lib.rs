@@ -93,10 +93,17 @@ impl Equation {
         self.left = mem::replace(&mut self.left, NULL_EXPRESSION).inflate_addition(expr.clone());
         self.right = mem::replace(&mut self.right, NULL_EXPRESSION).inflate_addition(expr);
     }
+    pub fn minus_to_both(&mut self, expr: Expression) {
+        self.plus_to_both(Expression::Negation(box expr))
+    }
     pub fn times_to_both(&mut self, expr: Expression) {
         self.left = mem::replace(&mut self.left, NULL_EXPRESSION)
             .inflate_multiplication(expr.clone());
         self.right = mem::replace(&mut self.right, NULL_EXPRESSION).inflate_multiplication(expr);
+    }
+    pub fn div_to_both(&mut self, expr: Expression) {
+        self.left = mem::replace(&mut self.left, NULL_EXPRESSION).inflate_division(expr.clone());
+        self.right = mem::replace(&mut self.right, NULL_EXPRESSION).inflate_division(expr);
     }
 }
 
@@ -262,6 +269,10 @@ impl Expression {
             }
             not_prod => Expression::Product(vec![not_prod, expr]),
         }
+    }
+    // TODO: Defaults
+    pub fn inflate_division(self, expr: Expression) -> Self {
+        Expression::Division(box self, box expr)
     }
 }
 

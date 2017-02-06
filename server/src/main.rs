@@ -32,6 +32,8 @@ fn send_mainpage(_: &mut Request) -> IronResult<Response> {
 enum Op {
     Plus,
     Times,
+    Div,
+    Minus,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -79,6 +81,8 @@ impl Cmd {
                     match op {
                         Op::Times => eq.times_to_both(new_expr),
                         Op::Plus => eq.plus_to_both(new_expr),
+                        Op::Div => eq.div_to_both(new_expr),
+                        Op::Minus => eq.minus_to_both(new_expr),
                     }
                     Ok(Return::EqOrExpr(EqOrExpr::Eq(eq)))
                 } else {
@@ -155,6 +159,16 @@ fn parse_cmd(s: &str) -> Result<Cmd, AlgebraDSLError> {
         let rest = &s[1..].trim();
         let expr = Expression::from_str(rest)?;
         return Ok(Cmd::Map(Op::Plus, expr));
+    }
+    if s.starts_with("-") {
+        let rest = &s[1..].trim();
+        let expr = Expression::from_str(rest)?;
+        return Ok(Cmd::Map(Op::Minus, expr));
+    }
+    if s.starts_with("/") {
+        let rest = &s[1..].trim();
+        let expr = Expression::from_str(rest)?;
+        return Ok(Cmd::Map(Op::Div, expr));
     }
     if s.starts_with("*") {
         let rest = &s[1..].trim();
