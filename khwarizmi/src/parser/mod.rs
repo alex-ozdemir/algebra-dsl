@@ -3,168 +3,12 @@
 //! We then convert those into `Expression`s
 
 pub mod latex;
+pub mod mac;
 use self::latex::{Token, Special};
+use std::num;
+use std::str::FromStr;
 use {Equation, Expression, Symbol, Atom, StandaloneSymbol, OperatorSymbol};
-
-
-/// The Control Sequences that our system handles. A small set of macros along with a *bunch* of
-/// symbols.
-#[allow(non_camel_case_types)]
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub enum KnownCS {
-    // TODO: Greek letters
-    frac,
-    dfrac,
-    sqrt,
-    cdot,
-    times,
-    div,
-    Preserved(Symbol),
-}
-
-impl KnownCS {
-    fn from_str(s: &str) -> Option<KnownCS> {
-        match s {
-            "frac" => Some(KnownCS::frac),
-            "dfrac" => Some(KnownCS::dfrac),
-            "cdot" => Some(KnownCS::cdot),
-            "times" => Some(KnownCS::times),
-            "sqrt" => Some(KnownCS::sqrt),
-            "div" => Some(KnownCS::div),
-            s => Symbol::from_str(s).map(KnownCS::Preserved),
-        }
-    }
-}
-
-
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub enum Operator {
-    Times,
-    Plus,
-    Minus,
-    Neg,
-    Div,
-    Underscore,
-    Caret,
-    LGroup,
-    RGroup,
-    /// Used only within the Operator Parser. Indicates beginning of expression
-    Begin,
-    /// Used only within the Operator Parser. Indicates end of expression
-    End,
-}
-
-impl Operator {
-    fn left_precedence(&self) -> u8 {
-        use self::Operator::*;
-        match *self {
-            Begin => panic!("We should never look left of Begin"),
-            End => u8::min_value(),
-            RGroup => u8::min_value() + 1,
-            Plus | Minus => 15,
-            Times | Div => 25,
-            Neg => 35,
-            Caret => 45,
-            Underscore => 55,
-            LGroup => u8::max_value() - 1,
-        }
-    }
-    fn right_precedence(&self) -> u8 {
-        use self::Operator::*;
-        match *self {
-            Begin => u8::min_value(),
-            End => panic!("We should never look right of End"),
-            LGroup => u8::min_value() + 1,
-            Plus | Minus => 16,
-            Times | Div => 26,
-            Neg => 34,
-            Caret => 44,
-            Underscore => 54,
-            RGroup => u8::max_value() - 1,
-        }
-    }
-    fn arity(&self) -> Option<u8> {
-        use self::Operator::*;
-        match *self {
-            Begin | End | LGroup | RGroup => None,
-            Plus | Minus | Times | Div | Caret | Underscore => Some(2),
-            Neg => Some(1),
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub enum PostMac {
-    Frac(Box<PostMac>, Box<PostMac>),
-    Sqrt(Box<PostMac>),
-    List(Vec<PostMac>),
-    Standalone(StandaloneSymbol),
-    Op(UniOp),
-    Char(char),
-    Natural(u64),
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub enum UniOp {
-    Std(Operator),
-    LimitOp(OperatorSymbol, Option<Box<PostMac>>, Option<Box<PostMac>>),
-}
-
-impl UniOp {
-    fn arity(&self) -> Option<u8> {
-        match self {
-            &UniOp::Std(op) => op.arity(),
-            &UniOp::LimitOp(_, _, _) => Some(1),
-        }
-    }
-    fn left_precedence(&self) -> u8 {
-        match self {
-            &UniOp::Std(op) => op.left_precedence(),
-            &UniOp::LimitOp(_, _, _) => 20,
-        }
-    }
-    fn right_precedence(&self) -> u8 {
-        match self {
-            &UniOp::Std(op) => op.right_precedence(),
-            &UniOp::LimitOp(_, _, _) => 19,
-        }
-    }
-}
-
-impl PostMac {
-    /// Return whether there should be an operator after this type of LaTeX construct.
-    fn expects_op_after(&self) -> bool {
-        match self {
-            &PostMac::List(ref list) => list.last().expect("No empty lists!").expects_op_after(),
-            &PostMac::Frac(_, _) => true,
-            &PostMac::Sqrt(_) => true,
-            &PostMac::Op(UniOp::Std(Operator::RGroup)) => true,
-            &PostMac::Standalone(_) => true,
-            &PostMac::Op(_) => false,
-            &PostMac::Char(_) => true,
-            &PostMac::Natural(_) => true,
-        }
-    }
-    /// Return whether there should be an operator before this type of LaTeX construct.
-    fn expects_op_before(&self) -> bool {
-        match self {
-            &PostMac::Frac(_, _) => true,
-            &PostMac::Sqrt(_) => true,
-            &PostMac::List(ref list) => list.first().expect("No empty lists!").expects_op_before(),
-            &PostMac::Op(UniOp::Std(Operator::LGroup)) => true,
-            &PostMac::Op(_) => false,
-            &PostMac::Standalone(_) => true,
-            &PostMac::Char(_) => true,
-            &PostMac::Natural(_) => true,
-        }
-    }
-    fn as_natural(&self) -> u64 {
-        match self {
-            &PostMac::Natural(n) => n,
-            _ => panic!("Called `as_natural` on a non-natural"),
-        }
-    }
-}
+use self::mac::{PostMac, UniOp, Operator, KnownCS, Numeric};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
@@ -180,126 +24,10 @@ pub enum ParseError {
     DoubleUnderscore,
     UnmatchGrouping(UniOp),
     DoubleCaret,
-}
-
-pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
-    match input {
-        Token::Special(Special::Star) => Ok(PostMac::Op(UniOp::Std(Operator::Times))),
-        Token::Special(Special::LParen) => Ok(PostMac::Op(UniOp::Std(Operator::LGroup))),
-        Token::Special(Special::RParen) => Ok(PostMac::Op(UniOp::Std(Operator::RGroup))),
-        Token::Special(Special::Plus) => Ok(PostMac::Op(UniOp::Std(Operator::Plus))),
-        Token::Special(Special::LSquareBracket) => Ok(PostMac::Op(UniOp::Std(Operator::LGroup))),
-        Token::Special(Special::RSquareBracket) => Ok(PostMac::Op(UniOp::Std(Operator::RGroup))),
-        Token::Special(Special::Dash) => Ok(PostMac::Op(UniOp::Std(Operator::Minus))),
-        Token::Special(Special::Divide) => Ok(PostMac::Op(UniOp::Std(Operator::Div))),
-        Token::Special(Special::Caret) => Ok(PostMac::Op(UniOp::Std(Operator::Caret))),
-        Token::Special(Special::Underscore) => Ok(PostMac::Op(UniOp::Std(Operator::Underscore))),
-        Token::Special(x) => Err(ParseError::UnknownSpecialChar(x)),
-        Token::Char(c) if c.is_alphabetic() => Ok(PostMac::Char(c)),
-        Token::Char(c) if c.is_numeric() => Ok(PostMac::Natural(c.to_digit(10).unwrap() as u64)),
-        Token::Char(c) => panic!("Unimplmented character `{}'", c),
-        Token::ControlSequence(cs) => {
-            let known_cs =
-                KnownCS::from_str(cs.as_str()).ok_or(ParseError::UnknownControlSequence(cs))?;
-            match known_cs {
-                KnownCS::div => Ok(PostMac::Op(UniOp::Std(Operator::Div))),
-                KnownCS::cdot | KnownCS::times => Ok(PostMac::Op(UniOp::Std(Operator::Times))),
-                KnownCS::Preserved(Symbol::Standalone(sym)) => Ok(PostMac::Standalone(sym)),
-                KnownCS::Preserved(Symbol::Operator(sym)) => {
-                    Ok(PostMac::Op(UniOp::LimitOp(sym, None, None)))
-                }
-                x => Err(ParseError::LoneControlSequence(x)),
-            }
-        }
-        Token::List(mut list) => {
-            list.reverse();
-            let mut result_list = vec![];
-            while let Some(next) = list.pop() {
-                let mut next = match to_known(next) {
-                    Err(ParseError::LoneControlSequence(KnownCS::dfrac)) |
-                    Err(ParseError::LoneControlSequence(KnownCS::frac)) => {
-                        let (first, second) = two_expressions(&mut list)?;
-                        PostMac::Frac(box first, box second)
-                    }
-                    Err(ParseError::LoneControlSequence(KnownCS::sqrt)) => {
-                        let argument = one_expression(&mut list)?;
-                        PostMac::Sqrt(box argument)
-                    }
-                    e @ Err(_) => return e,
-                    Ok(underscore @ PostMac::Op(UniOp::Std(Operator::Underscore))) => {
-                        let last = result_list.pop();
-                        if let Some(PostMac::Op(UniOp::LimitOp(op, l, u))) = last {
-                            if l.is_some() {
-                                return Err(ParseError::DoubleUnderscore);
-                            }
-                            let argument = one_expression(&mut list)?;
-                            PostMac::Op(UniOp::LimitOp(op, Some(box argument), u))
-                        } else {
-                            last.map(|l| result_list.push(l));
-                            underscore
-                        }
-                    }
-                    Ok(caret @ PostMac::Op(UniOp::Std(Operator::Caret))) => {
-                        let last = result_list.pop();
-                        if let Some(PostMac::Op(UniOp::LimitOp(op, l, u))) = last {
-                            if u.is_some() {
-                                return Err(ParseError::DoubleCaret);
-                            }
-                            let argument = one_expression(&mut list)?;
-                            PostMac::Op(UniOp::LimitOp(op, l, Some(box argument)))
-                        } else {
-                            last.map(|l| result_list.push(l));
-                            caret
-                        }
-                    }
-                    Ok(x) => x,
-                };
-
-                // If there are two adjacent 'natural number' tokens, merge them
-                let two_nats = if let (Some(&PostMac::Natural(_)), &PostMac::Natural(_)) =
-                    (result_list.last(), &next) {
-                    true
-                } else {
-                    false
-                };
-                if two_nats {
-                    let last = result_list.pop().unwrap().as_natural();
-                    let this = next.as_natural();
-                    result_list.push(PostMac::Natural(last * 10 + this));
-                } else {
-
-                    // Potentially insert multiplication
-                    let op_expected = result_list.last()
-                        .map(PostMac::expects_op_after)
-                        .unwrap_or(false);
-                    let implicit_times = op_expected && next.expects_op_before();
-                    if implicit_times {
-                        result_list.push(PostMac::Op(UniOp::Std(Operator::Times)));
-                    }
-                    if next == PostMac::Op(UniOp::Std(Operator::Minus)) && !op_expected {
-                        next = PostMac::Op(UniOp::Std(Operator::Neg));
-                    }
-                    result_list.push(next);
-                }
-            }
-            match result_list.len() {
-                0 => Err(ParseError::EmptyList),
-                1 => Ok(result_list.pop().unwrap()),
-                _ => Ok(PostMac::List(result_list)),
-            }
-        }
-    }
-}
-
-fn one_expression(input: &mut Vec<latex::Token>) -> Result<PostMac, ParseError> {
-    let first = to_known(input.pop().ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
-    Ok(first)
-}
-
-fn two_expressions(input: &mut Vec<latex::Token>) -> Result<(PostMac, PostMac), ParseError> {
-    let first = to_known(input.pop().ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
-    let second = to_known(input.pop().ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
-    Ok((first, second))
+    UnimplementedCharacter(char),
+    DoubleDecimalPoint,
+    InvalidNumericLiteral,
+    FPError(num::ParseFloatError),
 }
 
 fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
@@ -310,12 +38,22 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
         }
         PostMac::Char(c) => Ok(Expression::Atom(Atom::PlainVariable(c))),
         PostMac::Standalone(sym) => Ok(Expression::Atom(Atom::Symbol(Symbol::Standalone(sym)))),
-        PostMac::Natural(c) => Ok(Expression::Atom(Atom::Natural(c))),
         PostMac::Op(o) => Err(ParseError::LoneOperator(o)),
         PostMac::Frac(top, bottom) => {
             let parsed_top = parse_operators(*top)?;
             let parsed_bottom = parse_operators(*bottom)?;
             Ok(Expression::Division(box parsed_top, box parsed_bottom))
+        }
+        PostMac::Num(Numeric(natural, None)) =>
+            i64::from_str_radix(natural.as_str(), 10).ok()
+                                                     .ok_or(ParseError::InvalidNumericLiteral)
+                                                     .map(Atom::Natural)
+                                                     .map(Expression::Atom),
+        PostMac::Num(Numeric(natural, Some(dec))) => {
+            let s = format!("{}.{}", natural, dec);
+            f64::from_str(s.as_str()).map_err(|e| ParseError::FPError(e))
+                                     .map(Atom::Floating)
+                                     .map(Expression::Atom)
         }
         PostMac::List(mut tokens) => {
             let mut operator_stack = vec![UniOp::Std(Operator::Begin)];
@@ -447,7 +185,7 @@ pub fn parse_equation(input: &str) -> Result<Equation, ParseError> {
 pub fn parse_expr(input: &str) -> Result<Expression, ParseError> {
     let latex_tokens = latex::parse_tokens(input).map_err(ParseError::LatexError)?;
     println!("{:#?}", latex_tokens);
-    let expanded = to_known(latex_tokens)?;
+    let expanded = mac::to_known(latex_tokens)?;
     println!("{:#?}", expanded);
     parse_operators(expanded)
 }

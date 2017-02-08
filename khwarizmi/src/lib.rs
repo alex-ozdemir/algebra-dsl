@@ -274,6 +274,97 @@ impl Expression {
     pub fn inflate_division(self, expr: Expression) -> Self {
         Expression::Division(box self, box expr)
     }
+    pub fn simplify_constants(self) -> Self {
+        use Expression as Ex;
+        match self {
+            Ex::Negation(box expr) => {
+                match expr.simplify_constants() {
+                    Ex::Atom(Atom::Natural(n)) => Ex::Atom(Atom::Natural(-n)),
+                    Ex::Atom(Atom::Floating(n)) => Ex::Atom(Atom::Floating(-n)),
+                    e => Ex::Negation(box e),
+                }
+            }
+            Ex::Sum(exprs) => {
+                let mut f_acc = 0.0;
+                let mut n_acc = 0;
+                let mut new_exprs = vec![];
+                for ex in exprs.into_iter().map(Ex::simplify_constants) {
+                    match ex {
+                        Ex::Atom(Atom::Natural(n)) => n_acc += n,
+                        Ex::Atom(Atom::Floating(f)) => f_acc += f,
+                        e => new_exprs.push(e),
+                    }
+                }
+                if f_acc != 0. {
+                    new_exprs.push(Ex::Atom(Atom::Floating(f_acc + n_acc as f64)));
+                } else {
+                    if n_acc != 0 {
+                        new_exprs.push(Ex::Atom(Atom::Natural(n_acc)));
+                    }
+                }
+                if new_exprs.len() == 1 {
+                    new_exprs.pop().unwrap()
+                } else {
+                    Ex::Sum(new_exprs)
+                }
+            }
+            Ex::Product(exprs) => {
+                let mut f_acc = 1.0;
+                let mut n_acc = 1;
+                let mut new_exprs = vec![];
+                for ex in exprs.into_iter().map(Ex::simplify_constants) {
+                    match ex {
+                        Ex::Atom(Atom::Natural(n)) => n_acc *= n,
+                        Ex::Atom(Atom::Floating(f)) => f_acc *= f,
+                        e => new_exprs.push(e),
+                    }
+                }
+                if f_acc != 1. {
+                    new_exprs.push(Ex::Atom(Atom::Floating(f_acc * n_acc as f64)));
+                } else {
+                    if n_acc != 1 {
+                        new_exprs.push(Ex::Atom(Atom::Natural(n_acc)));
+                    }
+                }
+                if new_exprs.len() == 1 {
+                    new_exprs.pop().unwrap()
+                } else {
+                    Ex::Product(new_exprs)
+                }
+            }
+            Ex::Division(box top, box bottom) => {
+                let t = top.simplify_constants();
+                let b = bottom.simplify_constants();
+                match (t, b) {
+                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Floating(f2))) => Ex::Atom(Atom::Floating(f / f2)),
+                    (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Floating(f))) => Ex::Atom(Atom::Floating(n as f64 / f)),
+                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Natural(n))) => Ex::Atom(Atom::Floating(f / n as f64)),
+                    (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Natural(n2))) => {
+                        if n % n2 == 0 {
+                            Ex::Atom(Atom::Natural(n / n2))
+                        } else {
+                            Ex::Atom(Atom::Floating(n as f64 + n2 as f64))
+                        }
+                    },
+                    (e1, e2) => Ex::Division(box e1, box e2),
+
+                }
+            }
+//            Ex::Power(box base, box exp) => {
+//                let b = base.simplify_constants();
+//                let e = exp.simplify_constants();
+//                match (b, e) {
+//                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Floating(f2))) => Ex::Atom(Atom::Floating(f + f2)),
+//                    (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Floating(f))) => Ex::Atom(Atom::Floating(f + n as f64)),
+//                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Natural(n))) => Ex::Atom(Atom::Floating(f + n as f64)),
+//                    (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Natural(n2))) => Ex::Atom(Atom::Natural(n + n2)),
+//                    (e1, e2) => Ex::Division(box e1, box e2),
+//
+//                }
+//            }
+            e => e
+        }
+    }
 }
 
 impl Indexable for Expression {
@@ -686,7 +777,7 @@ fn fmt_as_latex(expr: &Expression, f: &mut fmt::Formatter, prev_precedence: u8)
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Atom {
     PlainVariable(char),
-    Natural(u64),
+    Natural(i64),
     Floating(f64),
     Symbol(Symbol),
 }
@@ -1116,9 +1207,10 @@ mod tests {
         let expr = Ex::Division(box Ex::Atom(Atom::PlainVariable('x')),
                                 box Ex::Atom(Atom::PlainVariable('y')));
         let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                        mathTreeNode=\"0\"><mfrac><mrow \
+                        mathTreeNode=\"0\"><mo form=\"prefix\">(</mo><mfrac><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
-                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></mfrac></mrow></math>";
+                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></mfrac>\
+                        <mo form=\"postfix\">)</mo></mrow></math>";
         let test = format!("{}", expr);
         assert_expected_eq_actual!(expected, test);
     }
@@ -1138,9 +1230,10 @@ mod tests {
         let expr = Ex::Subscript(box Ex::Atom(Atom::PlainVariable('x')),
                                  box Ex::Atom(Atom::PlainVariable('y')));
         let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                        mathTreeNode=\"0\"><msub><mrow \
+                        mathTreeNode=\"0\"><mo form=\"prefix\">(</mo><msub><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
-                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></msub></mrow></math>";
+                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></msub><mo \
+                        form=\"postfix\">)</mo></mrow></math>";
         let test = format!("{}", expr);
         assert_expected_eq_actual!(expected, test);
     }
@@ -1179,7 +1272,7 @@ mod tests {
                                           Ex::Atom(Atom::Natural(4)),
                                           Ex::Atom(Atom::PlainVariable('x')),
                                           Ex::Atom(Atom::Natural(7))]);
-        let index_strings = vec!["#(0,0)", "#(0,1)", "#(0,3)"];
+        let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
         let after =
             Ex::Product(vec![Ex::Atom(Atom::Natural(84)), Ex::Atom(Atom::PlainVariable('x'))]);
         let indices: Vec<_> =
@@ -1197,13 +1290,57 @@ mod tests {
                                           Ex::Atom(Atom::Natural(4)),
                                           Ex::Atom(Atom::PlainVariable('x')),
                                           Ex::Atom(Atom::Natural(7))]);
-        let idx = TreeIdx::from_str("#(0,1)").unwrap();
+        let v = vec![TreeIdx::from_str("#(mtn:0,1)").unwrap()];
+        let idx = SiblingIndices::from_indices(&v).unwrap();
         let after = Ex::Product(vec![Ex::Atom(Atom::Natural(3)),
                                      Ex::Atom(Atom::PlainVariable('x')),
                                      Ex::Atom(Atom::Natural(7))]);
-        before.delete(&idx).unwrap();
+        before.delete(idx).unwrap();
         assert_expected_eq_actual!(after, before);
     }
 
+    #[test]
+    fn simplify_product() {
+        let before = Ex::Product(vec![Ex::Atom(Atom::Natural(3)),
+                                      Ex::Atom(Atom::Natural(4)),
+                                      Ex::Atom(Atom::Natural(7))]);
+        let after = Ex::Atom(Atom::Natural(84));
+        assert_expected_eq_actual!(after, before.simplify_constants());
+
+        let before = Ex::Product(vec![Ex::Atom(Atom::Natural(3)),
+                                      Ex::Atom(Atom::Floating(4.0)),
+                                      Ex::Atom(Atom::Natural(7))]);
+        let after = Ex::Atom(Atom::Floating(84.0));
+        assert_expected_eq_actual!(after, before.simplify_constants());
+    }
+
+    #[test]
+    fn simplify_sum() {
+        let before = Ex::Sum(vec![Ex::Atom(Atom::Natural(3)),
+                                  Ex::Atom(Atom::Natural(4)),
+                                  Ex::Atom(Atom::Natural(7))]);
+        let after = Ex::Atom(Atom::Natural(14));
+        assert_expected_eq_actual!(after, before.simplify_constants());
+
+        let before = Ex::Sum(vec![Ex::Atom(Atom::Natural(3)),
+                                  Ex::Atom(Atom::Floating(4.0)),
+                                  Ex::Atom(Atom::Natural(7))]);
+        let after = Ex::Atom(Atom::Floating(14.0));
+        assert_expected_eq_actual!(after, before.simplify_constants());
+    }
+
+    #[test]
+    fn simplify_division() {
+        let before = Ex::Division(box Ex::Atom(Atom::Natural(8)),
+                                  box Ex::Atom(Atom::Natural(4)));
+        let after = Ex::Atom(Atom::Natural(2));
+        assert_expected_eq_actual!(after, before.simplify_constants());
+
+        let before = Ex::Division(box Ex::Atom(Atom::Floating(8.)),
+                                  box Ex::Atom(Atom::Floating(4.)));
+        let after = Ex::Atom(Atom::Floating(2.));
+        assert_expected_eq_actual!(after, before.simplify_constants());
+
+    }
 }
 

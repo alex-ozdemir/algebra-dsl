@@ -242,6 +242,24 @@ fn powers_and_fracs() {
 }
 
 #[test]
+fn float() {
+    let expected = Ex::Atom(Atom::Floating(5.1));
+    assert_expected_eq_actual!(Ok(expected), parse_expr("5.1"));
+}
+
+#[test]
+fn float_no_natural() {
+    let expected = Ex::Atom(Atom::Floating(0.1));
+    assert_expected_eq_actual!(Ok(expected), parse_expr(".1"));
+}
+
+#[test]
+fn float_no_dec() {
+    let expected = Ex::Atom(Atom::Floating(5.));
+    assert_expected_eq_actual!(Ok(expected), parse_expr("5."));
+}
+
+#[test]
 fn error_on_unmatch() {
     let expected = Err(ParseError::UnmatchGrouping(UniOp::Std(Operator::LGroup)));
     assert_expected_eq_actual!(expected, parse_expr("( a"));
