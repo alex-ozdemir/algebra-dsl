@@ -56,7 +56,8 @@ function createCM() {
 var socket = new WebSocket("ws://" + location.hostname + ':2794', "rust-websocket");
 
 function sendToServer(cmBox) {
-    currentCM.setOption('readOnly', 'nocursor');
+    currentCM.setOption('readOnly', true);
+    currentCM.setOption('cursorBlinkRate', -1);
     socket.send(cmBox.getValue());
 }
 
@@ -106,8 +107,7 @@ socket.onmessage = function (event) {
         MathJax.Hub.Queue(["Typeset", MathJax.Hub, eqnDiv.id]);
         MathJax.Hub.Queue([onFinishTypesetting, fullDiv.id]);
     } else if (type === 'LaTeX') {
-
-        var CM = CodeMirror(fullDiv, {readOnly: 'nocursor'});
+        var CM = CodeMirror(fullDiv, {readOnly: true, cursorBlinkRate: -1});
 
         CM.setValue(rest);
         // moo
