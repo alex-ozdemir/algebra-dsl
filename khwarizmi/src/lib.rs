@@ -27,7 +27,7 @@ impl TreeIdx {
             let mut idxs = s.split(',')
                 .map(|d| usize::from_str(d).map_err(|_| AlgebraDSLError::IllFormattedIndex));
             // Pop the first index, because every expression/equation is in the trivial 0 idx
-            debug_assert!(Some(Ok(0)) == idxs.next());
+            assert!(Some(Ok(0)) == idxs.next());
             let mut v = vec![];
             for idx in idxs {
                 v.push(idx?);
