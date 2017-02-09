@@ -1,3 +1,5 @@
+"use strict";
+
 MathJax.Hub.Config({
     showMathMenu: false,
     ShowMathMenuMSIE: false,
@@ -80,40 +82,66 @@ socket.onmessage = function (event) {
     var type = rest.substr(0, atIdx);
     var rest = rest.substr(atIdx+1);
 
+    if (type === 'LaTeX') {
+        var CM = CodeMirror(document.getElementById('repl'),
+                            {readOnly: true, cursorBlinkRate: -1});
+
+        CM.setValue(rest);
+    } else if (type === 'Err') {
+        var errDiv = document.createElement('div');
+        errDiv.className = 'output';
+
+        errDiv.className += ' algebra-dsl-error';
+        errDiv.innerHTML = rest;
+        document.getElementById('repl').appendChild(errDiv);
+    }
+
     var fullDiv = document.createElement('div');
-    fullDiv.className = 'output';
-    fullDiv.id = 'output'+formulaNum;
+    fullDiv.className = 'output math-output';
+    fullDiv.id = 'mathout'+formulaNum;
 
     document.getElementById('repl').appendChild(fullDiv);
 
+    if (formulaNum > 0) {
+        document.getElementById('mathout'+(formulaNum-1))
+                    .removeEventListener("click", clickMathCallback);
+    }
+
+    var checkbox = document.createElement('input');
+    checkbox.setAttribute('type', 'checkbox');
+    //checkbox.style = "float: left;";
+
+    fullDiv.appendChild(checkbox);
+
     if (type === 'Math') {
-        for (var i=0; i<formulaNum; i++) {
-            document.getElementById('output'+i).removeEventListener("click", clickMathCallback);
-        }
+        var mathBox = document.createElement('span');
+        mathBox.id = 'formula'+formulaNum;
+        mathBox.className += ' output disable-highlight';
 
-        var checkbox = document.createElement('input');
-        checkbox.setAttribute('type', 'checkbox');
+        mathBox.innerHTML = rest;
 
-        fullDiv.appendChild(checkbox);
+        fullDiv.className += ' new-math-output';
 
-        var eqnDiv = document.createElement('div');
-        eqnDiv.id = 'formula'+formulaNum;
-        eqnDiv.className += ' output disable-highlight';
-        eqnDiv.innerHTML = rest;
+        checkbox.checked = true;
 
-        fullDiv.appendChild(eqnDiv);
+        fullDiv.appendChild(mathBox);
 
         // Handle Actual Formula
-        MathJax.Hub.Queue(["Typeset", MathJax.Hub, eqnDiv.id]);
+        MathJax.Hub.Queue(["Typeset", MathJax.Hub, mathBox.id]);
         MathJax.Hub.Queue([onFinishTypesetting, fullDiv.id]);
-    } else if (type === 'LaTeX') {
-        var CM = CodeMirror(fullDiv, {readOnly: true, cursorBlinkRate: -1});
+    } else {
+        var mathBox = document.getElementById('mathout'+(formulaNum-1))
+                              .childNodes[1]
+                              .cloneNode(true);
+        var subNodes = mathBox.getElementsByTagName('*');
 
-        CM.setValue(rest);
-        // moo
-    } else if (type === 'Err') {
-        fullDiv.className += ' algebra-dsl-error';
-        fullDiv.innerHTML = rest;
+        for (var i=0; i<subNodes.length; i++) {
+            subNodes[i].removeAttribute('selected');
+            subNodes[i].removeAttribute('highlighted');
+        }
+
+        fullDiv.appendChild(mathBox);
+        mathBox.addEventListener("click", clickMathCallback, false);
     }
 
     createCM();
@@ -260,16 +288,21 @@ function sendOutputLatex() {
     var tosend = "output ";
 
     var cns = document.getElementById('repl').childNodes;
-    var first = true;
+
+    var firstPrint = true;
+    var eqnIdx = -1;
     for (var i=0; i<cns.length; i++) {
-        if (cns[i].className == 'output') {
+        if (cns[i].classList.contains('new-math-output')) {
+            eqnIdx++;
+        }
+        if (cns[i].classList.contains('math-output')) {
             var checkbox = cns[i].childNodes[0];
             if (checkbox.checked) {
-                if (!first) {
+                if (!firstPrint) {
                     tosend += ', ';
                 }
-                tosend += '' + Math.floor(i/2);
-                first = false;
+                tosend += '' + eqnIdx;
+                firstPrint = false;
             }
         }
     }

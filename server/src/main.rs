@@ -48,7 +48,7 @@ enum Cmd {
 impl Cmd {
     fn execute(self,
                e: Option<&EqOrExpr>,
-               history: &Vec<Option<EqOrExpr>>)
+               history: &Vec<EqOrExpr>)
                -> Result<Return, AlgebraDSLError> {
         match (self, e) {
             (Cmd::New(e), _) => Ok(Return::EqOrExpr(e)),
@@ -93,7 +93,7 @@ impl Cmd {
             (Cmd::Output(math_idxs_to_output), _) => {
                 let mut latex_writer = LatexWriter::new();
                 for idx in math_idxs_to_output {
-                    latex_writer.add_math(history[idx].as_ref()
+                    latex_writer.add_math(history.get(idx)
                             .ok_or(AlgebraDSLError::InvalidIdx)?)
                         .map_err(|_| AlgebraDSLError::InternalError)?;
                 }
@@ -219,7 +219,7 @@ fn main() {
             let (mut sender, mut receiver) = client.split();
 
             let mut formula_num = 0;
-            let mut history: Vec<Option<EqOrExpr>> = vec![];
+            let mut history: Vec<EqOrExpr> = vec![];
             for message in receiver.incoming_messages() {
                 let message: Message = message.unwrap();
 
@@ -238,11 +238,7 @@ fn main() {
                         println!("Received {}", string);
                         let output = match parse_cmd(string) {
                             Ok(cmd) => {
-                                cmd.execute(history.iter()
-                                                .rev()
-                                                .filter(|ref x| x.is_some())
-                                                .next()
-                                                .and_then(Option::as_ref),
+                                cmd.execute(history.last(),
                                             &history)
                             }
                             Err(e) => Err(e),
@@ -250,15 +246,13 @@ fn main() {
                         let msg = match output {
                             Ok(Return::EqOrExpr(e)) => {
                                 let s = format!("{}@Math@{}", formula_num, e);
-                                history.push(Some(e));
+                                history.push(e);
                                 s
                             }
                             Ok(Return::LaTeXStr(s)) => {
-                                history.push(None);
                                 format!("{}@LaTeX@{}", formula_num, s)
                             }
                             Err(e) => {
-                                history.push(None);
                                 format!("{}@Err@Error: {:?}", formula_num, e)
                             }
                         };
