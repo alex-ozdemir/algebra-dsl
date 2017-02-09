@@ -2,7 +2,7 @@ MathJax.Hub.Config({
     showMathMenu: false,
     ShowMathMenuMSIE: false,
     showProcessingMessages: false,
-    messagStyle: "none",
+    messageStyle: "none",
     //menuSettings: {
     //    inTabOrder: false,
     //},
@@ -56,7 +56,7 @@ function createCM() {
 var socket = new WebSocket("ws://" + location.hostname + ':2794', "rust-websocket");
 
 function sendToServer(cmBox) {
-    currentCM.setOption('readOnly', true);
+    currentCM.setOption('readOnly', 'nocursor');
     socket.send(cmBox.getValue());
 }
 
