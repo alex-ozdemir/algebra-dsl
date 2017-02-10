@@ -169,7 +169,9 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
         Token::Special(Special::Divide) => Ok(PostMac::Op(UniOp::Std(Operator::Div))),
         Token::Special(Special::Caret) => Ok(PostMac::Op(UniOp::Std(Operator::Caret))),
         Token::Special(Special::Underscore) => Ok(PostMac::Op(UniOp::Std(Operator::Underscore))),
-        Token::Special(Special::Period) => Ok(PostMac::Num(Numeric("".to_string(), Some("".to_string())))),
+        Token::Special(Special::Period) => {
+            Ok(PostMac::Num(Numeric("".to_string(), Some("".to_string()))))
+        }
         Token::Special(x) => Err(ParseError::UnknownSpecialChar(x)),
         Token::Char(c) if c.is_alphabetic() => Ok(PostMac::Char(c)),
         Token::Char(c) if c.is_numeric() => Ok(PostMac::Num(Numeric(c.to_string(), None))),
@@ -236,7 +238,7 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                 match (last, next) {
                     (Some(PostMac::Num(last_num)), PostMac::Num(next_num)) => {
                         result_list.push(PostMac::Num(merge_numerics(last_num, next_num)?));
-                    },
+                    }
                     (last, mut next) => {
                         last.map(|last| result_list.push(last));
                         // Potentially insert multiplication
@@ -275,7 +277,8 @@ fn two_expressions(input: &mut Vec<latex::Token>) -> Result<(PostMac, PostMac), 
 }
 
 pub fn merge_numerics(Numeric(mut l_pre, l_post): Numeric,
-                      Numeric(r_pre, r_post): Numeric) -> Result<Numeric, ParseError> {
+                      Numeric(r_pre, r_post): Numeric)
+                      -> Result<Numeric, ParseError> {
     match (l_post, r_post) {
         (Some(_), Some(_)) => Err(ParseError::DoubleDecimalPoint),
         (Some(mut l_post), None) => {

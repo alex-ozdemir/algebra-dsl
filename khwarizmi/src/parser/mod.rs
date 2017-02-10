@@ -47,16 +47,19 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
             let parsed_bottom = parse_operators(*bottom)?;
             Ok(Expression::Division(box parsed_top, box parsed_bottom))
         }
-        PostMac::Num(Numeric(natural, None)) =>
-            i64::from_str_radix(natural.as_str(), 10).ok()
-                                                     .ok_or(ParseError::InvalidNumericLiteral)
-                                                     .map(Atom::Natural)
-                                                     .map(Expression::Atom),
+        PostMac::Num(Numeric(natural, None)) => {
+            i64::from_str_radix(natural.as_str(), 10)
+                .ok()
+                .ok_or(ParseError::InvalidNumericLiteral)
+                .map(Atom::Natural)
+                .map(Expression::Atom)
+        }
         PostMac::Num(Numeric(natural, Some(dec))) => {
             let s = format!("{}.{}", natural, dec);
-            f64::from_str(s.as_str()).map_err(|e| ParseError::FPError(e))
-                                     .map(Atom::Floating)
-                                     .map(Expression::Atom)
+            f64::from_str(s.as_str())
+                .map_err(|e| ParseError::FPError(e))
+                .map(Atom::Floating)
+                .map(Expression::Atom)
         }
         PostMac::List(mut tokens) => {
             // We maintain an invariant that the `operator_stack` is non-empty
@@ -74,7 +77,9 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                               next_op.left_precedence() {
                             let combinator = operator_stack.pop().expect(UNREACH);
                             let second = expression_stack.pop().ok_or(ParseError::OperatorError)?;
-                            let new_expr = if combinator.arity().ok_or_else(|| ParseError::UnmatchGrouping(combinator.clone()))? == 1 {
+                            let new_expr = if combinator.arity()
+                                .ok_or_else(|| ParseError::UnmatchGrouping(combinator.clone()))? ==
+                                              1 {
                                 combine1(second, combinator)?
                             } else {
                                 let first = expression_stack.pop()

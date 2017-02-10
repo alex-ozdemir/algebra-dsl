@@ -1,13 +1,14 @@
-#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns)]
+#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from)]
 #![allow(dead_code)]
 #[macro_use]
 extern crate nom;
 mod parser;
 
 use parser::ParseError;
-use std::{fmt, mem};
+use std::convert::TryFrom;
 use std::str::FromStr;
 use std::string::String;
+use std::{fmt, mem};
 
 const NULL_EXPRESSION: Expression = Expression::Atom(Atom::Natural(0));
 const NULL_IDX: &'static [TreeInt] = &[];
@@ -107,6 +108,12 @@ impl Equation {
         self.left = mem::replace(&mut self.left, NULL_EXPRESSION).inflate_division(expr.clone());
         self.right = mem::replace(&mut self.right, NULL_EXPRESSION).inflate_division(expr);
     }
+    pub fn simplify_constants(self) -> Self {
+        Equation {
+            left: self.left.simplify_constants(),
+            right: self.right.simplify_constants(),
+        }
+    }
 }
 
 impl Indexable for Equation {
@@ -134,7 +141,6 @@ pub struct SiblingIndices<'a> {
 }
 
 impl<'a> SiblingIndices<'a> {
-
     /// If all the input indices share a parent, constructs a sibling index representing all of
     /// them
     pub fn from_indices(indices: &'a [TreeIdx]) -> Result<SiblingIndices<'a>, AlgebraDSLError> {
@@ -144,7 +150,8 @@ impl<'a> SiblingIndices<'a> {
         }
         let first_parent = indices[0].as_ref().parent().expect(UNREACH);
         if indices.iter().all(|idx| idx.as_ref().parent() == Some(first_parent)) {
-            let mut vec: Vec<_> = indices.iter().map(|i| i.as_ref().last().expect(UNREACH)).collect();
+            let mut vec: Vec<_> =
+                indices.iter().map(|i| i.as_ref().last().expect(UNREACH)).collect();
             vec.sort();
             Ok(SiblingIndices {
                 parent_idx: first_parent,
@@ -341,33 +348,50 @@ impl Expression {
                 let t = top.simplify_constants();
                 let b = bottom.simplify_constants();
                 match (t, b) {
-                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Floating(f2))) => Ex::Atom(Atom::Floating(f / f2)),
-                    (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Floating(f))) => Ex::Atom(Atom::Floating(n as f64 / f)),
-                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Natural(n))) => Ex::Atom(Atom::Floating(f / n as f64)),
+                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Floating(f2))) => {
+                        Ex::Atom(Atom::Floating(f / f2))
+                    }
+                    (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Floating(f))) => {
+                        Ex::Atom(Atom::Floating(n as f64 / f))
+                    }
+                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Natural(n))) => {
+                        Ex::Atom(Atom::Floating(f / n as f64))
+                    }
                     (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Natural(n2))) => {
                         if n % n2 == 0 {
                             Ex::Atom(Atom::Natural(n / n2))
                         } else {
                             Ex::Atom(Atom::Floating(n as f64 + n2 as f64))
                         }
-                    },
+                    }
                     (e1, e2) => Ex::Division(box e1, box e2),
 
                 }
             }
-//            Ex::Power(box base, box exp) => {
-//                let b = base.simplify_constants();
-//                let e = exp.simplify_constants();
-//                match (b, e) {
-//                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Floating(f2))) => Ex::Atom(Atom::Floating(f + f2)),
-//                    (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Floating(f))) => Ex::Atom(Atom::Floating(f + n as f64)),
-//                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Natural(n))) => Ex::Atom(Atom::Floating(f + n as f64)),
-//                    (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Natural(n2))) => Ex::Atom(Atom::Natural(n + n2)),
-//                    (e1, e2) => Ex::Division(box e1, box e2),
-//
-//                }
-//            }
-            e => e
+            Ex::Power(box base, box exp) => {
+                let b = base.simplify_constants();
+                let e = exp.simplify_constants();
+                match (b, e) {
+                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Floating(f2))) => {
+                        Ex::Atom(Atom::Floating(f.powf(f2)))
+                    }
+                    (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Floating(f))) => {
+                        Ex::Atom(Atom::Floating((n as f64).powf(f)))
+                    }
+                    (Ex::Atom(Atom::Floating(f)), Ex::Atom(Atom::Natural(n))) => {
+                        Ex::Atom(Atom::Floating(f.powf(n as f64)))
+                    }
+                    (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Natural(n2))) => {
+                        let p: Result<u32, _> = TryFrom::try_from(n2);
+                        Ex::Atom(p.map(|u| n.pow(u))
+                            .map(Atom::Natural)
+                            .unwrap_or(Atom::Floating((n as f64).powf(n2 as f64))))
+                    }
+                    (e1, e2) => Ex::Division(box e1, box e2),
+
+                }
+            }
+            e => e,
         }
     }
 }
@@ -493,7 +517,7 @@ impl fmt::Display for Equation {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
-        fmt_as_math_ml(&self, f, "0",0)?;
+        fmt_as_math_ml(&self, f, "0", 0)?;
         write!(f, "</math>")
     }
 }
@@ -517,10 +541,10 @@ impl LatexWriter {
                         fmt_as_latex(&eq.left, f, 0)?;
                         write!(f, " &= ")?;
                         fmt_as_latex(&eq.right, f, 0)?;
-                    },
+                    }
                     &EqOrExpr::Ex(ref ex) => {
                         fmt_as_latex(&ex, f, 0)?;
-                    },
+                    }
                 }
                 write!(f, " \\\\\n")
             }
@@ -539,11 +563,11 @@ impl LatexWriter {
 fn precedence(expr: &Expression) -> u8 {
     match expr {
         &Expression::Atom(_) => u8::max_value(),
-        &Expression::Application(_,_) => u8::max_value(),
-        &Expression::LimitOp(_,_,_,_) => 60,
-        &Expression::Subscript(_,_) => u8::min_value(),
-        &Expression::Power(_,_) => 45,
-        &Expression::Division(_,_) => u8::min_value(),
+        &Expression::Application(_, _) => u8::max_value(),
+        &Expression::LimitOp(_, _, _, _) => 60,
+        &Expression::Subscript(_, _) => u8::min_value(),
+        &Expression::Power(_, _) => 45,
+        &Expression::Division(_, _) => u8::min_value(),
         &Expression::Product(_) => 25,
         &Expression::Sum(_) => 15,
         &Expression::Negation(_) => 15,
@@ -552,12 +576,13 @@ fn precedence(expr: &Expression) -> u8 {
 
 fn fmt_as_math_ml(expr: &Expression,
                   f: &mut fmt::Formatter,
-                  prev_index: &str, prev_precedence: u8)
+                  prev_index: &str,
+                  prev_precedence: u8)
                   -> Result<(), fmt::Error> {
     let prec = precedence(expr);
     write!(f, "<mrow mathTreeNode=\"{}\">", prev_index)?;
     if prec <= prev_precedence {
-        write!(f,"<mo form=\"prefix\">(</mo>")?;
+        write!(f, "<mo form=\"prefix\">(</mo>")?;
     }
     match expr {
         &Expression::Atom(atom) => {
@@ -694,16 +719,18 @@ fn fmt_as_math_ml(expr: &Expression,
         }
     }
     if prec <= prev_precedence {
-        write!(f,"<mo form=\"postfix\">)</mo>")?;
+        write!(f, "<mo form=\"postfix\">)</mo>")?;
     }
-    write!(f,"</mrow>")
+    write!(f, "</mrow>")
 }
 
-fn fmt_as_latex(expr: &Expression, f: &mut fmt::Formatter, prev_precedence: u8)
-                  -> Result<(), fmt::Error> {
+fn fmt_as_latex(expr: &Expression,
+                f: &mut fmt::Formatter,
+                prev_precedence: u8)
+                -> Result<(), fmt::Error> {
     let prec = precedence(expr);
     if prec <= prev_precedence {
-        write!(f,"\\left(")?;
+        write!(f, "\\left(")?;
     }
     match expr {
         &Expression::Atom(atom) => {
@@ -774,7 +801,7 @@ fn fmt_as_latex(expr: &Expression, f: &mut fmt::Formatter, prev_precedence: u8)
         }
     }
     if prec <= prev_precedence {
-        write!(f,"\\right)")?;
+        write!(f, "\\right)")?;
     }
     Ok(())
 }
@@ -1165,6 +1192,16 @@ impl Indexable for EqOrExpr {
     }
 }
 
+impl EqOrExpr {
+    pub fn simplify_constants(self) -> Self {
+        use self::EqOrExpr::*;
+        match self {
+            Eq(eq) => Eq(eq.simplify_constants()),
+            Ex(ex) => Ex(ex.simplify_constants()),
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -1246,8 +1283,8 @@ mod tests {
     #[test]
     fn format_add() {
         let expr = Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('x')),
-                                        Ex::Atom(Atom::PlainVariable('y')),
-                                        Ex::Atom(Atom::PlainVariable('z'))]);
+                                Ex::Atom(Atom::PlainVariable('y')),
+                                Ex::Atom(Atom::PlainVariable('z'))]);
         let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
                         mathTreeNode=\"0\"><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
@@ -1260,8 +1297,8 @@ mod tests {
     #[test]
     fn format_prod() {
         let expr = Ex::Product(vec![Ex::Atom(Atom::PlainVariable('x')),
-                                            Ex::Atom(Atom::PlainVariable('y')),
-                                            Ex::Atom(Atom::PlainVariable('z'))]);
+                                    Ex::Atom(Atom::PlainVariable('y')),
+                                    Ex::Atom(Atom::PlainVariable('z'))]);
         let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
                         mathTreeNode=\"0\"><mrow \
                         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
@@ -1278,8 +1315,8 @@ mod tests {
                                           Ex::Atom(Atom::PlainVariable('x')),
                                           Ex::Atom(Atom::Natural(7))]);
         let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
-        let after =
-            Ex::Product(vec![Ex::Atom(Atom::Natural(84)), Ex::Atom(Atom::PlainVariable('x'))]);
+        let after = Ex::Product(vec![Ex::Atom(Atom::Natural(84)),
+                                     Ex::Atom(Atom::PlainVariable('x'))]);
         let indices: Vec<_> =
             index_strings.into_iter().map(TreeIdx::from_str).map(Result::unwrap).collect();
         println!("{:#?}", indices);
@@ -1348,4 +1385,3 @@ mod tests {
 
     }
 }
-
