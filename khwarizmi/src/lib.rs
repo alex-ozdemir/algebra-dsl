@@ -11,6 +11,8 @@ use std::string::String;
 
 const NULL_EXPRESSION: Expression = Expression::Atom(Atom::Natural(0));
 const NULL_IDX: &'static [TreeInt] = &[];
+const UNREACH: &'static str = "An option/result that was expected to be Some/Ok was not.\n\
+                               This is a bug!";
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Equation {
@@ -132,15 +134,18 @@ pub struct SiblingIndices<'a> {
 }
 
 impl<'a> SiblingIndices<'a> {
+
+    /// If all the input indices share a parent, constructs a sibling index representing all of
+    /// them
     pub fn from_indices(indices: &'a [TreeIdx]) -> Result<SiblingIndices<'a>, AlgebraDSLError> {
-        if indices.len() < 1 || indices.iter().map(|i| i.as_ref().len()).min().unwrap() == 0 {
+        if indices.len() < 1 ||
+           indices.iter().map(|i| i.as_ref().len()).min().expect(UNREACH) == 0 {
             return Err(AlgebraDSLError::InvalidSiblingIndices);
         }
-        let first_parent = indices[0].as_ref().parent();
-        if indices.iter().all(|idx| idx.as_ref().parent() == first_parent) {
-            let mut vec: Vec<_> = indices.iter().map(|i| i.as_ref().last().unwrap()).collect();
+        let first_parent = indices[0].as_ref().parent().expect(UNREACH);
+        if indices.iter().all(|idx| idx.as_ref().parent() == Some(first_parent)) {
+            let mut vec: Vec<_> = indices.iter().map(|i| i.as_ref().last().expect(UNREACH)).collect();
             vec.sort();
-            let first_parent = first_parent.expect("unreachable");
             Ok(SiblingIndices {
                 parent_idx: first_parent,
                 children: vec,
@@ -303,7 +308,7 @@ impl Expression {
                     }
                 }
                 if new_exprs.len() == 1 {
-                    new_exprs.pop().unwrap()
+                    new_exprs.pop().expect(UNREACH)
                 } else {
                     Ex::Sum(new_exprs)
                 }
@@ -327,7 +332,7 @@ impl Expression {
                     }
                 }
                 if new_exprs.len() == 1 {
-                    new_exprs.pop().unwrap()
+                    new_exprs.pop().expect(UNREACH)
                 } else {
                     Ex::Product(new_exprs)
                 }

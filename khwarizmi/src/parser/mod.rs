@@ -10,6 +10,9 @@ use std::str::FromStr;
 use {Equation, Expression, Symbol, Atom, StandaloneSymbol, OperatorSymbol};
 use self::mac::{PostMac, UniOp, Operator, KnownCS, Numeric};
 
+const UNREACH: &'static str = "An option/result that was expected to be Some/Ok was not.\n\
+                               This is a bug!";
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError {
     UnknownSpecialChar(Special),
@@ -56,6 +59,7 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                                      .map(Expression::Atom)
         }
         PostMac::List(mut tokens) => {
+            // We maintain an invariant that the `operator_stack` is non-empty
             let mut operator_stack = vec![UniOp::Std(Operator::Begin)];
             let mut expression_stack = vec![];
             tokens.push(PostMac::Op(UniOp::Std(Operator::End)));
@@ -66,9 +70,9 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                          expression_stack);
                 match token {
                     PostMac::Op(next_op) => {
-                        while operator_stack.last().unwrap().right_precedence() >
+                        while operator_stack.last().expect(UNREACH).right_precedence() >
                               next_op.left_precedence() {
-                            let combinator = operator_stack.pop().unwrap();
+                            let combinator = operator_stack.pop().expect(UNREACH);
                             let second = expression_stack.pop().ok_or(ParseError::OperatorError)?;
                             let new_expr = if combinator.arity().ok_or_else(|| ParseError::UnmatchGrouping(combinator.clone()))? == 1 {
                                 combine1(second, combinator)?
@@ -100,7 +104,7 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
             debug_assert!(&operator_stack[..] ==
                           &[UniOp::Std(Operator::Begin), UniOp::Std(Operator::End)]);
             if expression_stack.len() == 1 {
-                Ok(expression_stack.pop().unwrap())
+                Ok(expression_stack.pop().expect(UNREACH))
             } else {
                 Err(ParseError::OperatorError)
             }
@@ -168,14 +172,11 @@ fn combine2(left: Expression, op: UniOp, right: Expression) -> Expression {
 
 pub fn parse_equation(input: &str) -> Result<Equation, ParseError> {
     let mut sides = input.split("=").collect::<Vec<_>>();
-    // println!("Sides: {:?}", sides);
     if sides.len() != 2 {
         return Err(ParseError::WrongNumberOfEqualSigns);
     }
-    let right = parse_expr(sides.pop().unwrap())?;
-    // println!("Right: {:?}", right);
-    let left = parse_expr(sides.pop().unwrap())?;
-    // println!("Left: {:?}", left);
+    let right = parse_expr(sides.pop().expect(UNREACH))?;
+    let left = parse_expr(sides.pop().expect(UNREACH))?;
     Ok(Equation {
         left: left,
         right: right,
