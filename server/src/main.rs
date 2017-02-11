@@ -112,6 +112,7 @@ fn main() {
 
                         formula_num += 1;
                         println!("Output: {:#?}", msg);
+                        println!("The current formula is {:#?}", history.last());
                         sender.send_message(&Message::text(msg)).unwrap();
                     }
                     _ => unreachable!(),

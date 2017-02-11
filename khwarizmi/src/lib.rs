@@ -332,11 +332,9 @@ impl Expression {
                     }
                 }
                 if f_acc != 1. {
-                    new_exprs.push(Ex::Atom(Atom::Floating(f_acc * n_acc as f64)));
-                } else {
-                    if n_acc != 1 {
-                        new_exprs.push(Ex::Atom(Atom::Natural(n_acc)));
-                    }
+                    new_exprs.insert(0, Ex::Atom(Atom::Floating(f_acc * n_acc as f64)));
+                } else if n_acc != 1 {
+                    new_exprs.insert(0, Ex::Atom(Atom::Natural(n_acc)));
                 }
                 if new_exprs.len() == 1 {
                     new_exprs.pop().expect(UNREACH)
@@ -387,11 +385,19 @@ impl Expression {
                             .map(Atom::Natural)
                             .unwrap_or(Atom::Floating((n as f64).powf(n2 as f64))))
                     }
-                    (e1, e2) => Ex::Division(box e1, box e2),
+                    (e1, e2) => Ex::Power(box e1, box e2),
 
                 }
             }
-            e => e,
+            Ex::LimitOp(sym, sub, sup, op) => {
+                Ex::LimitOp(sym, sub.map(|box x| box x.simplify_constants()),
+                                 sup.map(|box x| box x.simplify_constants()),
+                                  box op.simplify_constants())
+            }
+            Ex::Application(func, arg) => {
+                Ex::Application(func, box arg.simplify_constants())
+            }
+            e => e
         }
     }
 }

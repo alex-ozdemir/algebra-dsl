@@ -109,7 +109,7 @@ impl str::FromStr for Cmd {
                 indices.push(idx);
                 rest = &rest[(idx_end + 1)..].trim();
             }
-            if rest.trim().len() > 0 {
+            if !rest.is_empty() {
                 println!("Rest isn't empty, it's {}", rest);
                 Err(AlgebraDSLError::IllFormattedCommand)
             } else {
@@ -147,10 +147,11 @@ impl str::FromStr for Cmd {
             Ok(Cmd::Map(Op::Times, expr))
         } else if s.starts_with("$") {
             let rest = &s[1..].trim();
-            if let Some(eq) = Equation::from_str(rest).ok() {
+            if let Ok(eq) = Equation::from_str(rest) {
                 Ok(Cmd::New(EqOrExpr::Eq(eq)))
             } else {
-                Ok(Cmd::New(EqOrExpr::Ex(Expression::from_str(rest)?)))
+                let ex = Expression::from_str(rest)?;
+                Ok(Cmd::New(EqOrExpr::Ex(ex)))
             }
         } else {
             Err(AlgebraDSLError::UnrecognizedCmd)
