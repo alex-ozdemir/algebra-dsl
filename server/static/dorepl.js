@@ -3,24 +3,25 @@
 MathJax.Hub.Config({
     showMathMenu: false,
     ShowMathMenuMSIE: false,
-    showProcessingMessages: false,
+    //showProcessingMessages: false,
     messageStyle: "none",
-    //menuSettings: {
-    //    inTabOrder: false,
-    //},
-    //"HTML-CSS": {
-    //    EqnChunkDelay: 0,
-    //},
-    //ignoreMMLattributes: {
-    //    'onclick': false,
-    //},
+    CommonHTML: {
+        scale: 200,
+        linebreaks: {
+            automatic: true
+        }
+    }
 });
+
+var currentCM = null;
 
 window.onload = function() {
     createCM();
+
+    currentCM.setValue("$ ");
+    currentCM.setCursor({line: 0, ch: 2});
 }
 
-var currentCM = null;
 function createCM() {
     currentCM = CodeMirror(document.getElementById('repl'), {
         autofocus: true,
@@ -28,31 +29,14 @@ function createCM() {
             'Enter': sendToServer,
         },
     });
-    //myCodeMirror.setSize(null, 1);
 
-    currentCM.cmIndex = 0;
+    // Use last colors first
+    currentCM.availColors = [9,8,7,6,5,4,3,2,1,0];
+    currentCM.selectedDOM = null;
+    currentCM.selectedTextMarker = null;
 
-    currentCM.on('beforeSelectionChange', function(instance) {
-        if (curSelected !== null) {
-            curSelected.removeAttribute('selected');
-
-            // Put a span inside that has a highlight color and has all of
-            // curSelected's children
-            var newspan = document.createElement('span');
-            newspan.setAttribute('highlighted', currentCM.cmIndex);
-
-            while (curSelected.children.length > 0) {
-                // This (re)moves the child from curSelected
-                newspan.appendChild(curSelected.children[0]);
-            }
-
-            curSelected.appendChild(newspan);
-
-            currentCM.cmIndex += 1;
-            curSelected = null;
-            lastClickedID = null;
-        }
-    });
+    currentCM.on('keydown',  solidifyCurrent);
+    currentCM.on('mousedown',  solidifyCurrent);
 }
 
 var socket = new WebSocket("ws://" + location.hostname + ':2794', "rust-websocket");
@@ -63,7 +47,7 @@ function sendToServer(cmBox) {
     socket.send(cmBox.getValue());
 }
 
-socket.onmessage = function (event) {
+socket.onmessage = function(event) {
     var data = event.data;
 
     var atIdx = data.indexOf('@');
@@ -82,6 +66,8 @@ socket.onmessage = function (event) {
     var type = rest.substr(0, atIdx);
     var rest = rest.substr(atIdx+1);
 
+    // Print out the latex or error
+
     if (type === 'LaTeX') {
         var CM = CodeMirror(document.getElementById('repl'),
                             {readOnly: true, cursorBlinkRate: -1});
@@ -95,6 +81,8 @@ socket.onmessage = function (event) {
         errDiv.innerHTML = rest;
         document.getElementById('repl').appendChild(errDiv);
     }
+
+    // Print the current math regardless
 
     var fullDiv = document.createElement('div');
     fullDiv.className = 'output math-output';
@@ -130,97 +118,24 @@ socket.onmessage = function (event) {
         MathJax.Hub.Queue(["Typeset", MathJax.Hub, mathBox.id]);
         MathJax.Hub.Queue([onFinishTypesetting, fullDiv.id]);
     } else {
-        var mathBox = document.getElementById('mathout'+(formulaNum-1))
-                              .childNodes[1]
-                              .cloneNode(true);
-        var subNodes = mathBox.getElementsByTagName('*');
+        var prevOut = document.getElementById('mathout'+(formulaNum-1));
+        if (prevOut && prevOut.childNodes.length > 1) {
+            var mathBox = prevOut.childNodes[1].cloneNode(true);
+            var subNodes = mathBox.getElementsByTagName('*');
 
-        for (var i=0; i<subNodes.length; i++) {
-            subNodes[i].removeAttribute('selected');
-            subNodes[i].removeAttribute('highlighted');
+            for (var i=0; i<subNodes.length; i++) {
+                subNodes[i].removeAttribute('selected');
+                subNodes[i].removeAttribute('highlighted');
+            }
+
+            mathBox.addEventListener("click", clickMathCallback, false);
+
+            fullDiv.appendChild(mathBox);
         }
-
-        fullDiv.appendChild(mathBox);
-        mathBox.addEventListener("click", clickMathCallback, false);
     }
 
     createCM();
 };
-
-function insertIntoCurrrentEquation(e) {
-
-    var copyOfElement = e.cloneNode(true);
-
-    copyOfElement.setAttribute('highlighted', currentCM.cmIndex);
-
-    copyOfElement.removeAttribute('selected');
-    var subTreeNodes = copyOfElement.getElementsByTagName("*");
-    for (var i=0; i<subTreeNodes.length; i++) {
-        subTreeNodes[i].removeAttribute('selected');
-        subTreeNodes[i].removeAttribute('highlighted');
-        subTreeNodes[i].removeAttribute('id');
-    }
-
-    var toInsert = document.createElement('span');
-    toInsert.className = 'mjx-math mjx-chtml mathInEquation';
-    toInsert.appendChild(copyOfElement);
-
-    toInsert.addEventListener("mouseenter", function(ev) {
-        copyOfElement.setAttribute('hoverednode',
-            copyOfElement.getAttribute('highlighted'));
-        e.setAttribute('hoverednode',
-            copyOfElement.getAttribute('highlighted'));
-    });
-
-    toInsert.addEventListener("mouseleave", function(ev) {
-        e.removeAttribute('hoverednode');
-        copyOfElement.removeAttribute('hoverednode');
-    });
-
-    var literaltext = '#(mtn:' + copyOfElement.getAttribute('mathtreenode') + ')';
-
-    if (!currentCM.somethingSelected()) {
-        var place = currentCM.getCursor();
-
-        currentCM.replaceRange(literaltext, place);
-
-        var place2 = currentCM.getCursor();
-        var x = currentCM.markText(place, place2, { replacedWith: toInsert });
-        currentCM.setSelection(place, place2);
-    } else {
-        var oldCurSelected = curSelected;
-        curSelected = null;
-        currentCM.replaceSelection(literaltext, 'around');
-        curSelected = oldCurSelected;
-
-        var selections = currentCM.listSelections();
-        var anchor = selections[0].anchor;
-        var head = selections[0].head;
-        var beg;
-        var end;
-        if (anchor.line < head.line || anchor.line == head.line && anchor.ch < head.ch) {
-            beg = anchor;
-            end = head;
-        } else {
-            beg = head;
-            end = anchor;
-        }
-        currentCM.markText(beg, end, { replacedWith: toInsert });
-    }
-    currentCM.focus();
-}
-
-function removeSelection() {
-    if (currentCM.somethingSelected()) {
-        var oldCurSelected = curSelected;
-        curSelected = null;
-        currentCM.replaceSelection('');
-        curSelected = oldCurSelected;
-    }
-}
-
-var lastClickedID = null;
-var curSelected = null;
 
 function mathTreeNodeNodeAbove(cur, topLevel) {
     while (!cur.hasAttribute('mathtreenode')) {
@@ -232,41 +147,147 @@ function mathTreeNodeNodeAbove(cur, topLevel) {
     return cur;
 }
 
+function mathTreeNodeAboveBoth(n1, n2, topLevel) {
+    var n1sAncestors = [n1];
+    var cur = n1;
+    while (cur != topLevel) {
+        cur = cur.parentNode;
+        n1sAncestors.push(cur);
+    }
+
+    cur = n2;
+
+    while (n1sAncestors.indexOf(cur) == -1) {
+        cur = cur.parentNode;
+    }
+    return cur;
+}
+
+function solidifyCurrent() {
+    if (currentCM.selectedDOM) {
+        currentCM.selectedDOM.removeAttribute('selected');
+
+        var thisColor = currentCM.selectedDOM.getAttribute('highlighted');
+        currentCM.selectedDOM.removeAttribute('highlighted');
+
+        // Put a span inside that has a highlight color and has all of
+        // curSelected's children
+        var newspan = document.createElement('span');
+        newspan.setAttribute('highlighted', thisColor);
+
+        while (currentCM.selectedDOM.children.length > 0) {
+            // This (re)moves the child from curSelected
+            newspan.appendChild(currentCM.selectedDOM.children[0]);
+        }
+
+        currentCM.selectedDOM.appendChild(newspan);
+
+        // Add listeners in case it's deleted
+        (function(correspondingDOM, itscolor) {
+            currentCM.selectedTextMarker.on('hide', function() {
+                correspondingDOM.removeAttribute('selected');
+                correspondingDOM.removeAttribute('highlighted');
+            });
+            currentCM.selectedTextMarker.on('unhide', function() {
+                correspondingDOM.setAttribute('highlighted', itscolor);
+            });
+
+            var insertedSpan = currentCM.selectedTextMarker.replacedWith;
+
+            insertedSpan.removeEventListener("mouseenter", insertedSpan.mouseEnterListener);
+            insertedSpan.removeEventListener("mouseleave", insertedSpan.mouseLeaveListener);
+
+            if (currentCM.selectedDOM.hasAttribute('hoverednode')) {
+                currentCM.selectedDOM.removeAttribute('hoverednode');
+                correspondingDOM.setAttribute('hoverednode', true);
+            }
+
+            insertedSpan.addEventListener("mouseenter", function() {
+                correspondingDOM.setAttribute('hoverednode', true);
+            });
+
+            insertedSpan.addEventListener("mouseleave", function() {
+                correspondingDOM.removeAttribute('hoverednode', true);
+            });
+        })(newspan, thisColor);
+
+
+        currentCM.availColors.pop();
+        currentCM.selectedDOM = null;
+        currentCM.selectedTextMarker = null;
+    }
+}
+
 function clickMathCallback(event) {
+    var toAdd = mathTreeNodeNodeAbove(event.target, this);
+
     // Remove the other highlighted stuff
-    if (curSelected !== null) {
-        curSelected.removeAttribute('selected');
-    }
-
-    var reset = false;
-    var closestAbove = mathTreeNodeNodeAbove(event.target, this);
-    if (closestAbove === null) {
-        reset = true;
-    } else {
-        var elementToHighlight = null;
-        if (closestAbove.id === lastClickedID) {
-            elementToHighlight = mathTreeNodeNodeAbove(
-                curSelected.parentNode,
-                this);
-        } else {
-            elementToHighlight = closestAbove;
+    if (currentCM.selectedDOM !== null) {
+        var cur = event.target;
+        while (cur !== this && cur !== currentCM.selectedDOM) {
+            cur = cur.parentNode;
         }
-        if (elementToHighlight === null || elementToHighlight.tagName === 'math') {
-            reset = true;
-        } else {
-            elementToHighlight.setAttribute('selected', '0');
 
-            insertIntoCurrrentEquation(elementToHighlight);
-            lastClickedID = closestAbove.id;
-            curSelected = elementToHighlight;
+        if (cur === currentCM.selectedDOM) {
+            currentCM.selectedDOM.removeAttribute('selected');
+            currentCM.selectedDOM.removeAttribute('highlighted');
+
+            // Delete the old stuff
+            var oldfromto = currentCM.selectedTextMarker.find();
+            currentCM.replaceRange('', oldfromto.from, oldfromto.to);
+
+            // Re-click: expand!
+            toAdd = mathTreeNodeNodeAbove(currentCM.selectedDOM.parentNode, this);
+
+            if (toAdd === null) {
+                currentCM.selectedDOM = null;
+                currentCM.selectedTextMarker = null;
+            }
+        } else {
+            // New click
+            solidifyCurrent(currentCM.selectedDOM);
         }
     }
-    if (reset) {
-        removeSelection();
 
-        lastClickedID = null;
-        curSelected = null;
+    if (toAdd !== null) {
+        toAdd.setAttribute('highlighted',
+            currentCM.availColors[currentCM.availColors.length - 1]);
+        toAdd.setAttribute('selected', 'true');
+
+        var copy = toAdd.cloneNode(true);
+
+        var subTreeNodes = copy.getElementsByTagName("*");
+        for (var i=0; i<subTreeNodes.length; i++) {
+            subTreeNodes[i].removeAttribute('highlighted');
+        }
+
+        var toInsert = document.createElement('span');
+        toInsert.className = 'mjx-math mjx-chtml mathInEquation';
+        toInsert.appendChild(copy);
+
+        toInsert.mouseEnterListener = function() {
+            toAdd.setAttribute('hoverednode', true);
+        }
+        toInsert.addEventListener("mouseenter", toInsert.mouseEnterListener);
+
+        toInsert.mouseLeaveListener = function() {
+            toAdd.removeAttribute('hoverednode');
+        }
+        toInsert.addEventListener("mouseleave", toInsert.mouseLeaveListener);
+
+        var literaltext = '#(mtn:' + copy.getAttribute('mathtreenode') + ')';
+
+        var start_of_literal_loc = currentCM.getCursor();
+        currentCM.replaceRange(literaltext, start_of_literal_loc);
+        var end_of_literal_loc = currentCM.getCursor();
+
+        currentCM.selectedTextMarker = currentCM.markText(
+            start_of_literal_loc, end_of_literal_loc,
+            { replacedWith: toInsert });
+        currentCM.selectedDOM = toAdd;
     }
+
+    currentCM.focus();
 }
 
 function onFinishTypesetting(where) {

@@ -8,8 +8,8 @@
   height: auto;
 }
 
-[highlighted] {
-    border: 1px solid;
+[highlighted]:not([selected]) {
+    border-style: solid;
 }
 
 [highlighted="0"]  { border-color: purple; outline-color: purple; }
@@ -23,19 +23,18 @@
 [highlighted="8"]  { border-color: violet; outline-color: violet; }
 [highlighted="9"]  { border-color: greenyellow; outline-color: greenyellow; }
 
-[hoverednode="0"]  [highlighted="0"],
-[hoverednode="1"]  [highlighted="1"],
-[hoverednode="2"]  [highlighted="2"],
-[hoverednode="3"]  [highlighted="3"],
-[hoverednode="4"]  [highlighted="4"],
-[hoverednode="5"]  [highlighted="5"],
-[hoverednode="6"]  [highlighted="6"],
-[hoverednode="7"]  [highlighted="7"],
-[hoverednode="8"]  [highlighted="8"],
-[hoverednode="9"]  [highlighted="9"] { outline-style: solid; outline-width: 3px; }
+[hoverednode][selected] {
+    outline-style: solid;
+    outline-width: 3px;
+}
+
+[hoverednode]:not([selected]) {
+    outline-style: solid;
+    outline-width: 2px;
+}
 
 [mathtreenode][selected] {
-    outline: 1px solid #706ad8;
+    outline-style: solid;
 }
 
 .output {
