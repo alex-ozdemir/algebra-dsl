@@ -250,20 +250,26 @@ function clickMathCallback(event) {
     }
 
     if (toAdd !== null) {
+        var copy = toAdd.cloneNode(true);
+
         toAdd.setAttribute('highlighted',
             currentCM.availColors[currentCM.availColors.length - 1]);
         toAdd.setAttribute('selected', 'true');
-
-        var copy = toAdd.cloneNode(true);
 
         var subTreeNodes = copy.getElementsByTagName("*");
         for (var i=0; i<subTreeNodes.length; i++) {
             subTreeNodes[i].removeAttribute('highlighted');
         }
 
+        var inside = document.createElement('span');
+        inside.className = 'mjx-math mjx-chtml mathInEquation';
+        inside.appendChild(copy);
+
         var toInsert = document.createElement('span');
-        toInsert.className = 'mjx-math mjx-chtml mathInEquation';
-        toInsert.appendChild(copy);
+        toInsert.appendChild(inside);
+
+        toInsert.setAttribute('highlighted',
+            currentCM.availColors[currentCM.availColors.length - 1]);
 
         toInsert.mouseEnterListener = function() {
             toAdd.setAttribute('hoverednode', true);
