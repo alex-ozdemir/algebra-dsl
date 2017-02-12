@@ -1,7 +1,6 @@
 use std::str;
 
-use khwarizmi::{Expression, Equation, TreeIdx, AlgebraDSLError, Indexable, SiblingIndices,
-                EqOrExpr, LatexWriter};
+use khwarizmi::{Expression, Equation, TreeIdx, AlgebraDSLError, Indexable, EqOrExpr, LatexWriter};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Return {
@@ -33,7 +32,7 @@ impl Cmd {
                    -> Result<Return, AlgebraDSLError> {
         match (self, e) {
             (Cmd::New(e), _) => Ok(Return::EqOrExpr(e)),
-            (Cmd::Make(mut indices, new_expr), Some(old_expr)) => {
+            (Cmd::Make(indices, new_expr), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
                 if indices.len() == 1 {
                     expr.replace(&indices[0], new_expr)?;
