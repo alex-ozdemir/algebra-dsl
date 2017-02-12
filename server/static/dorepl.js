@@ -95,6 +95,7 @@ socket.onmessage = function(event) {
                     .removeEventListener("click", clickMathCallback);
     }
 
+
     var checkbox = document.createElement('input');
     checkbox.setAttribute('type', 'checkbox');
     //checkbox.style = "float: left;";
@@ -133,6 +134,36 @@ socket.onmessage = function(event) {
             fullDiv.appendChild(mathBox);
         }
     }
+
+    // Create a button which will recover what was just displayed.
+    var recoverButton = document.createElement('button');
+    recoverButton.innerHTML = "&#x27f2;";
+    recoverButton.className += " recover"
+
+    recoverButton.addEventListener("click", function(e) {
+        var tosend = "recover"
+
+        var cns = document.getElementById('repl').childNodes;
+
+        var eqnIdx = -1;
+        for (var i=0; i<cns.length; i++) {
+            if (cns[i].classList.contains('new-math-output')) {
+                eqnIdx++;
+            }
+            if (e.target == cns[i].childNodes[2]) {
+                console.log("Found:");
+                console.log(cns[i].childNodes[2]);
+                tosend += ' ' + eqnIdx;
+                break;
+            }
+        }
+
+        currentCM.setValue(tosend);
+
+        sendToServer(currentCM);
+    });
+    fullDiv.appendChild(recoverButton);
+
 
     createCM();
 };

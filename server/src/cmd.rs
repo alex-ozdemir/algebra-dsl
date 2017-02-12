@@ -1,6 +1,6 @@
 use std::str;
 
-use khwarizmi::{Expression, Equation, TreeIdx, AlgebraDSLError, Indexable, EqOrExpr, LatexWriter};
+use khwarizmi::{Expression, TreeIdx, AlgebraDSLError, Indexable, EqOrExpr, LatexWriter};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Return {
@@ -23,6 +23,7 @@ pub enum Cmd {
     Delete(Vec<TreeIdx>),
     Map(Op, Expression),
     Output(Vec<usize>),
+    Recover(usize),
 }
 
 impl Cmd {
@@ -76,6 +77,13 @@ impl Cmd {
                 Ok(Return::LaTeXStr(latex_writer.finish_str()
                     .map_err(|_| AlgebraDSLError::InternalError)?))
             }
+            (Cmd::Recover(idx), e) => {
+                println!("History is index {:?}: {:#?}", idx, history);
+                let recover_math = history.get(idx).ok_or(AlgebraDSLError::InvalidIdx)?;
+                let latex_string = recover_math.as_inline_latex();
+                let parsed = EqOrExpr::from_str(latex_string.as_str().trim())?;
+                Cmd::New(parsed).execute(e, history)
+            }
         }
     }
 }
@@ -124,6 +132,10 @@ impl str::FromStr for Cmd {
                 }
             }
             Ok(Cmd::Output(indices))
+        } else if s.starts_with("recover") {
+            let rest = &s[7..].trim();
+            let idx = usize::from_str(rest).map_err(|_| AlgebraDSLError::InvalidIdx)?;
+            Ok(Cmd::Recover(idx))
         } else if s.starts_with("+") {
             let rest = &s[1..].trim();
             let expr = Expression::from_str(rest)?;
@@ -141,13 +153,7 @@ impl str::FromStr for Cmd {
             let expr = Expression::from_str(rest)?;
             Ok(Cmd::Map(Op::Times, expr))
         } else if s.starts_with("$") {
-            let rest = &s[1..].trim();
-            if let Ok(eq) = Equation::from_str(rest) {
-                Ok(Cmd::New(EqOrExpr::Eq(eq)))
-            } else {
-                let ex = Expression::from_str(rest)?;
-                Ok(Cmd::New(EqOrExpr::Ex(ex)))
-            }
+            Ok(Cmd::New(EqOrExpr::from_str(&s[1..].trim())?))
         } else {
             Err(AlgebraDSLError::UnrecognizedCmd)
         }

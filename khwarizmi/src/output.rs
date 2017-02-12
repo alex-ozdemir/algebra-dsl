@@ -40,6 +40,29 @@ impl fmt::Display for Atom {
     }
 }
 
+impl EqOrExpr {
+    pub fn as_inline_latex(&self) -> String {
+        struct DisplaysAsLatex<'a>(&'a EqOrExpr);
+        impl<'a> fmt::Display for DisplaysAsLatex<'a> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "")?;
+                match self.0 {
+                    &EqOrExpr::Eq(ref eq) => {
+                        fmt_as_latex(&eq.left, f, (&eq.left, false, true))?;
+                        write!(f, " = ")?;
+                        fmt_as_latex(&eq.right, f, (&eq.right, false, true))?;
+                    }
+                    &EqOrExpr::Ex(ref ex) => {
+                        fmt_as_latex(&ex, f, (&ex, false, true))?;
+                    }
+                }
+                write!(f, "")
+            }
+        }
+        format!("{}", DisplaysAsLatex(self))
+    }
+}
+
 pub struct LatexWriter(String);
 
 impl LatexWriter {

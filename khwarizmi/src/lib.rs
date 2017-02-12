@@ -1262,6 +1262,14 @@ impl EqOrExpr {
             Ex(ex) => Ex(ex.simplify_constants()),
         }
     }
+    pub fn from_str(s: &str) -> Result<Self, AlgebraDSLError> {
+        if let Ok(eq) = Equation::from_str(s) {
+            Ok(EqOrExpr::Eq(eq))
+        } else {
+            let ex = Expression::from_str(s)?;
+            Ok(EqOrExpr::Ex(ex))
+        }
+    }
 }
 
 

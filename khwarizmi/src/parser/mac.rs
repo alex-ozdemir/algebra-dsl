@@ -12,6 +12,8 @@ pub enum KnownCS {
     cdot,
     times,
     div,
+    left,
+    right,
     Preserved(Symbol),
 }
 
@@ -24,6 +26,8 @@ impl KnownCS {
             "times" => Some(KnownCS::times),
             "sqrt" => Some(KnownCS::sqrt),
             "div" => Some(KnownCS::div),
+            "left" => Some(KnownCS::left),
+            "right" => Some(KnownCS::right),
             s => Symbol::from_str(s).map(KnownCS::Preserved),
         }
     }
@@ -202,6 +206,10 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                     Err(ParseError::LoneControlSequence(KnownCS::sqrt)) => {
                         let argument = one_expression(&mut list)?;
                         PostMac::Sqrt(box argument)
+                    }
+                    Err(ParseError::LoneControlSequence(KnownCS::left)) |
+                    Err(ParseError::LoneControlSequence(KnownCS::right)) => {
+                        continue;
                     }
                     e @ Err(_) => return e,
                     Ok(underscore @ PostMac::Op(UniOp::Std(Operator::Underscore))) => {
