@@ -3,12 +3,15 @@
 #[macro_use]
 extern crate nom;
 mod parser;
+mod output;
 
-use parser::ParseError;
+pub use output::LatexWriter;
+
 use std::convert::TryFrom;
 use std::str::FromStr;
-use std::string::String;
 use std::{fmt, mem};
+
+use parser::ParseError;
 
 const NULL_EXPRESSION: Expression = Expression::Atom(Atom::Natural(0));
 const NULL_IDX: &'static [TreeInt] = &[];
@@ -30,7 +33,9 @@ impl TreeIdx {
             let mut idxs = s.split(',')
                 .map(|d| usize::from_str(d).map_err(|_| AlgebraDSLError::IllFormattedIndex));
             // Pop the first index, because every expression/equation is in the trivial 0 idx
-            assert!(Some(Ok(0)) == idxs.next());
+            if Some(Ok(0)) != idxs.next() {
+                return Err(AlgebraDSLError::IllFormattedIndex);
+            }
             let mut v = vec![];
             for idx in idxs {
                 v.push(idx?);
@@ -40,6 +45,15 @@ impl TreeIdx {
     }
     fn as_ref<'a>(&'a self) -> TreeIdxRef<'a> {
         TreeIdxRef(&self.0[..])
+    }
+    fn push(&mut self, i: TreeInt) {
+        self.0.push(i)
+    }
+    fn pop(&mut self) -> Option<TreeInt> {
+        self.0.pop()
+    }
+    fn get(&self, i: usize) -> Option<TreeInt> {
+        self.0.get(i).cloned()
     }
 }
 
@@ -75,6 +89,13 @@ impl<'a> TreeIdxRef<'a> {
             None
         }
     }
+    pub fn grandparent(&self) -> Option<TreeIdxRef<'a>> {
+        if self.len() > 1 {
+            Some(TreeIdxRef(&self.0[..self.len() - 2]))
+        } else {
+            None
+        }
+    }
     pub fn last(&self) -> Option<usize> {
         if self.len() > 0 {
             Some(self.0[self.len() - 1])
@@ -82,9 +103,26 @@ impl<'a> TreeIdxRef<'a> {
             None
         }
     }
+    pub fn prefix(&self) -> Option<TreeIdxRef<'a>> {
+        if self.len() > 0 {
+            Some(TreeIdxRef(&self.0[0..(self.len() - 1)]))
+        } else {
+            None
+        }
+    }
     #[inline]
     pub fn len(&self) -> usize {
         self.0.len()
+    }
+    pub fn tail_from(&self, n: usize) -> Option<TreeIdxRef<'a>> {
+        if n < self.len() {
+            Some(TreeIdxRef(&self.0[n..]))
+        } else {
+            None
+        }
+    }
+    pub fn to_owned(&self) -> TreeIdx {
+        TreeIdx(self.0.iter().cloned().collect())
     }
 }
 
@@ -118,7 +156,6 @@ impl Equation {
 
 impl Indexable for Equation {
     fn get(&self, index: TreeIdxRef) -> Result<&Expression, AlgebraDSLError> {
-        println!("index {:?} in {:#?}", index, self);
         match index.first() {
             Some(0) => self.left.get(index.rest()),
             Some(1) => self.right.get(index.rest()),
@@ -134,41 +171,26 @@ impl Indexable for Equation {
     }
 }
 
-pub struct SiblingIndices<'a> {
-    parent_idx: TreeIdxRef<'a>,
-    // This list *must* be sorted
-    children: Vec<TreeInt>,
+#[derive(PartialEq, Debug, Clone)]
+pub enum SiblingIndices {
+    // Siblings in an associative soup (a sum or product).
+    AssocSoup {
+        parent_idx: TreeIdx,
+        // This list *must* be sorted. This is enforced by the constructor
+        children: Vec<TreeInt>,
+    },
+    Division {
+        division_idx: TreeIdx,
+        // These lists *must* be sorted. This is enforced by the constructor
+        //
+        // If they are empty it is understood to mean delete *no* elements
+        // If they are None that is understood to mean delete *all*
+        top_children: Option<Vec<TreeInt>>,
+        bottom_children: Option<Vec<TreeInt>>,
+    },
 }
 
-impl<'a> SiblingIndices<'a> {
-    /// If all the input indices share a parent, constructs a sibling index representing all of
-    /// them
-    pub fn from_indices(indices: &'a [TreeIdx]) -> Result<SiblingIndices<'a>, AlgebraDSLError> {
-        if indices.len() < 1 ||
-           indices.iter().map(|i| i.as_ref().len()).min().expect(UNREACH) == 0 {
-            return Err(AlgebraDSLError::InvalidSiblingIndices);
-        }
-        let first_parent = indices[0].as_ref().parent().expect(UNREACH);
-        if indices.iter().all(|idx| idx.as_ref().parent() == Some(first_parent)) {
-            let mut vec: Vec<_> =
-                indices.iter().map(|i| i.as_ref().last().expect(UNREACH)).collect();
-            vec.sort();
-            Ok(SiblingIndices {
-                parent_idx: first_parent,
-                children: vec,
-            })
-        } else {
-            Err(AlgebraDSLError::InvalidSiblingIndices)
-        }
-    }
-
-    /// Get the smallest child index
-    fn lowest_child_index(&self) -> usize {
-        self.children[0]
-    }
-}
-
-pub trait Indexable: fmt::Display + fmt::Debug {
+pub trait Indexable: fmt::Display + fmt::Debug + Clone {
     fn get(&self, index: TreeIdxRef) -> Result<&Expression, AlgebraDSLError>;
     fn get_mut(&mut self, index: TreeIdxRef) -> Result<&mut Expression, AlgebraDSLError>;
     fn replace(&mut self,
@@ -185,36 +207,156 @@ pub trait Indexable: fmt::Display + fmt::Debug {
         Ok(old)
     }
     fn delete(&mut self, indices: SiblingIndices) -> Result<(), AlgebraDSLError> {
-        match self.get_mut(indices.parent_idx)? {
-            &mut Expression::Sum(ref mut args) |
-            &mut Expression::Product(ref mut args) => {
-                if args.len() == indices.children.len() {
-                    return Err(AlgebraDSLError::InvalidDelete);
-                }
+        let cp = self.clone();
+        let res = self.delete_inner(indices);
+        if let Err(_) = res {
+            *self = cp;
+        }
+        res
+    }
 
-                for idx in indices.children.iter().rev() {
-                    args.remove(*idx);
+    /// May eat the structure on error
+    fn delete_inner(&mut self, indices: SiblingIndices) -> Result<(), AlgebraDSLError> {
+        use Expression as Ex;
+        match indices {
+            SiblingIndices::AssocSoup{ parent_idx, children } => {
+                match self.get_mut(parent_idx.as_ref())? {
+                    &mut Ex::Sum(ref mut args) |
+                    &mut Ex::Product(ref mut args) => {
+                        if args.len() == children.len() {
+                            return Err(AlgebraDSLError::InvalidDelete);
+                        }
+
+                        for idx in children.iter().rev() {
+                            args.remove(*idx);
+                        }
+                        Ok(())
+                    }
+                    _ => Err(AlgebraDSLError::InvalidSiblingIndices),
                 }
+            },
+            SiblingIndices::Division { division_idx, top_children, bottom_children } => {
+                let expr_ref = self.get_mut(division_idx.as_ref())?;
+                match expr_ref {
+                    &mut Ex::Division(..) => {},
+                    _ => return Err(AlgebraDSLError::InvalidDelete),
+                };
+                let (top, bottom) = match expr_ref.take() {
+                    Ex::Division(box top, box bottom) => {
+                        let new_top = match top_children.as_ref().map(Vec::as_slice) {
+                            Some(slice) if slice.len() == 0 => vec![top],
+                            Some(slice) => {
+                                match top {
+                                    Ex::Product(args) => delete_prod(args, slice),
+                                    _ => return Err(AlgebraDSLError::InvalidDelete),
+                                }
+                            }
+                            None => vec![],
+                        };
+                        let new_bottom = match bottom_children.as_ref().map(Vec::as_slice) {
+                            Some(slice) if slice.len() == 0 => vec![bottom],
+                            Some(slice) => {
+                                match bottom {
+                                    Ex::Product(args) => delete_prod(args, slice),
+                                    _ => return Err(AlgebraDSLError::InvalidDelete),
+                                }
+                            }
+                            None => vec![],
+                        };
+                        (new_top, new_bottom)
+                    },
+                    _ => unreachable!(),
+                };
+                *expr_ref = make_division(top, bottom);
                 Ok(())
-            }
-            _ => Err(AlgebraDSLError::InvalidSiblingIndices),
+            },
+        }
+    }
+
+    /// May eat the structure on error
+    fn replace_with_inner(&mut self, indices: SiblingIndices, expr: Expression) -> Result<(), AlgebraDSLError> {
+        use Expression as Ex;
+        match indices {
+            SiblingIndices::AssocSoup{ parent_idx, children } => {
+                match self.get_mut(parent_idx.as_ref())? {
+                    &mut Ex::Sum(ref mut args) |
+                    &mut Ex::Product(ref mut args) => {
+                        remove_args(args, children.as_slice());
+                        args.insert(children.iter().min().cloned().unwrap_or(0), expr);
+                        Ok(())
+                    }
+                    _ => Err(AlgebraDSLError::InvalidSiblingIndices),
+                }
+            },
+            SiblingIndices::Division { division_idx, top_children, bottom_children } => {
+                let expr_ref = self.get_mut(division_idx.as_ref())?;
+                match expr_ref {
+                    &mut Ex::Division(..) => {},
+                    _ => return Err(AlgebraDSLError::InvalidMake),
+                };
+                let (mut top, mut bottom) = match expr_ref.take() {
+                    Ex::Division(box top, box bottom) => {
+                        let new_top = match top_children.as_ref().map(Vec::as_slice) {
+                            Some(slice) if slice.len() == 0 => vec![top],
+                            Some(slice) => {
+                                match top {
+                                    Ex::Product(args) => delete_prod(args, slice),
+                                    _ => return Err(AlgebraDSLError::InvalidDelete),
+                                }
+                            }
+                            None => vec![],
+                        };
+                        let new_bottom = match bottom_children.as_ref().map(Vec::as_slice) {
+                            Some(slice) if slice.len() == 0 => vec![bottom],
+                            Some(slice) => {
+                                match bottom {
+                                    Ex::Product(args) => delete_prod(args, slice),
+                                    _ => return Err(AlgebraDSLError::InvalidDelete),
+                                }
+                            }
+                            None => vec![],
+                        };
+                        (new_top, new_bottom)
+                    },
+                    _ => unreachable!(),
+                };
+
+                // We figure out if it would be reasonable for the user to insert in various
+                // location, regardless of the expression they're inserting.
+                let top_idx = top_children.as_ref().map(|c| c.iter().cloned().min().unwrap_or(0)).unwrap_or(0);
+                let bottom_idx = bottom_children.as_ref().map(|c| c.iter().cloned().min().unwrap_or(0)).unwrap_or(0);
+                match expr {
+                    Ex::Division(box insert_top, box insert_bottom) => {
+                        top.insert(top_idx, insert_top);
+                        bottom.insert(bottom_idx, insert_bottom);
+                    }
+                    e => {
+                        match (top_children, bottom_children) {
+                            (Some(ref t), Some(_)) if t.len() == 0 => {
+                                bottom.insert(bottom_idx, e)
+                            }
+                            _ => {
+                                top.insert(top_idx, e)
+                            }
+                        }
+                    }
+                };
+                *expr_ref = make_division(top, bottom);
+                Ok(())
+            },
         }
     }
     fn replace_siblings(&mut self,
                         indices: SiblingIndices,
                         expr: Expression)
                         -> Result<(), AlgebraDSLError> {
-        match self.get_mut(indices.parent_idx)? {
-            &mut Expression::Sum(ref mut args) |
-            &mut Expression::Product(ref mut args) => {
-                for idx in indices.children.iter().rev() {
-                    args.remove(*idx);
-                }
-                args.insert(indices.lowest_child_index(), expr);
-                Ok(())
-            }
-            _ => Err(AlgebraDSLError::InvalidSiblingIndices),
+
+        let cp = self.clone();
+        let res = self.replace_with_inner(indices, expr);
+        if let Err(_) = res {
+            *self = cp;
         }
+        res
     }
     fn replace_with_str(&mut self,
                         index: &TreeIdx,
@@ -255,6 +397,135 @@ pub trait Indexable: fmt::Display + fmt::Debug {
         *expr = replacement;
         Ok(())
     }
+
+    /// If all the input indices share a parent, constructs a sibling index representing all of
+    /// them
+    fn make_siblings(&self, indices: &[TreeIdx]) -> Result<SiblingIndices, AlgebraDSLError> {
+        fn stem(indices: &[TreeIdx]) -> Option<(TreeIdx, Vec<TreeIdx>)> {
+            let mut v = vec![];
+            let mut i = 0;
+            if indices.len() == 0 { return None; }
+            loop {
+                let first = match indices[0].get(i) {
+                    None => break,
+                    Some(first) => first,
+                };
+                if indices.iter().any(|idx| idx.get(i) != Some(first)) {
+                    break;
+                }
+                v.push(first);
+                i += 1;
+            }
+            let tails = indices.iter().filter_map(|idx: &TreeIdx| idx.as_ref().tail_from(i).map(|idx| idx.to_owned())).collect();
+            Some((TreeIdx(v), tails))
+        }
+
+        if indices.len() < 1 ||
+           indices.iter().map(|i| i.as_ref().len()).min().expect(UNREACH) == 0 {
+            return Err(AlgebraDSLError::InvalidSiblingIndices);
+        }
+
+
+        let (mut trunk, mut branches) = stem(indices).ok_or(AlgebraDSLError::InvalidSiblingIndices)?;
+
+        if branches.len() == 0  {
+            // If there is only one index, push the trunk up one.
+            match trunk.pop() {
+                Some(last) => branches.push(TreeIdx(vec![last])),
+                None => return Err(AlgebraDSLError::InvalidSiblingIndices),
+            }
+        }
+
+        match self.get(trunk.as_ref())? {
+            &Expression::Sum(_) | &Expression::Product(_) => {
+                if branches.iter().any(|idx| idx.as_ref().len() != 1) {
+                    return Err(AlgebraDSLError::InvalidSiblingIndices);
+                }
+                let mut single_indices: Vec<_> = branches.iter().map(|idx| idx.as_ref().first().expect(UNREACH)).collect();
+                single_indices.sort();
+                single_indices.dedup();
+
+
+                if let Some(&Expression::Division(..)) = trunk.as_ref().prefix().and_then(|idx| self.get(idx).ok()) {
+                    let last = trunk.pop().expect(UNREACH);
+                    if last == 0 {
+                        Ok(SiblingIndices::Division{
+                            division_idx: trunk,
+                            top_children: Some(single_indices),
+                            bottom_children: Some(vec![]),
+                        })
+                    } else {
+                        Ok(SiblingIndices::Division{
+                            division_idx: trunk,
+                            top_children: Some(vec![]),
+                            bottom_children: Some(single_indices),
+                        })
+                    }
+                } else {
+                    Ok(SiblingIndices::AssocSoup{
+                        parent_idx: trunk,
+                        children: single_indices,
+                    })
+                }
+            }
+            &Expression::Division(..) => {
+                if branches.iter().any(|idx| idx.as_ref().len() > 2 || idx.as_ref().len() == 0) {
+                    return Err(AlgebraDSLError::InvalidSiblingIndices);
+                }
+                let delete_top = branches.iter().any(|idx| idx.as_ref().len() == 1 && idx.as_ref().first() == Some(0));
+                let delete_bottom = branches.iter().any(|idx| idx.as_ref().len() == 1 && idx.as_ref().first() == Some(1));
+                if delete_top && branches.iter().any(|idx| idx.as_ref().first() == Some(0) && idx.as_ref().len() > 1) {
+                    return Err(AlgebraDSLError::InvalidSiblingIndices);
+                }
+                if delete_bottom && branches.iter().any(|idx| idx.as_ref().first() == Some(1) && idx.as_ref().len() > 1) {
+                    return Err(AlgebraDSLError::InvalidSiblingIndices);
+                }
+                let top_vec = if delete_top {
+                    None
+                } else {
+                    Some(branches.iter().filter(|idx| idx.0[0] == 0).filter_map(|idx| idx.0.get(0).cloned()).collect())
+                };
+                let bottom_vec = if delete_bottom {
+                    None
+                } else {
+                    Some(branches.iter().filter(|idx| idx.0[0] == 1).filter_map(|idx| idx.0.get(1).cloned()).collect())
+                };
+                Ok(SiblingIndices::Division{
+                    division_idx: trunk,
+                    top_children: top_vec,
+                    bottom_children: bottom_vec,
+                })
+            }
+            _ => Err(AlgebraDSLError::InvalidSiblingIndices),
+        }
+    }
+
+}
+
+fn delete_prod(mut p: Vec<Expression>, is: &[TreeInt]) -> Vec<Expression> {
+    remove_args(&mut p, is);
+    p
+}
+
+fn remove_args(args: &mut Vec<Expression>, idxs: &[TreeInt]) {
+    for idx in idxs.iter().rev() {
+        args.remove(*idx);
+    }
+}
+
+fn make_division(mut top: Vec<Expression>, mut bottom: Vec<Expression>) -> Expression {
+    use Expression as Ex;
+    match (top.len(), bottom.len()) {
+        (0, 0) => Ex::Atom(Atom::Natural(1)),
+        (0, 1) => Ex::Division(box Ex::Atom(Atom::Natural(1)), box bottom.remove(0)),
+        (1, 0) => top.remove(0),
+        (1, 1) => Ex::Division(box top.remove(0), box bottom.remove(0)),
+        (0, _) => Ex::Division(box Ex::Atom(Atom::Natural(1)), box Ex::Product(bottom)),
+        (_, 0) => Ex::Product(top),
+        (1, _) => Ex::Division(box top.remove(0), box Ex::Product(bottom)),
+        (_, 1) => Ex::Division(box Ex::Product(top), box bottom.remove(0)),
+        (_, _) => Ex::Division(box Ex::Product(top), box Ex::Product(bottom)),
+    }
 }
 
 impl Expression {
@@ -286,6 +557,7 @@ impl Expression {
     pub fn inflate_division(self, expr: Expression) -> Self {
         Expression::Division(box self, box expr)
     }
+
     pub fn simplify_constants(self) -> Self {
         use Expression as Ex;
         match self {
@@ -404,7 +676,6 @@ impl Expression {
 
 impl Indexable for Expression {
     fn get(&self, index: TreeIdxRef) -> Result<&Expression, AlgebraDSLError> {
-        println!("index {:?} in {:#?}", index, self);
         match index.first() {
             None => Ok(self),
             Some(first) => {
@@ -485,6 +756,7 @@ pub enum AlgebraDSLError {
     IllFormattedIndex,
     IllFormattedCommand,
     InvalidDelete,
+    InvalidMake,
     InvalidSiblingIndices,
     MapExpression,
     NeedsExpression,
@@ -998,17 +1270,6 @@ pub enum Atom {
     Symbol(Symbol),
 }
 
-impl fmt::Display for Atom {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &Atom::PlainVariable(c) => write!(f, "<mi>{}</mi>", c),
-            &Atom::Natural(n) => write!(f, "<mn>{}</mn>", n),
-            &Atom::Floating(r) => write!(f, "<mn>{}</mn>", r),
-            &Atom::Symbol(sym) => write!(f, "<mo>{}</mo>", sym.as_math_ml()),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Symbol {
     /// Symbols which are effectively variable names
@@ -1388,201 +1649,4 @@ impl EqOrExpr {
 
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use Expression as Ex;
-
-    // This macro is an assertion with nicely formatted failure output
-    macro_rules! assert_expected_eq_actual {
-        ($a:expr, $b:expr) => ({
-            let (a, b) = (&$a, &$b);
-            assert!(*a == *b,
-                    "\nExpected `{:?}` is not equal to Actual `{:?}`\
-                     \nAssertion: `assert_expected_eq_actual!({}, {})`",
-                    *a,
-                    *b,
-                    stringify!($a),
-                    stringify!($b));
-        })
-    }
-
-    #[test]
-    fn format_power() {
-        let expr = Ex::Power(box Ex::Atom(Atom::PlainVariable('x')),
-                             box Ex::Atom(Atom::PlainVariable('y')));
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                        mathTreeNode=\"0\"><msup><mrow \
-                        mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
-                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></msup></mrow></math>";
-        let test = format!("{}", expr);
-        assert_expected_eq_actual!(expected, test);
-    }
-
-    #[test]
-    fn index_power() {
-        let expr = Ex::Power(box Ex::Atom(Atom::PlainVariable('x')),
-                             box Ex::Atom(Atom::PlainVariable('y')));
-        let r = expr.get(TreeIdx(vec![1]).as_ref());
-        let rr = &Ex::Atom(Atom::PlainVariable('y'));
-        let e = Ok(rr);
-        assert_expected_eq_actual!(e, r);
-    }
-
-    #[test]
-    fn format_frac() {
-        let expr = Ex::Division(box Ex::Atom(Atom::PlainVariable('x')),
-                                box Ex::Atom(Atom::PlainVariable('y')));
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                        mathTreeNode=\"0\"><mo form=\"prefix\">(</mo><mfrac><mrow \
-                        mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
-                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></mfrac>\
-                        <mo form=\"postfix\">)</mo></mrow></math>";
-        let test = format!("{}", expr);
-        assert_expected_eq_actual!(expected, test);
-    }
-
-    #[test]
-    fn format_negation() {
-        let expr = Ex::Negation(box Ex::Atom(Atom::PlainVariable('x')));
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                        mathTreeNode=\"0\"><mo>-</mo><mrow \
-                        mathTreeNode=\"0,0\"><mi>x</mi></mrow></mrow></math>";
-        let test = format!("{}", expr);
-        assert_expected_eq_actual!(expected, test);
-    }
-
-    #[test]
-    fn format_sub() {
-        let expr = Ex::Subscript(box Ex::Atom(Atom::PlainVariable('x')),
-                                 box Ex::Atom(Atom::PlainVariable('y')));
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                        mathTreeNode=\"0\"><mo form=\"prefix\">(</mo><msub><mrow \
-                        mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
-                        mathTreeNode=\"0,1\"><mi>y</mi></mrow></msub><mo \
-                        form=\"postfix\">)</mo></mrow></math>";
-        let test = format!("{}", expr);
-        assert_expected_eq_actual!(expected, test);
-    }
-
-    #[test]
-    fn format_add() {
-        let expr = Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('x')),
-                                Ex::Atom(Atom::PlainVariable('y')),
-                                Ex::Atom(Atom::PlainVariable('z'))]);
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                        mathTreeNode=\"0\"><mrow \
-                        mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
-                        mathTreeNode=\"0,1\"><mi>y</mi></mrow><mo>+</mo><mrow \
-                        mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
-        let test = format!("{}", expr);
-        assert_expected_eq_actual!(expected, test);
-    }
-
-    #[test]
-    fn format_prod() {
-        let expr = Ex::Product(vec![Ex::Atom(Atom::PlainVariable('x')),
-                                    Ex::Atom(Atom::PlainVariable('y')),
-                                    Ex::Atom(Atom::PlainVariable('z'))]);
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                        mathTreeNode=\"0\"><mrow \
-                        mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
-                        mathTreeNode=\"0,1\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow \
-                        mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
-        let test = format!("{}", expr);
-        assert_expected_eq_actual!(expected, test);
-    }
-
-    #[test]
-    fn format_prod_add() {
-        let expr = Ex::Product(vec![
-            Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('x')), Ex::Atom(Atom::PlainVariable('y'))]),
-            Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('z')), Ex::Atom(Atom::PlainVariable('a'))])]);
-        let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                        mathTreeNode=\"0\"><mrow \
-                        mathTreeNode=\"0,0\"><mo form=\"prefix\">(</mo><mrow \
-                        mathTreeNode=\"0,0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
-                        mathTreeNode=\"0,0,1\"><mi>y</mi></mrow><mo form=\"postfix\">)</mo></mrow><mo>&#8290;</mo><mrow \
-                        mathTreeNode=\"0,1\"><mo form=\"prefix\">(</mo><mrow \
-                        mathTreeNode=\"0,1,0\"><mi>z</mi></mrow><mo>+</mo><mrow \
-                        mathTreeNode=\"0,1,1\"><mi>a</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
-        let test = format!("{}", expr);
-        assert_expected_eq_actual!(expected, test);
-    }
-
-    #[test]
-    fn replace_siblings() {
-        let mut before = Ex::Product(vec![Ex::Atom(Atom::Natural(3)),
-                                          Ex::Atom(Atom::Natural(4)),
-                                          Ex::Atom(Atom::PlainVariable('x')),
-                                          Ex::Atom(Atom::Natural(7))]);
-        let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
-        let after = Ex::Product(vec![Ex::Atom(Atom::Natural(84)),
-                                     Ex::Atom(Atom::PlainVariable('x'))]);
-        let indices: Vec<_> =
-            index_strings.into_iter().map(TreeIdx::from_str).map(Result::unwrap).collect();
-        println!("{:#?}", indices);
-        let siblings = SiblingIndices::from_indices(indices.as_slice()).unwrap();
-        let replacement = Ex::Atom(Atom::Natural(84));
-        before.replace_siblings(siblings, replacement).unwrap();
-        assert_expected_eq_actual!(after, before);
-    }
-
-    #[test]
-    fn delete_expr() {
-        let mut before = Ex::Product(vec![Ex::Atom(Atom::Natural(3)),
-                                          Ex::Atom(Atom::Natural(4)),
-                                          Ex::Atom(Atom::PlainVariable('x')),
-                                          Ex::Atom(Atom::Natural(7))]);
-        let v = vec![TreeIdx::from_str("#(mtn:0,1)").unwrap()];
-        let idx = SiblingIndices::from_indices(&v).unwrap();
-        let after = Ex::Product(vec![Ex::Atom(Atom::Natural(3)),
-                                     Ex::Atom(Atom::PlainVariable('x')),
-                                     Ex::Atom(Atom::Natural(7))]);
-        before.delete(idx).unwrap();
-        assert_expected_eq_actual!(after, before);
-    }
-
-    #[test]
-    fn simplify_product() {
-        let before = Ex::Product(vec![Ex::Atom(Atom::Natural(3)),
-                                      Ex::Atom(Atom::Natural(4)),
-                                      Ex::Atom(Atom::Natural(7))]);
-        let after = Ex::Atom(Atom::Natural(84));
-        assert_expected_eq_actual!(after, before.simplify_constants());
-
-        let before = Ex::Product(vec![Ex::Atom(Atom::Natural(3)),
-                                      Ex::Atom(Atom::Floating(4.0)),
-                                      Ex::Atom(Atom::Natural(7))]);
-        let after = Ex::Atom(Atom::Floating(84.0));
-        assert_expected_eq_actual!(after, before.simplify_constants());
-    }
-
-    #[test]
-    fn simplify_sum() {
-        let before = Ex::Sum(vec![Ex::Atom(Atom::Natural(3)),
-                                  Ex::Atom(Atom::Natural(4)),
-                                  Ex::Atom(Atom::Natural(7))]);
-        let after = Ex::Atom(Atom::Natural(14));
-        assert_expected_eq_actual!(after, before.simplify_constants());
-
-        let before = Ex::Sum(vec![Ex::Atom(Atom::Natural(3)),
-                                  Ex::Atom(Atom::Floating(4.0)),
-                                  Ex::Atom(Atom::Natural(7))]);
-        let after = Ex::Atom(Atom::Floating(14.0));
-        assert_expected_eq_actual!(after, before.simplify_constants());
-    }
-
-    #[test]
-    fn simplify_division() {
-        let before = Ex::Division(box Ex::Atom(Atom::Natural(8)),
-                                  box Ex::Atom(Atom::Natural(4)));
-        let after = Ex::Atom(Atom::Natural(2));
-        assert_expected_eq_actual!(after, before.simplify_constants());
-
-        let before = Ex::Division(box Ex::Atom(Atom::Floating(8.)),
-                                  box Ex::Atom(Atom::Floating(4.)));
-        let after = Ex::Atom(Atom::Floating(2.));
-        assert_expected_eq_actual!(after, before.simplify_constants());
-
-    }
-}
+mod tests;

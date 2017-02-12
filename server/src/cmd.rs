@@ -36,23 +36,19 @@ impl Cmd {
             (Cmd::Make(mut indices, new_expr), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
                 if indices.len() == 1 {
-                    let idx = indices.pop().expect("unreachable");
-                    expr.replace(&idx, new_expr)?;
-                    Ok(Return::EqOrExpr(expr))
+                    expr.replace(&indices[0], new_expr)?;
                 } else {
-                    if indices.len() > 1 {
-                        let sibs = SiblingIndices::from_indices(indices.as_slice())?;
-                        expr.replace_siblings(sibs, new_expr)?;
-                        Ok(Return::EqOrExpr(expr))
-                    } else {
-                        Err(AlgebraDSLError::InvalidIdx)
-                    }
+                    let sibs = old_expr.make_siblings(indices.as_slice())?;
+                    println!("Make location {:?} into {:?}", sibs, new_expr);
+                    expr.replace_siblings(sibs, new_expr)?;
                 }
+                Ok(Return::EqOrExpr(expr))
             }
             (Cmd::Make(_, _), None) => Err(AlgebraDSLError::NeedsExpression),
             (Cmd::Delete(indices), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
-                expr.delete(SiblingIndices::from_indices(indices.as_slice())?)?;
+                let sibs = old_expr.make_siblings(indices.as_slice())?;
+                expr.delete(sibs)?;
                 Ok(Return::EqOrExpr(expr))
             }
             (Cmd::Delete(_), None) => Err(AlgebraDSLError::NeedsExpression),

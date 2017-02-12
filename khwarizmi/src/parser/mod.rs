@@ -68,9 +68,9 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
             tokens.push(PostMac::Op(UniOp::Std(Operator::End)));
             tokens.reverse();
             while let Some(token) = tokens.pop() {
-                println!("New Round\n\tOps:   {:?}\n\tExprs: {:?}",
-                         operator_stack,
-                         expression_stack);
+//                println!("New Round\n\tOps:   {:?}\n\tExprs: {:?}",
+//                         operator_stack,
+//                         expression_stack);
                 match token {
                     PostMac::Op(next_op) => {
                         while operator_stack.last().expect(UNREACH).right_precedence() >
@@ -190,9 +190,9 @@ pub fn parse_equation(input: &str) -> Result<Equation, ParseError> {
 
 pub fn parse_expr(input: &str) -> Result<Expression, ParseError> {
     let latex_tokens = latex::parse_tokens(input).map_err(ParseError::LatexError)?;
-    println!("{:#?}", latex_tokens);
+    //println!("{:#?}", latex_tokens);
     let expanded = mac::to_known(latex_tokens)?;
-    println!("{:#?}", expanded);
+    //println!("{:#?}", expanded);
     parse_operators(expanded)
 }
 
