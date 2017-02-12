@@ -261,12 +261,9 @@ function clickMathCallback(event) {
             subTreeNodes[i].removeAttribute('highlighted');
         }
 
-        var inside = document.createElement('span');
-        inside.className = 'mjx-math mjx-chtml mathInEquation';
-        inside.appendChild(copy);
-
         var toInsert = document.createElement('span');
-        toInsert.appendChild(inside);
+        toInsert.className = 'mjx-math mjx-chtml mathinequation';
+        toInsert.appendChild(copy);
 
         toInsert.setAttribute('highlighted',
             currentCM.availColors[currentCM.availColors.length - 1]);
