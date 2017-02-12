@@ -41,11 +41,10 @@ fn index_power() {
 fn format_frac() {
     let expr = Ex::Division(box Ex::Atom(Atom::PlainVariable('x')),
                             box Ex::Atom(Atom::PlainVariable('y')));
-    let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                    mathTreeNode=\"0\"><mfrac><mrow \
-                    mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
-                    mathTreeNode=\"0,1\"><mi>y</mi></mrow></mfrac>\
-                    </mrow></math>";
+    let expected =
+        "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mfrac><mrow \
+         mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
+         mathTreeNode=\"0,1\"><mi>y</mi></mrow></mfrac></mrow></math>";
     let test = format!("{}", expr);
     assert_expected_eq_actual!(expected, test);
 }
@@ -105,14 +104,14 @@ fn format_prod_add() {
     let expr = Ex::Product(vec![
         Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('x')), Ex::Atom(Atom::PlainVariable('y'))]),
         Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('z')), Ex::Atom(Atom::PlainVariable('a'))])]);
-    let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                    mathTreeNode=\"0\"><mrow \
-                    mathTreeNode=\"0,0\"><mo form=\"prefix\">(</mo><mrow \
-                    mathTreeNode=\"0,0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
-                    mathTreeNode=\"0,0,1\"><mi>y</mi></mrow><mo form=\"postfix\">)</mo></mrow><mo>&#8290;</mo><mrow \
-                    mathTreeNode=\"0,1\"><mo form=\"prefix\">(</mo><mrow \
-                    mathTreeNode=\"0,1,0\"><mi>z</mi></mrow><mo>+</mo><mrow \
-                    mathTreeNode=\"0,1,1\"><mi>a</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
+    let expected =
+        "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mrow \
+         mathTreeNode=\"0,0\"><mo form=\"prefix\">(</mo><mrow \
+         mathTreeNode=\"0,0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
+         mathTreeNode=\"0,0,1\"><mi>y</mi></mrow><mo \
+         form=\"postfix\">)</mo></mrow><mo>&#8290;</mo><mrow mathTreeNode=\"0,1\"><mo \
+         form=\"prefix\">(</mo><mrow mathTreeNode=\"0,1,0\"><mi>z</mi></mrow><mo>+</mo><mrow \
+         mathTreeNode=\"0,1,1\"><mi>a</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
     let test = format!("{}", expr);
     assert_expected_eq_actual!(expected, test);
 }
@@ -215,12 +214,12 @@ fn simplify_division() {
 #[test]
 fn simplify_power() {
     let before = Ex::Power(box Ex::Atom(Atom::Natural(3)),
-                              box Ex::Atom(Atom::Natural(4)));
+                           box Ex::Atom(Atom::Natural(4)));
     let after = Ex::Atom(Atom::Natural(81));
     assert_expected_eq_actual!(after, before.simplify_constants());
 
     let before = Ex::Power(box Ex::Atom(Atom::Floating(3.)),
-                              box Ex::Atom(Atom::Natural(4)));
+                           box Ex::Atom(Atom::Natural(4)));
     let after = Ex::Atom(Atom::Floating(81.));
     assert_expected_eq_actual!(after, before.simplify_constants());
 

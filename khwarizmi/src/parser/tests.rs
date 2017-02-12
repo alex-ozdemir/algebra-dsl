@@ -1,6 +1,7 @@
 use super::*;
 
 use Expression as Ex;
+use FunctionSymbol;
 use Atom as At;
 
 // This macro is an assertion with nicely formatted failure output
@@ -205,19 +206,34 @@ fn sqrt() {
 
 #[test]
 fn sin() {
-    let expected = Ex::LimitOp(OperatorSymbol::sin,
-                               None,
-                               None,
-                               box Ex::Atom(Atom::PlainVariable('x')));
+    let expected = Ex::Application(box FunctionSymbol::sin.as_expr(),
+                                   box Ex::Atom(Atom::PlainVariable('x')));
     assert_expected_eq_actual!(Ok(expected), parse_expr("\\sin x"));
 }
 
 #[test]
-#[ignore]
 fn sin_with_power() {
-    let expected = Ex::Application(box Ex::Atom(At::Symbol(Symbol::Operator(OperatorSymbol::sin))),
-                                   box Ex::Atom(At::PlainVariable('x')));
+    let expected = Ex::Power(box Ex::Application(box FunctionSymbol::sin.as_expr(),
+                                                 box Ex::Atom(At::PlainVariable('x'))),
+                             box Ex::Atom(At::Natural(2)));
     assert_expected_eq_actual!(Ok(expected), parse_expr("\\sin^2 x"));
+}
+
+#[test]
+fn log_with_power_and_sub() {
+    let f = Ex::Subscript(box FunctionSymbol::log.as_expr(),
+                          box Ex::Atom(Atom::Natural(5)));
+    let expected = Ex::Power(box Ex::Application(box f, box Ex::Atom(At::PlainVariable('x'))),
+                             box Ex::Atom(Atom::Natural(2)));
+    assert_expected_eq_actual!(Ok(expected), parse_expr("\\log^2_5 x"));
+}
+
+#[test]
+fn cot_with_power() {
+    let expected = Ex::Power(box Ex::Application(box FunctionSymbol::cot.as_expr(),
+                                                 box Ex::Atom(At::PlainVariable('x'))),
+                             box Ex::Atom(At::Floating(2.6)));
+    assert_expected_eq_actual!(Ok(expected), parse_expr("\\cot^{2.6} x"));
 }
 
 #[test]

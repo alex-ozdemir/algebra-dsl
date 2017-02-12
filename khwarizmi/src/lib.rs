@@ -193,7 +193,7 @@ pub enum SiblingIndices {
 impl SiblingIndices {
     fn parent(&self) -> TreeIdxRef {
         match self {
-            &SiblingIndices::AssocSoup{ ref parent_idx, .. } => parent_idx.as_ref(),
+            &SiblingIndices::AssocSoup { ref parent_idx, .. } => parent_idx.as_ref(),
             &SiblingIndices::Division { ref division_idx, .. } => division_idx.as_ref(),
         }
     }
@@ -228,7 +228,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
     fn delete_inner(&mut self, indices: SiblingIndices) -> Result<(), AlgebraDSLError> {
         use Expression as Ex;
         match indices {
-            SiblingIndices::AssocSoup{ parent_idx, children } => {
+            SiblingIndices::AssocSoup { parent_idx, children } => {
                 match self.get_mut(parent_idx.as_ref())? {
                     &mut Ex::Sum(ref mut args) |
                     &mut Ex::Product(ref mut args) => {
@@ -243,11 +243,11 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                     }
                     _ => Err(AlgebraDSLError::InvalidSiblingIndices),
                 }
-            },
+            }
             SiblingIndices::Division { division_idx, top_children, bottom_children } => {
                 let expr_ref = self.get_mut(division_idx.as_ref())?;
                 match expr_ref {
-                    &mut Ex::Division(..) => {},
+                    &mut Ex::Division(..) => {}
                     _ => return Err(AlgebraDSLError::InvalidDelete),
                 };
                 let (top, bottom) = match expr_ref.take() {
@@ -273,20 +273,23 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                             None => vec![],
                         };
                         (new_top, new_bottom)
-                    },
+                    }
                     _ => unreachable!(),
                 };
                 *expr_ref = make_division(top, bottom);
                 Ok(())
-            },
+            }
         }
     }
 
     /// May eat the structure on error
-    fn replace_with_inner(&mut self, indices: &SiblingIndices, expr: Expression) -> Result<(), AlgebraDSLError> {
+    fn replace_with_inner(&mut self,
+                          indices: &SiblingIndices,
+                          expr: Expression)
+                          -> Result<(), AlgebraDSLError> {
         use Expression as Ex;
         match indices {
-            &SiblingIndices::AssocSoup{ ref parent_idx, ref children } => {
+            &SiblingIndices::AssocSoup { ref parent_idx, ref children } => {
                 let r = self.get_mut(parent_idx.as_ref())?;
                 let new: Expression = match r.take() {
                     Ex::Sum(mut args) => {
@@ -311,11 +314,13 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 };
                 *r = new;
                 Ok(())
-            },
-            &SiblingIndices::Division { ref division_idx, ref top_children, ref bottom_children } => {
+            }
+            &SiblingIndices::Division { ref division_idx,
+                                        ref top_children,
+                                        ref bottom_children } => {
                 let expr_ref = self.get_mut(division_idx.as_ref())?;
                 match expr_ref {
-                    &mut Ex::Division(..) => {},
+                    &mut Ex::Division(..) => {}
                     _ => return Err(AlgebraDSLError::InvalidMake),
                 };
                 let (mut top, mut bottom) = match expr_ref.take() {
@@ -341,14 +346,18 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                             None => vec![],
                         };
                         (new_top, new_bottom)
-                    },
+                    }
                     _ => unreachable!(),
                 };
 
                 // We figure out if it would be reasonable for the user to insert in various
                 // location, regardless of the expression they're inserting.
-                let top_idx = top_children.as_ref().map(|c| c.iter().cloned().min().unwrap_or(0)).unwrap_or(0);
-                let bottom_idx = bottom_children.as_ref().map(|c| c.iter().cloned().min().unwrap_or(0)).unwrap_or(0);
+                let top_idx = top_children.as_ref()
+                    .map(|c| c.iter().cloned().min().unwrap_or(0))
+                    .unwrap_or(0);
+                let bottom_idx = bottom_children.as_ref()
+                    .map(|c| c.iter().cloned().min().unwrap_or(0))
+                    .unwrap_or(0);
                 match expr {
                     Ex::Division(box insert_top, box insert_bottom) => {
                         top.insert(top_idx, insert_top);
@@ -359,15 +368,13 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                             (&Some(ref t), &Some(_)) if t.len() == 0 => {
                                 bottom.insert(bottom_idx, e)
                             }
-                            _ => {
-                                top.insert(top_idx, e)
-                            }
+                            _ => top.insert(top_idx, e),
                         }
                     }
                 };
                 *expr_ref = make_division(top, bottom);
                 Ok(())
-            },
+            }
         }
     }
     fn replace_siblings(&mut self,
@@ -429,7 +436,9 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         fn stem(indices: &[TreeIdx]) -> Option<(TreeIdx, Vec<TreeIdx>)> {
             let mut v = vec![];
             let mut i = 0;
-            if indices.len() == 0 { return None; }
+            if indices.len() == 0 {
+                return None;
+            }
             loop {
                 let first = match indices[0].get(i) {
                     None => break,
@@ -441,7 +450,9 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 v.push(first);
                 i += 1;
             }
-            let tails = indices.iter().filter_map(|idx: &TreeIdx| idx.as_ref().tail_from(i).map(|idx| idx.to_owned())).collect();
+            let tails = indices.iter()
+                .filter_map(|idx: &TreeIdx| idx.as_ref().tail_from(i).map(|idx| idx.to_owned()))
+                .collect();
             Some((TreeIdx(v), tails))
         }
 
@@ -451,9 +462,10 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         }
 
 
-        let (mut trunk, mut branches) = stem(indices).ok_or(AlgebraDSLError::InvalidSiblingIndices)?;
+        let (mut trunk, mut branches) =
+            stem(indices).ok_or(AlgebraDSLError::InvalidSiblingIndices)?;
 
-        if branches.len() == 0  {
+        if branches.len() == 0 {
             // If there is only one index, push the trunk up one.
             match trunk.pop() {
                 Some(last) => branches.push(TreeIdx(vec![last])),
@@ -462,10 +474,12 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         }
 
         match self.get(trunk.as_ref())? {
-            &Expression::Sum(ref args) | &Expression::Product(ref args) => {
+            &Expression::Sum(ref args) |
+            &Expression::Product(ref args) => {
                 if branches.iter().any(|idx| {
                     if idx.as_ref().len() != 1 {
-                        if let Some(&Expression::Negation(_)) = idx.as_ref().first().and_then(|i| args.get(i)) {
+                        if let Some(&Expression::Negation(_)) =
+                            idx.as_ref().first().and_then(|i| args.get(i)) {
                             false
                         } else {
                             true
@@ -476,28 +490,30 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 }) {
                     return Err(AlgebraDSLError::InvalidSiblingIndices);
                 }
-                let mut single_indices: Vec<_> = branches.iter().map(|idx| idx.as_ref().first().expect(UNREACH)).collect();
+                let mut single_indices: Vec<_> =
+                    branches.iter().map(|idx| idx.as_ref().first().expect(UNREACH)).collect();
                 single_indices.sort();
                 single_indices.dedup();
 
 
-                if let Some(&Expression::Division(..)) = trunk.as_ref().prefix().and_then(|idx| self.get(idx).ok()) {
+                if let Some(&Expression::Division(..)) =
+                    trunk.as_ref().prefix().and_then(|idx| self.get(idx).ok()) {
                     let last = trunk.pop().expect(UNREACH);
                     if last == 0 {
-                        Ok(SiblingIndices::Division{
+                        Ok(SiblingIndices::Division {
                             division_idx: trunk,
                             top_children: Some(single_indices),
                             bottom_children: Some(vec![]),
                         })
                     } else {
-                        Ok(SiblingIndices::Division{
+                        Ok(SiblingIndices::Division {
                             division_idx: trunk,
                             top_children: Some(vec![]),
                             bottom_children: Some(single_indices),
                         })
                     }
                 } else {
-                    Ok(SiblingIndices::AssocSoup{
+                    Ok(SiblingIndices::AssocSoup {
                         parent_idx: trunk,
                         children: single_indices,
                     })
@@ -507,25 +523,37 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 if branches.iter().any(|idx| idx.as_ref().len() > 2 || idx.as_ref().len() == 0) {
                     return Err(AlgebraDSLError::InvalidSiblingIndices);
                 }
-                let delete_top = branches.iter().any(|idx| idx.as_ref().len() == 1 && idx.as_ref().first() == Some(0));
-                let delete_bottom = branches.iter().any(|idx| idx.as_ref().len() == 1 && idx.as_ref().first() == Some(1));
-                if delete_top && branches.iter().any(|idx| idx.as_ref().first() == Some(0) && idx.as_ref().len() > 1) {
+                let delete_top = branches.iter()
+                    .any(|idx| idx.as_ref().len() == 1 && idx.as_ref().first() == Some(0));
+                let delete_bottom = branches.iter()
+                    .any(|idx| idx.as_ref().len() == 1 && idx.as_ref().first() == Some(1));
+                if delete_top &&
+                   branches.iter()
+                    .any(|idx| idx.as_ref().first() == Some(0) && idx.as_ref().len() > 1) {
                     return Err(AlgebraDSLError::InvalidSiblingIndices);
                 }
-                if delete_bottom && branches.iter().any(|idx| idx.as_ref().first() == Some(1) && idx.as_ref().len() > 1) {
+                if delete_bottom &&
+                   branches.iter()
+                    .any(|idx| idx.as_ref().first() == Some(1) && idx.as_ref().len() > 1) {
                     return Err(AlgebraDSLError::InvalidSiblingIndices);
                 }
                 let top_vec = if delete_top {
                     None
                 } else {
-                    Some(branches.iter().filter(|idx| idx.0[0] == 0).filter_map(|idx| idx.0.get(0).cloned()).collect())
+                    Some(branches.iter()
+                        .filter(|idx| idx.0[0] == 0)
+                        .filter_map(|idx| idx.0.get(0).cloned())
+                        .collect())
                 };
                 let bottom_vec = if delete_bottom {
                     None
                 } else {
-                    Some(branches.iter().filter(|idx| idx.0[0] == 1).filter_map(|idx| idx.0.get(1).cloned()).collect())
+                    Some(branches.iter()
+                        .filter(|idx| idx.0[0] == 1)
+                        .filter_map(|idx| idx.0.get(1).cloned())
+                        .collect())
                 };
-                Ok(SiblingIndices::Division{
+                Ok(SiblingIndices::Division {
                     division_idx: trunk,
                     top_children: top_vec,
                     bottom_children: bottom_vec,
@@ -534,7 +562,6 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             _ => Err(AlgebraDSLError::InvalidSiblingIndices),
         }
     }
-
 }
 
 fn delete_prod(mut p: Vec<Expression>, is: &[TreeInt]) -> Vec<Expression> {
@@ -697,14 +724,13 @@ impl Expression {
                 }
             }
             Ex::LimitOp(sym, sub, sup, op) => {
-                Ex::LimitOp(sym, sub.map(|box x| box x.simplify_constants()),
-                                 sup.map(|box x| box x.simplify_constants()),
-                                  box op.simplify_constants())
+                Ex::LimitOp(sym,
+                            sub.map(|box x| box x.simplify_constants()),
+                            sup.map(|box x| box x.simplify_constants()),
+                            box op.simplify_constants())
             }
-            Ex::Application(func, arg) => {
-                Ex::Application(func, box arg.simplify_constants())
-            }
-            e => e
+            Ex::Application(func, arg) => Ex::Application(func, box arg.simplify_constants()),
+            e => e,
         }
     }
 }
@@ -893,34 +919,110 @@ pub enum OperatorSymbol {
     oint,
     sum,
     prod,
-    // Functions
-    arccos,
-    cos,
-    csc,
-    exp,
     limsup,
     min,
-    sinh,
-    arcsin,
-    cosh,
     gcd,
-    lg,
-    ln,
     sup,
-    arctan,
-    cot,
     det,
     lim,
-    log,
-    sec,
-    tan,
-    coth,
     inf,
     liminf,
     max,
-    sin,
-    tanh,
     pm,
+    Function(FunctionSymbol),
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FunctionSymbol {
+    // Superscriptable
+    sin,
+    cos,
+    tan,
+    csc,
+    sec,
+    cot,
+    arcsin,
+    arccos,
+    arctan,
+    sinh,
+    cosh,
+    tanh,
+    coth,
+
+    // Subscriptable & superscriptable
+    lg,
+    ln,
+    log,
+
+    // Neither
+    exp,
+}
+
+impl FunctionSymbol {
+    fn as_latex(&self) -> &'static str {
+        match self {
+            &FunctionSymbol::arccos => "\\arccos",
+            &FunctionSymbol::cos => "\\cos",
+            &FunctionSymbol::csc => "\\csc",
+            &FunctionSymbol::exp => "\\exp",
+            &FunctionSymbol::sinh => "\\sinh",
+            &FunctionSymbol::arcsin => "\\arcsin",
+            &FunctionSymbol::cosh => "\\cosh",
+            &FunctionSymbol::lg => "\\lg",
+            &FunctionSymbol::ln => "\\ln",
+            &FunctionSymbol::arctan => "\\arctan",
+            &FunctionSymbol::cot => "\\cot",
+            &FunctionSymbol::log => "\\log",
+            &FunctionSymbol::sec => "\\sec",
+            &FunctionSymbol::tan => "\\tan",
+            &FunctionSymbol::coth => "\\coth",
+            &FunctionSymbol::sin => "\\sin",
+            &FunctionSymbol::tanh => "\\tanh",
+        }
+    }
+    fn as_math_ml(&self) -> &'static str {
+        match self {
+            &FunctionSymbol::arccos => "<mi>arccos</mi>",
+            &FunctionSymbol::cos => "<mi>cos</mi>",
+            &FunctionSymbol::csc => "<mi>csc</mi>",
+            &FunctionSymbol::exp => "<mi>exp</mi>",
+            &FunctionSymbol::sinh => "<mi>sinh</mi>",
+            &FunctionSymbol::arcsin => "<mi>arcsin</mi>",
+            &FunctionSymbol::cosh => "<mi>cosh</mi>",
+            &FunctionSymbol::lg => "<mi>lg</mi>",
+            &FunctionSymbol::ln => "<mi>ln</mi>",
+            &FunctionSymbol::arctan => "<mi>arctan</mi>",
+            &FunctionSymbol::cot => "<mi>cot</mi>",
+            &FunctionSymbol::log => "<mi>log</mi>",
+            &FunctionSymbol::sec => "<mi>sec</mi>",
+            &FunctionSymbol::tan => "<mi>tan</mi>",
+            &FunctionSymbol::coth => "<mi>coth</mi>",
+            &FunctionSymbol::sin => "<mi>sin</mi>",
+            &FunctionSymbol::tanh => "<mi>tanh</mi>",
+        }
+    }
+    fn as_expr(self) -> Expression {
+        Expression::Atom(Atom::Symbol(Symbol::Operator(OperatorSymbol::Function(self))))
+    }
+    fn accepts_subscripts(self) -> bool {
+        use FunctionSymbol::*;
+        match self {
+            lg | ln | log => true,
+            exp => false,
+            sin | cos | tan | csc | sec | cot | arcsin | arccos | arctan | sinh | cosh | tanh |
+            coth => false,
+        }
+    }
+    fn accepts_superscripts(self) -> bool {
+        use FunctionSymbol::*;
+        match self {
+            lg | ln | log => true,
+            exp => false,
+            sin | cos | tan | csc | sec | cot | arcsin | arccos | arctan | sinh | cosh | tanh |
+            coth => true,
+        }
+    }
 }
 
 impl OperatorSymbol {
@@ -930,33 +1032,17 @@ impl OperatorSymbol {
             &OperatorSymbol::oint => "<mo>&oint;</mo>",
             &OperatorSymbol::sum => "<mo>&sum;</mo>",
             &OperatorSymbol::prod => "<mo>&prod;</mo>",
-            &OperatorSymbol::arccos => "<mi>arccos</mi>",
-            &OperatorSymbol::cos => "<mi>cos</mi>",
-            &OperatorSymbol::csc => "<mi>csc</mi>",
-            &OperatorSymbol::exp => "<mi>exp</mi>",
             &OperatorSymbol::limsup => "<mi>limsup</mi>",
             &OperatorSymbol::min => "<mi>min</mi>",
-            &OperatorSymbol::sinh => "<mi>sinh</mi>",
-            &OperatorSymbol::arcsin => "<mi>arcsin</mi>",
-            &OperatorSymbol::cosh => "<mi>cosh</mi>",
             &OperatorSymbol::gcd => "<mi>gcd</mi>",
-            &OperatorSymbol::lg => "<mi>lg</mi>",
-            &OperatorSymbol::ln => "<mi>ln</mi>",
             &OperatorSymbol::sup => "<mi>sup</mi>",
-            &OperatorSymbol::arctan => "<mi>arctan</mi>",
-            &OperatorSymbol::cot => "<mi>cot</mi>",
             &OperatorSymbol::det => "<mi>det</mi>",
             &OperatorSymbol::lim => "<mi>lim</mi>",
-            &OperatorSymbol::log => "<mi>log</mi>",
-            &OperatorSymbol::sec => "<mi>sec</mi>",
-            &OperatorSymbol::tan => "<mi>tan</mi>",
-            &OperatorSymbol::coth => "<mi>coth</mi>",
             &OperatorSymbol::inf => "<mi>inf</mi>",
             &OperatorSymbol::liminf => "<mi>liminf</mi>",
             &OperatorSymbol::max => "<mi>max</mi>",
-            &OperatorSymbol::sin => "<mi>sin</mi>",
-            &OperatorSymbol::tanh => "<mi>tanh</mi>",
             &OperatorSymbol::pm => "<mi>pm</mi>",
+            &OperatorSymbol::Function(ref f) => f.as_math_ml(),
         }
     }
     fn as_latex(&self) -> &'static str {
@@ -965,34 +1051,21 @@ impl OperatorSymbol {
             &OperatorSymbol::oint => "\\oint",
             &OperatorSymbol::sum => "\\sum",
             &OperatorSymbol::prod => "\\prod",
-            &OperatorSymbol::arccos => "\\arccos",
-            &OperatorSymbol::cos => "\\cos",
-            &OperatorSymbol::csc => "\\csc",
-            &OperatorSymbol::exp => "\\exp",
             &OperatorSymbol::limsup => "\\limsup",
             &OperatorSymbol::min => "\\min",
-            &OperatorSymbol::sinh => "\\sinh",
-            &OperatorSymbol::arcsin => "\\arcsin",
-            &OperatorSymbol::cosh => "\\cosh",
             &OperatorSymbol::gcd => "\\gcd",
-            &OperatorSymbol::lg => "\\lg",
-            &OperatorSymbol::ln => "\\ln",
             &OperatorSymbol::sup => "\\sup",
-            &OperatorSymbol::arctan => "\\arctan",
-            &OperatorSymbol::cot => "\\cot",
             &OperatorSymbol::det => "\\det",
             &OperatorSymbol::lim => "\\lim",
-            &OperatorSymbol::log => "\\log",
-            &OperatorSymbol::sec => "\\sec",
-            &OperatorSymbol::tan => "\\tan",
-            &OperatorSymbol::coth => "\\coth",
             &OperatorSymbol::inf => "\\inf",
             &OperatorSymbol::liminf => "\\liminf",
             &OperatorSymbol::max => "\\max",
-            &OperatorSymbol::sin => "\\sin",
-            &OperatorSymbol::tanh => "\\tanh",
             &OperatorSymbol::pm => "\\pm",
+            &OperatorSymbol::Function(ref f) => f.as_latex(),
         }
+    }
+    fn as_expr(self) -> Expression {
+        Expression::Atom(Atom::Symbol(Symbol::Operator(self)))
     }
 }
 
@@ -1116,33 +1189,33 @@ impl Symbol {
             "oint" => Some(Symbol::Operator(OperatorSymbol::oint)),
             "sum" => Some(Symbol::Operator(OperatorSymbol::sum)),
             "prod" => Some(Symbol::Operator(OperatorSymbol::prod)),
-            "arccos" => Some(Symbol::Operator(OperatorSymbol::arccos)),
-            "cos" => Some(Symbol::Operator(OperatorSymbol::cos)),
-            "csc" => Some(Symbol::Operator(OperatorSymbol::csc)),
-            "exp" => Some(Symbol::Operator(OperatorSymbol::exp)),
             "limsup" => Some(Symbol::Operator(OperatorSymbol::limsup)),
             "min" => Some(Symbol::Operator(OperatorSymbol::min)),
-            "sinh" => Some(Symbol::Operator(OperatorSymbol::sinh)),
-            "arcsin" => Some(Symbol::Operator(OperatorSymbol::arcsin)),
-            "cosh" => Some(Symbol::Operator(OperatorSymbol::cosh)),
             "gcd" => Some(Symbol::Operator(OperatorSymbol::gcd)),
-            "lg" => Some(Symbol::Operator(OperatorSymbol::lg)),
-            "ln" => Some(Symbol::Operator(OperatorSymbol::ln)),
             "sup" => Some(Symbol::Operator(OperatorSymbol::sup)),
-            "arctan" => Some(Symbol::Operator(OperatorSymbol::arctan)),
-            "cot" => Some(Symbol::Operator(OperatorSymbol::cot)),
             "det" => Some(Symbol::Operator(OperatorSymbol::det)),
             "lim" => Some(Symbol::Operator(OperatorSymbol::lim)),
-            "log" => Some(Symbol::Operator(OperatorSymbol::log)),
-            "sec" => Some(Symbol::Operator(OperatorSymbol::sec)),
-            "tan" => Some(Symbol::Operator(OperatorSymbol::tan)),
-            "coth" => Some(Symbol::Operator(OperatorSymbol::coth)),
             "inf" => Some(Symbol::Operator(OperatorSymbol::inf)),
             "liminf" => Some(Symbol::Operator(OperatorSymbol::liminf)),
             "max" => Some(Symbol::Operator(OperatorSymbol::max)),
-            "sin" => Some(Symbol::Operator(OperatorSymbol::sin)),
-            "tanh" => Some(Symbol::Operator(OperatorSymbol::tanh)),
             "pm" => Some(Symbol::Operator(OperatorSymbol::pm)),
+            "arccos" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::arccos))),
+            "cos" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::cos))),
+            "csc" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::csc))),
+            "exp" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::exp))),
+            "sinh" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::sinh))),
+            "arcsin" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::arcsin))),
+            "cosh" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::cosh))),
+            "lg" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::lg))),
+            "ln" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::ln))),
+            "arctan" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::arctan))),
+            "cot" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::cot))),
+            "log" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::log))),
+            "sec" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::sec))),
+            "tan" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::tan))),
+            "coth" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::coth))),
+            "sin" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::sin))),
+            "tanh" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::tanh))),
             _ => None,
         }
     }

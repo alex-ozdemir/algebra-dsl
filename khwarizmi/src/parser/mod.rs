@@ -7,7 +7,7 @@ pub mod mac;
 use self::latex::{Token, Special};
 use std::num;
 use std::str::FromStr;
-use {Equation, Expression, Symbol, Atom, StandaloneSymbol, OperatorSymbol};
+use {Equation, Expression, Symbol, Atom, StandaloneSymbol, OperatorSymbol, FunctionSymbol};
 use self::mac::{PostMac, UniOp, Operator, KnownCS, Numeric};
 
 const UNREACH: &'static str = "An option/result that was expected to be Some/Ok was not.\n\
@@ -30,6 +30,8 @@ pub enum ParseError {
     UnimplementedCharacter(char),
     DoubleDecimalPoint,
     InvalidNumericLiteral,
+    OperatorDoesNotAcceptSubscripts(FunctionSymbol),
+    OperatorDoesNotAcceptSuperscripts(FunctionSymbol),
     FPError(num::ParseFloatError),
 }
 
@@ -68,9 +70,9 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
             tokens.push(PostMac::Op(UniOp::Std(Operator::End)));
             tokens.reverse();
             while let Some(token) = tokens.pop() {
-//                println!("New Round\n\tOps:   {:?}\n\tExprs: {:?}",
-//                         operator_stack,
-//                         expression_stack);
+                //                println!("New Round\n\tOps:   {:?}\n\tExprs: {:?}",
+                //                         operator_stack,
+                //                         expression_stack);
                 match token {
                     PostMac::Op(next_op) => {
                         while operator_stack.last().expect(UNREACH).right_precedence() >
@@ -139,6 +141,68 @@ macro_rules! combine_associative {
     };
 }
 
+
+
+fn post_process(expr: Expression) -> Result<Expression, ParseError> {
+    use self::post_process as post;
+    use Expression::*;
+    println!("Post processing {:#?}", expr);
+    match expr {
+        Negation(box e) => Ok(Negation(box post(e)?)),
+        Sum(es) => {
+            Ok(Sum(es.into_iter()
+                .fold(Ok(Vec::new()), |earlier, this| {
+                    earlier.and_then(|mut vec| {
+                        post(this).map(|post_this| {
+                            vec.push(post_this);
+                            vec
+                        })
+                    })
+                })?))
+        }
+        Product(es) => {
+            Ok(Product(es.into_iter()
+                .fold(Ok(Vec::new()), |earlier, this| {
+                    earlier.and_then(|mut vec| {
+                        post(this).map(|post_this| {
+                            vec.push(post_this);
+                            vec
+                        })
+                    })
+                })?))
+        }
+        Division(box e1, box e2) => Ok(Division(box post(e1)?, box post(e2)?)),
+        Power(box e1, box e2) => Ok(Power(box post(e1)?, box post(e2)?)),
+        Subscript(box e1, box e2) => Ok(Subscript(box post(e1)?, box post(e2)?)),
+        LimitOp(OperatorSymbol::Function(f), sub, sup, box e) => {
+            let op_expr = match (f.accepts_subscripts(), sub) {
+                (false, Some(_)) => return Err(ParseError::OperatorDoesNotAcceptSubscripts(f)),
+                (true, Some(box script)) => Subscript(box f.as_expr(), box post(script)?),
+                (_, None) => f.as_expr(),
+            };
+            let app = Application(box op_expr, box post(e)?);
+            match (f.accepts_superscripts(), sup) {
+                (false, Some(_)) => Err(ParseError::OperatorDoesNotAcceptSuperscripts(f)),
+                (true, Some(box script)) => Ok(Power(box app, box post(script)?)),
+                (_, None) => Ok(app),
+            }
+        }
+        LimitOp(f, sub, sup, box e) => {
+            let psub = match sub {
+                Some(box s) => Some(box post(s)?),
+                None => None,
+            };
+            let psup = match sup {
+                Some(box s) => Some(box post(s)?),
+                None => None,
+            };
+            Ok(LimitOp(f, psub, psup, box post(e)?))
+        }
+        Application(box e1, box e2) => Ok(Application(box post(e1)?, box post(e2)?)),
+        a @ Atom(_) => Ok(a),
+    }
+}
+
 fn combine1(expr: Expression, op: UniOp) -> Result<Expression, ParseError> {
     use self::Operator::*;
     Ok(match op {
@@ -190,10 +254,12 @@ pub fn parse_equation(input: &str) -> Result<Equation, ParseError> {
 
 pub fn parse_expr(input: &str) -> Result<Expression, ParseError> {
     let latex_tokens = latex::parse_tokens(input).map_err(ParseError::LatexError)?;
-    //println!("{:#?}", latex_tokens);
+    // println!("{:#?}", latex_tokens);
     let expanded = mac::to_known(latex_tokens)?;
-    //println!("{:#?}", expanded);
-    parse_operators(expanded)
+    // println!("{:#?}", expanded);
+    let expr = parse_operators(expanded)?;
+
+    post_process(expr)
 }
 
 #[cfg(test)]

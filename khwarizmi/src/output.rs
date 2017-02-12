@@ -14,9 +14,9 @@ impl fmt::Display for Equation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
         write!(f, "<mrow mathTreeNode=\"0\">")?;
-        fmt_as_math_ml(&self.left, f, "0,0", (&self.left,false,true))?;
+        fmt_as_math_ml(&self.left, f, "0,0", (&self.left, false, true))?;
         write!(f, "<mo>=</mo>")?;
-        fmt_as_math_ml(&self.right, f, "0,1", (&self.right,false,true))?;
+        fmt_as_math_ml(&self.right, f, "0,1", (&self.right, false, true))?;
         write!(f, "</mrow>")?;
         write!(f, "</math>")
     }
@@ -25,7 +25,7 @@ impl fmt::Display for Equation {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
-        fmt_as_math_ml(&self, f, "0", (&self,false,true))?;
+        fmt_as_math_ml(&self, f, "0", (&self, false, true))?;
         write!(f, "</math>")
     }
 }
@@ -56,12 +56,12 @@ impl LatexWriter {
                 write!(f, "  ")?;
                 match self.0 {
                     &EqOrExpr::Eq(ref eq) => {
-                        fmt_as_latex(&eq.left, f, (&eq.left,false,true))?;
+                        fmt_as_latex(&eq.left, f, (&eq.left, false, true))?;
                         write!(f, " &= ")?;
-                        fmt_as_latex(&eq.right, f, (&eq.right,false,true))?;
+                        fmt_as_latex(&eq.right, f, (&eq.right, false, true))?;
                     }
                     &EqOrExpr::Ex(ref ex) => {
-                        fmt_as_latex(&ex, f, (&ex,false,true))?;
+                        fmt_as_latex(&ex, f, (&ex, false, true))?;
                     }
                 }
                 write!(f, " \\\\\n")
@@ -78,112 +78,111 @@ impl LatexWriter {
     }
 }
 
-//alt is usually for right expressions, when they need different rules
-//Outputs whether expr1 captures expr2 with parenthesis
+// alt is usually for right expressions, when they need different rules
+// Outputs whether expr1 captures expr2 with parenthesis
 fn capture(expr1: &Expression, expr2: &Expression, alt: bool, top: bool) -> bool {
-    if top { //Did we just come from the top level call?
+    if top {
+        // Did we just come from the top level call?
         return false;
     }
-    if !alt { //Left capture
+    if !alt {
+        // Left capture
         match expr1 {
             &Expression::Sum(_) => {
                 match expr2 {
-                    _ => false
+                    _ => false,
                 }
             }
             &Expression::Product(_) => {
                 match expr2 {
                     &Expression::Sum(_) => true,
                     &Expression::Negation(_) => true,
-                    _ => false
+                    _ => false,
                 }
             }
             &Expression::Negation(_) => {
                 match expr2 {
                     &Expression::Sum(_) => true,
-                    _ => false
+                    _ => false,
                 }
             }
-            &Expression::Application(_,_) => {
+            &Expression::Application(_, _) => {
                 match expr2 {
-                    _ => false
+                    _ => false,
                 }
             }
-            &Expression::LimitOp(_,_,_,_) => {
+            &Expression::LimitOp(_, _, _, _) => {
                 match expr2 {
-                    _ => false
+                    _ => false,
                 }
             }
-            &Expression::Division(_,_) => {
+            &Expression::Division(_, _) => {
                 match expr2 {
-                    _ => false
+                    _ => false,
                 }
             }
-            &Expression::Power(_,_) => {
+            &Expression::Power(_, _) => {
                 match expr2 {
                     &Expression::Sum(_) => true,
                     &Expression::Product(_) => true,
-                    &Expression::Power(_,_) => true,
+                    &Expression::Power(_, _) => true,
                     &Expression::Negation(_) => true,
-                    &Expression::Division(_,_) => true,
-                    _ => false
+                    &Expression::Division(_, _) => true,
+                    _ => false,
                 }
             }
-            &Expression::Subscript(_,_) => {
+            &Expression::Subscript(_, _) => {
                 match expr2 {
                     &Expression::Atom(_) => false,
-                    _ => true
+                    _ => true,
                 }
             }
-            &Expression::Atom(_) => {
-                false
-            }
+            &Expression::Atom(_) => false,
         }
-    } else { //right capture
+    } else {
+        // right capture
         match expr1 {
             &Expression::Sum(_) => {
                 match expr2 {
-                    _ => false
+                    _ => false,
                 }
             }
             &Expression::Product(_) => {
                 match expr2 {
-                    _ => false
+                    _ => false,
                 }
             }
             &Expression::Negation(_) => {
                 match expr2 {
-                    _ => false
+                    _ => false,
                 }
             }
-            &Expression::Application(_,_) => {
+            &Expression::Application(_, _) => {
                 match expr2 {
-                    _ => true
+                    _ => true,
                 }
             }
-            &Expression::LimitOp(_,_,_,_) => {
+            &Expression::LimitOp(_, _, _, _) => {
                 match expr2 {
-                    _ => false
+                    _ => false,
                 }
             }
-            &Expression::Division(_,_) => {
+            &Expression::Division(_, _) => {
                 match expr2 {
-                    _ => false
+                    _ => false,
                 }
             }
-            &Expression::Power(_,_) => {
+            &Expression::Power(_, _) => {
                 match expr2 {
-                    _ => false
+                    _ => false,
                 }
             }
-            &Expression::Subscript(_,_) => {
+            &Expression::Subscript(_, _) => {
                 match expr2 {
-                    _ => false
+                    _ => false,
                 }
             }
-            &Expression::Atom(_) => {
-                false
-            }
+            &Expression::Atom(_) => false,
         }
     }
 }
@@ -191,10 +190,13 @@ fn capture(expr1: &Expression, expr2: &Expression, alt: bool, top: bool) -> bool
 fn fmt_as_math_ml(expr: &Expression,
                   f: &mut fmt::Formatter,
                   prev_index: &str,
-                  prev_precedence: (&Expression, bool,bool))
+                  prev_precedence: (&Expression, bool, bool))
                   -> Result<(), fmt::Error> {
     write!(f, "<mrow mathTreeNode=\"{}\">", prev_index)?;
-    if capture(prev_precedence.0, expr, prev_precedence.1, prev_precedence.2) {
+    if capture(prev_precedence.0,
+               expr,
+               prev_precedence.1,
+               prev_precedence.2) {
         write!(f,"<mo form=\"prefix\">(</mo>")?;
     }
     match expr {
@@ -216,46 +218,46 @@ fn fmt_as_math_ml(expr: &Expression,
                                 write!(f, "{}", atom)?
                             }
                         }
-                        _ => write!(f, "{}", atom)?
+                        _ => write!(f, "{}", atom)?,
                     }
                 }
-                _ => write!(f, "{}", atom)?
+                _ => write!(f, "{}", atom)?,
             };
         }
         &Expression::Power(ref b, ref p) => {
             let mut base_string = String::from(prev_index);
             write!(f, "<msup>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(b, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(b, f, &base_string, (expr, false, false))?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
-            fmt_as_math_ml(p, f, &base_string, (expr,true,false))?;
+            fmt_as_math_ml(p, f, &base_string, (expr, true, false))?;
             write!(f, "</msup>")?;
         }
         &Expression::Negation(ref n) => {
             let mut base_string = String::from(prev_index);
             write!(f, "<mo>-</mo>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(n, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(n, f, &base_string, (expr, false, false))?;
         }
         &Expression::Division(ref n, ref d) => {
             let mut base_string = String::from(prev_index);
             write!(f, "<mfrac>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(n, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(n, f, &base_string, (expr, false, false))?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
-            fmt_as_math_ml(d, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(d, f, &base_string, (expr, false, false))?;
             write!(f, "</mfrac>")?;
         }
         &Expression::Subscript(ref e, ref s) => {
             let mut base_string = String::from(prev_index);
             write!(f, "<msub>")?;
             base_string.push_str(",0");
-            fmt_as_math_ml(e, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(e, f, &base_string, (expr, false, false))?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
-            fmt_as_math_ml(s, f, &base_string, (expr,true,false))?;
+            fmt_as_math_ml(s, f, &base_string, (expr, true, false))?;
             write!(f, "</msub>")?;
         }
         &Expression::Sum(ref s) => {
@@ -266,12 +268,12 @@ fn fmt_as_math_ml(expr: &Expression,
                 base_string.push_str(",");
                 base_string.push_str(&i.to_string());
                 if i == len - 1 {
-                    fmt_as_math_ml(e, f, &base_string, (expr,false,false))?;
+                    fmt_as_math_ml(e, f, &base_string, (expr, false, false))?;
                 } else {
-                    fmt_as_math_ml(e, f, &base_string, (expr,false,false))?;
-                    let e_next = &s[i+1];
+                    fmt_as_math_ml(e, f, &base_string, (expr, false, false))?;
+                    let e_next = &s[i + 1];
                     match e_next {
-                        &Expression::Negation(_) => {},
+                        &Expression::Negation(_) => {}
                         &Expression::Atom(Atom::Floating(n)) => {
                             if n >= 0.0 {
                                 write!(f, "<mo>+</mo>")?;
@@ -282,7 +284,7 @@ fn fmt_as_math_ml(expr: &Expression,
                                 write!(f, "<mo>+</mo>")?;
                             }
                         }
-                        _ => write!(f, "<mo>+</mo>")?
+                        _ => write!(f, "<mo>+</mo>")?,
                     };
                 }
             }
@@ -295,14 +297,14 @@ fn fmt_as_math_ml(expr: &Expression,
                 base_string.push_str(",");
                 base_string.push_str(&i.to_string());
                 if i == len - 1 {
-                    fmt_as_math_ml(e, f, &base_string, (expr,false,false))?;
+                    fmt_as_math_ml(e, f, &base_string, (expr, false, false))?;
                 } else {
-                    fmt_as_math_ml(e, f, &base_string, (expr,false,false))?;
-                    let e_next = &s[i+1];
+                    fmt_as_math_ml(e, f, &base_string, (expr, false, false))?;
+                    let e_next = &s[i + 1];
                     match e_next {
                         &Expression::Atom(Atom::Floating(_)) => write!(f, "<mo>&#x022C5;</mo>")?,
                         &Expression::Atom(Atom::Natural(_)) => write!(f, "<mo>&#x022C5;</mo>")?,
-                        _ => write!(f, "<mo>&#8290;</mo>")?
+                        _ => write!(f, "<mo>&#8290;</mo>")?,
                     };
                 }
             }
@@ -310,17 +312,17 @@ fn fmt_as_math_ml(expr: &Expression,
         &Expression::Application(ref func, ref arg) => {
             let mut base_string = String::from(prev_index);
             base_string.push_str(",0");
-            fmt_as_math_ml(func, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(func, f, &base_string, (expr, false, false))?;
             let mut base_string = String::from(prev_index);
             base_string.push_str(",1");
-            fmt_as_math_ml(arg, f, &base_string, (expr,true,false))?;
+            fmt_as_math_ml(arg, f, &base_string, (expr, true, false))?;
         }
         &Expression::LimitOp(ref op, None, None, ref expr) => {
             let mut base_string = String::from(prev_index);
             write!(f, "{}", op.as_math_ml())?;
 
             base_string.push_str(",2");
-            fmt_as_math_ml(expr, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(expr, f, &base_string, (expr, false, false))?;
         }
         &Expression::LimitOp(ref op, Some(ref sub), None, ref expr) => {
             let mut base_string = String::from(prev_index);
@@ -329,12 +331,12 @@ fn fmt_as_math_ml(expr: &Expression,
             write!(f, "{}", op.as_math_ml())?;
 
             base_string.push_str(",0");
-            fmt_as_math_ml(sub, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(sub, f, &base_string, (expr, false, false))?;
             base_string.truncate(orig_len);
 
             write!(f, "</munder>")?;
             base_string.push_str(",2");
-            fmt_as_math_ml(expr, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(expr, f, &base_string, (expr, false, false))?;
         }
         &Expression::LimitOp(ref op, None, Some(ref sup), ref expr) => {
             let mut base_string = String::from(prev_index);
@@ -343,12 +345,12 @@ fn fmt_as_math_ml(expr: &Expression,
             write!(f, "{}", op.as_math_ml())?;
 
             base_string.push_str(",1");
-            fmt_as_math_ml(sup, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(sup, f, &base_string, (expr, false, false))?;
             base_string.truncate(orig_len);
 
             write!(f, "</mover>")?;
             base_string.push_str(",2");
-            fmt_as_math_ml(expr, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(expr, f, &base_string, (expr, false, false))?;
         }
         &Expression::LimitOp(ref op, Some(ref sub), Some(ref sup), ref expr) => {
             let mut base_string = String::from(prev_index);
@@ -358,32 +360,38 @@ fn fmt_as_math_ml(expr: &Expression,
 
             base_string.push_str(",0");
 
-            fmt_as_math_ml(sub, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(sub, f, &base_string, (expr, false, false))?;
 
             base_string.truncate(orig_len);
 
             base_string.push_str(",1");
 
-            fmt_as_math_ml(sup, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(sup, f, &base_string, (expr, false, false))?;
 
             base_string.truncate(orig_len);
 
             write!(f, "</munderover>")?;
             base_string.push_str(",2");
-            fmt_as_math_ml(expr, f, &base_string, (expr,false,false))?;
+            fmt_as_math_ml(expr, f, &base_string, (expr, false, false))?;
         }
     }
-    if capture(prev_precedence.0, expr, prev_precedence.1, prev_precedence.2) {
+    if capture(prev_precedence.0,
+               expr,
+               prev_precedence.1,
+               prev_precedence.2) {
         write!(f,"<mo form=\"postfix\">)</mo>")?;
     }
     write!(f, "</mrow>")
 }
 
 fn fmt_as_latex(expr: &Expression,
-                  f: &mut fmt::Formatter,
-                  prev_precedence: (&Expression,bool,bool))
-                  -> Result<(), fmt::Error> {
-    if capture(prev_precedence.0, expr, prev_precedence.1, prev_precedence.2) {
+                f: &mut fmt::Formatter,
+                prev_precedence: (&Expression, bool, bool))
+                -> Result<(), fmt::Error> {
+    if capture(prev_precedence.0,
+               expr,
+               prev_precedence.1,
+               prev_precedence.2) {
         write!(f,"\\left(")?;
     }
     match expr {
@@ -397,27 +405,27 @@ fn fmt_as_latex(expr: &Expression,
         }
         &Expression::Power(ref b, ref p) => {
             write!(f,"{{")?;
-            fmt_as_latex(b, f, (expr,false,false))?;
+            fmt_as_latex(b, f, (expr, false, false))?;
             write!(f,"}}^{{")?;
-            fmt_as_latex(p, f, (expr,true,false))?;
+            fmt_as_latex(p, f, (expr, true, false))?;
             write!(f,"}}")?;
         }
         &Expression::Negation(ref n) => {
             write!(f,"-")?;
-            fmt_as_latex(n, f, (expr,false,false))?;
+            fmt_as_latex(n, f, (expr, false, false))?;
         }
         &Expression::Division(ref n, ref d) => {
             write!(f,"\\frac{{")?;
-            fmt_as_latex(n, f, (expr,false,false))?;
+            fmt_as_latex(n, f, (expr, false, false))?;
             write!(f,"}}{{")?;
-            fmt_as_latex(d, f, (expr,false,false))?;
+            fmt_as_latex(d, f, (expr, false, false))?;
             write!(f,"}}")?;
         }
         &Expression::Subscript(ref e, ref s) => {
             write!(f,"{{")?;
-            fmt_as_latex(e, f, (expr,false,false))?;
+            fmt_as_latex(e, f, (expr, false, false))?;
             write!(f,"}}_{{")?;
-            fmt_as_latex(s, f, (expr,true,false))?;
+            fmt_as_latex(s, f, (expr, true, false))?;
             write!(f,"}}")?;
         }
         &Expression::Sum(ref s) => {
@@ -425,12 +433,12 @@ fn fmt_as_latex(expr: &Expression,
             let iter = s.iter().enumerate();
             for (i, e) in iter {
                 if i == len - 1 {
-                    fmt_as_latex(e, f, (expr,false,false))?;
+                    fmt_as_latex(e, f, (expr, false, false))?;
                 } else {
-                    fmt_as_latex(e, f, (expr,false,false))?;
-                    let e_next = &s[i+1];
+                    fmt_as_latex(e, f, (expr, false, false))?;
+                    let e_next = &s[i + 1];
                     match e_next {
-                        &Expression::Negation(_) => {},
+                        &Expression::Negation(_) => {}
                         &Expression::Atom(Atom::Floating(n)) => {
                             if n >= 0.0 {
                                 write!(f, "<mo>+</mo>")?;
@@ -441,7 +449,7 @@ fn fmt_as_latex(expr: &Expression,
                                 write!(f, "<mo>+</mo>")?;
                             }
                         }
-                        _ => write!(f, "<mo>+</mo>")?
+                        _ => write!(f, "<mo>+</mo>")?,
                     };
                 }
             }
@@ -451,52 +459,55 @@ fn fmt_as_latex(expr: &Expression,
             let iter = s.iter().enumerate();
             for (i, e) in iter {
                 if i == len - 1 {
-                    fmt_as_latex(e, f, (expr,false,false))?;
+                    fmt_as_latex(e, f, (expr, false, false))?;
                 } else {
-                    fmt_as_latex(e, f, (expr,false,false))?;
-                    let e_next = &s[i+1];
+                    fmt_as_latex(e, f, (expr, false, false))?;
+                    let e_next = &s[i + 1];
                     match e_next {
                         &Expression::Atom(Atom::Floating(_)) => write!(f,"\\cdot")?,
-                        &Expression::Atom(Atom::Natural(_)) =>  write!(f,"\\cdot")?,
+                        &Expression::Atom(Atom::Natural(_)) => write!(f,"\\cdot")?,
                         _ => {}
                     };
                 }
             }
         }
         &Expression::Application(ref func, ref arg) => {
-            fmt_as_latex(func, f, (expr,false,false))?;
+            fmt_as_latex(func, f, (expr, false, false))?;
             write!(f," ")?;
-            fmt_as_latex(arg, f, (expr,true,false))?;
+            fmt_as_latex(arg, f, (expr, true, false))?;
         }
         &Expression::LimitOp(ref op, None, None, ref expr) => {
             write!(f,"{}", op.as_latex())?;
-            fmt_as_latex(expr, f, (expr,false,false))?;
+            fmt_as_latex(expr, f, (expr, false, false))?;
         }
         &Expression::LimitOp(ref op, Some(ref sub), None, ref expr) => {
             write!(f,"{}", op.as_latex())?;
             write!(f,"_{{")?;
-            fmt_as_latex(sub, f, (expr,false,false))?;
+            fmt_as_latex(sub, f, (expr, false, false))?;
             write!(f,"}} ")?;
-            fmt_as_latex(expr, f, (expr,false,false))?;
+            fmt_as_latex(expr, f, (expr, false, false))?;
         }
         &Expression::LimitOp(ref op, None, Some(ref sup), ref expr) => {
             write!(f,"{}", op.as_latex())?;
             write!(f,"^{{")?;
-            fmt_as_latex(sup, f, (expr,false,false))?;
+            fmt_as_latex(sup, f, (expr, false, false))?;
             write!(f,"}} ")?;
-            fmt_as_latex(expr, f, (expr,false,false))?;
+            fmt_as_latex(expr, f, (expr, false, false))?;
         }
         &Expression::LimitOp(ref op, Some(ref sub), Some(ref sup), ref expr) => {
             write!(f,"{}", op.as_latex())?;
             write!(f,"_{{")?;
-            fmt_as_latex(sub, f, (expr,false,false))?;
+            fmt_as_latex(sub, f, (expr, false, false))?;
             write!(f,"}}^{{")?;
-            fmt_as_latex(sup, f, (expr,false,false))?;
+            fmt_as_latex(sup, f, (expr, false, false))?;
             write!(f,"}} ")?;
-            fmt_as_latex(expr, f, (expr,false,false))?;
+            fmt_as_latex(expr, f, (expr, false, false))?;
         }
     }
-    if capture(prev_precedence.0, expr, prev_precedence.1, prev_precedence.2) {
+    if capture(prev_precedence.0,
+               expr,
+               prev_precedence.1,
+               prev_precedence.2) {
         write!(f,"\\right)")?;
     }
     Ok(())
@@ -516,4 +527,3 @@ pub fn precedence(expr: &Expression) -> u8 {
         &Expression::Negation(_) => 15,
     }
 }
-
