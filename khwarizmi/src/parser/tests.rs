@@ -266,3 +266,12 @@ fn error_on_unmatch() {
     let expected = Err(ParseError::UnmatchGrouping(UniOp::Std(Operator::RGroup)));
     assert_expected_eq_actual!(expected, parse_expr("a )"));
 }
+
+#[test]
+fn negation_and_multiplication() {
+    let expected = Ex::Negation(box Ex::Product(vec![Ex::Atom(At::PlainVariable('x')),
+                                Ex::Atom(At::Natural(2)),
+                                Ex::Atom(At::Natural(9)),
+                                Ex::Atom(At::Natural(7))]));
+    assert_expected_eq_actual!(Ok(expected), parse_expr("-x*2*9*7"));
+}

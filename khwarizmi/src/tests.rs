@@ -42,10 +42,10 @@ fn format_frac() {
     let expr = Ex::Division(box Ex::Atom(Atom::PlainVariable('x')),
                             box Ex::Atom(Atom::PlainVariable('y')));
     let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                    mathTreeNode=\"0\"><mo form=\"prefix\">(</mo><mfrac><mrow \
+                    mathTreeNode=\"0\"><mfrac><mrow \
                     mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
                     mathTreeNode=\"0,1\"><mi>y</mi></mrow></mfrac>\
-                    <mo form=\"postfix\">)</mo></mrow></math>";
+                    </mrow></math>";
     let test = format!("{}", expr);
     assert_expected_eq_actual!(expected, test);
 }
@@ -65,10 +65,9 @@ fn format_sub() {
     let expr = Ex::Subscript(box Ex::Atom(Atom::PlainVariable('x')),
                              box Ex::Atom(Atom::PlainVariable('y')));
     let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                    mathTreeNode=\"0\"><mo form=\"prefix\">(</mo><msub><mrow \
+                    mathTreeNode=\"0\"><msub><mrow \
                     mathTreeNode=\"0,0\"><mi>x</mi></mrow><mrow \
-                    mathTreeNode=\"0,1\"><mi>y</mi></mrow></msub><mo \
-                    form=\"postfix\">)</mo></mrow></math>";
+                    mathTreeNode=\"0,1\"><mi>y</mi></mrow></msub></mrow></math>";
     let test = format!("{}", expr);
     assert_expected_eq_actual!(expected, test);
 }
@@ -130,7 +129,25 @@ fn replace_siblings() {
     let indices: Vec<_> =
         index_strings.into_iter().map(TreeIdx::from_str).map(Result::unwrap).collect();
     println!("{:#?}", indices);
-    let siblings = SiblingIndices::from_indices(indices.as_slice()).unwrap();
+    let siblings = before.make_siblings(indices.as_slice()).unwrap();
+    let replacement = Ex::Atom(Atom::Natural(84));
+    before.replace_siblings(siblings, replacement).unwrap();
+    assert_expected_eq_actual!(after, before);
+}
+
+#[test]
+fn replace_siblings_sum() {
+    let mut before = Ex::Sum(vec![Ex::Atom(Atom::Natural(3)),
+                                      Ex::Atom(Atom::Natural(4)),
+                                      Ex::Atom(Atom::PlainVariable('x')),
+                                      Ex::Atom(Atom::Natural(7))]);
+    let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
+    let after = Ex::Sum(vec![Ex::Atom(Atom::Natural(84)),
+                                 Ex::Atom(Atom::PlainVariable('x'))]);
+    let indices: Vec<_> =
+        index_strings.into_iter().map(TreeIdx::from_str).map(Result::unwrap).collect();
+    println!("{:#?}", indices);
+    let siblings = before.make_siblings(indices.as_slice()).unwrap();
     let replacement = Ex::Atom(Atom::Natural(84));
     before.replace_siblings(siblings, replacement).unwrap();
     assert_expected_eq_actual!(after, before);
@@ -143,7 +160,7 @@ fn delete_expr() {
                                       Ex::Atom(Atom::PlainVariable('x')),
                                       Ex::Atom(Atom::Natural(7))]);
     let v = vec![TreeIdx::from_str("#(mtn:0,1)").unwrap()];
-    let idx = SiblingIndices::from_indices(&v).unwrap();
+    let idx = before.make_siblings(v.as_slice()).unwrap();
     let after = Ex::Product(vec![Ex::Atom(Atom::Natural(3)),
                                  Ex::Atom(Atom::PlainVariable('x')),
                                  Ex::Atom(Atom::Natural(7))]);
@@ -202,22 +219,8 @@ fn simplify_power() {
     let after = Ex::Atom(Atom::Natural(81));
     assert_expected_eq_actual!(after, before.simplify_constants());
 
-    let before = Ex::Division(box Ex::Atom(Atom::Floating(3.)),
-                              box Ex::Atom(Atom::Floating(4)));
-    let after = Ex::Atom(Atom::Floating(81.));
-    assert_expected_eq_actual!(after, before.simplify_constants());
-
-}
-
-#[test]
-fn delete() {
-    let before = Ex::Power(box Ex::Atom(Atom::Natural(3)),
+    let before = Ex::Power(box Ex::Atom(Atom::Floating(3.)),
                               box Ex::Atom(Atom::Natural(4)));
-    let after = Ex::Atom(Atom::Natural(81));
-    assert_expected_eq_actual!(after, before.simplify_constants());
-
-    let before = Ex::Division(box Ex::Atom(Atom::Floating(3.)),
-                              box Ex::Atom(Atom::Floating(4)));
     let after = Ex::Atom(Atom::Floating(81.));
     assert_expected_eq_actual!(after, before.simplify_constants());
 

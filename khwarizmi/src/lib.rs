@@ -289,17 +289,22 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             &SiblingIndices::AssocSoup{ ref parent_idx, ref children } => {
                 let r = self.get_mut(parent_idx.as_ref())?;
                 let new: Expression = match r.take() {
-                    Ex::Sum(mut args) |
-                    Ex::Product(mut args) => {
-                        println!("expr: {:?}, args: {:?}", expr, args);
+                    Ex::Sum(mut args) => {
                         remove_args(&mut args, children.as_slice());
-                        println!("expr: {:?}, args: {:?}", expr, args);
                         args.insert(children.iter().min().cloned().unwrap_or(0), expr);
-                        println!("expr: , args: {:?}", args);
                         if args.len() == 1 {
                             args.remove(0)
                         } else {
                             Ex::Sum(args)
+                        }
+                    }
+                    Ex::Product(mut args) => {
+                        remove_args(&mut args, children.as_slice());
+                        args.insert(children.iter().min().cloned().unwrap_or(0), expr);
+                        if args.len() == 1 {
+                            args.remove(0)
+                        } else {
+                            Ex::Product(args)
                         }
                     }
                     _ => return Err(AlgebraDSLError::InvalidSiblingIndices),
@@ -456,12 +461,10 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             }
         }
 
-        println!("{:?} {:?} {:?}", trunk, branches, self.get(trunk.as_ref()));
         match self.get(trunk.as_ref())? {
             &Expression::Sum(ref args) | &Expression::Product(ref args) => {
                 if branches.iter().any(|idx| {
                     if idx.as_ref().len() != 1 {
-                        println!("{:?}", idx.as_ref().first().and_then(|i| args.get(i)));
                         if let Some(&Expression::Negation(_)) = idx.as_ref().first().and_then(|i| args.get(i)) {
                             false
                         } else {
