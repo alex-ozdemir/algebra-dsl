@@ -693,7 +693,7 @@ impl Expression {
                         if n % n2 == 0 {
                             Ex::Atom(Atom::Natural(n / n2))
                         } else {
-                            Ex::Atom(Atom::Floating(n as f64 + n2 as f64))
+                            Ex::Atom(Atom::Floating(n as f64 / n2 as f64))
                         }
                     }
                     (e1, e2) => Ex::Division(box e1, box e2),
