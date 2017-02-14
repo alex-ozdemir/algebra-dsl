@@ -473,6 +473,11 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             }
         }
 
+        let is_product = match self.get(trunk.as_ref())? {
+            &Expression::Product(..) => true,
+            _ => false,
+        };
+
         match self.get(trunk.as_ref())? {
             &Expression::Sum(ref args) |
             &Expression::Product(ref args) => {
@@ -495,21 +500,27 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 single_indices.sort();
                 single_indices.dedup();
 
-
-                if let Some(&Expression::Division(..)) =
-                    trunk.as_ref().prefix().and_then(|idx| self.get(idx).ok()) {
-                    let last = trunk.pop().expect(UNREACH);
-                    if last == 0 {
-                        Ok(SiblingIndices::Division {
-                            division_idx: trunk,
-                            top_children: Some(single_indices),
-                            bottom_children: Some(vec![]),
-                        })
+                if is_product {
+                    if let Some(&Expression::Division(..)) =
+                        trunk.as_ref().prefix().and_then(|idx| self.get(idx).ok()) {
+                        let last = trunk.pop().expect(UNREACH);
+                        if last == 0 {
+                            Ok(SiblingIndices::Division {
+                                division_idx: trunk,
+                                top_children: Some(single_indices),
+                                bottom_children: Some(vec![]),
+                            })
+                        } else {
+                            Ok(SiblingIndices::Division {
+                                division_idx: trunk,
+                                top_children: Some(vec![]),
+                                bottom_children: Some(single_indices),
+                            })
+                        }
                     } else {
-                        Ok(SiblingIndices::Division {
-                            division_idx: trunk,
-                            top_children: Some(vec![]),
-                            bottom_children: Some(single_indices),
+                        Ok(SiblingIndices::AssocSoup {
+                            parent_idx: trunk,
+                            children: single_indices,
                         })
                     }
                 } else {
