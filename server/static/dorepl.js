@@ -30,6 +30,12 @@ function createCM() {
         },
     });
 
+    // Scroll down
+    document.getElementById('repl').lastElementChild.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+
     // Use last colors first
     currentCM.availColors = [9,8,7,6,5,4,3,2,1,0];
     currentCM.selectedDOM = null;
@@ -151,9 +157,7 @@ socket.onmessage = function(event) {
                 eqnIdx++;
             }
             if (e.target == cns[i].childNodes[2]) {
-                console.log("Found:");
                 console.log(cns[i].childNodes[2]);
-                tosend += ' ' + eqnIdx;
                 break;
             }
         }
