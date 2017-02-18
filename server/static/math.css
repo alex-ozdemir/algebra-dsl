@@ -8,6 +8,10 @@
   height: auto;
 }
 
+body {
+    padding-bottom: 75px;
+}
+
 [highlighted="0"]  { border-color: purple !important; outline-color: purple; }
 [highlighted="1"]  { border-color: orange !important; outline-color: orange; }
 [highlighted="2"]  { border-color: lightblue !important; outline-color: lightblue; }

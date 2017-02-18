@@ -147,7 +147,7 @@ socket.onmessage = function(event) {
     recoverButton.className += " recover"
 
     recoverButton.addEventListener("click", function(e) {
-        var tosend = "recover"
+        var tosend = "recover "
 
         var cns = document.getElementById('repl').childNodes;
 
@@ -158,6 +158,7 @@ socket.onmessage = function(event) {
             }
             if (e.target == cns[i].childNodes[2]) {
                 console.log(cns[i].childNodes[2]);
+                tosend += eqnIdx;
                 break;
             }
         }
