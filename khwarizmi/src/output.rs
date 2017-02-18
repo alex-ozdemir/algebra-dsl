@@ -464,15 +464,15 @@ fn fmt_as_latex(expr: &Expression,
                         &Expression::Negation(_) => {}
                         &Expression::Atom(Atom::Floating(n)) => {
                             if n >= 0.0 {
-                                write!(f, "<mo>+</mo>")?;
+                                write!(f, "+")?;
                             }
                         }
                         &Expression::Atom(Atom::Natural(n)) => {
                             if n >= 0 {
-                                write!(f, "<mo>+</mo>")?;
+                                write!(f, "+")?;
                             }
                         }
-                        _ => write!(f, "<mo>+</mo>")?,
+                        _ => write!(f, "+")?,
                     };
                 }
             }
