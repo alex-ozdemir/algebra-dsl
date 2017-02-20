@@ -119,7 +119,11 @@ fn main() {
                         println!("The current formula is {:#?}", history.last());
                         sender.send_message(&Message::text(msg)).unwrap();
                     }
-                    _ => unreachable!(),
+                    _ => {
+                        println!("Got unknown mesage.Closing connection");
+                        let message = Message::close();
+                        sender.send_message(&message).unwrap();
+                    }
                 }
             }
         });
