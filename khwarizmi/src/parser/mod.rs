@@ -36,32 +36,33 @@ pub enum ParseError {
 }
 
 fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
+    use Expression as Ex;
     match input {
         PostMac::Sqrt(radical) => {
-            Ok(Expression::Power(box parse_operators(*radical)?,
-                                 box Expression::Atom(Atom::Floating(0.5))))
+            Ok(Ex::Power(box parse_operators(*radical)?,
+                         box Ex::Atom(Atom::Floating(0.5))))
         }
-        PostMac::Char(c) => Ok(Expression::Atom(Atom::PlainVariable(c))),
-        PostMac::Standalone(sym) => Ok(Expression::Atom(Atom::Symbol(Symbol::Standalone(sym)))),
+        PostMac::Char(c) => Ok(Ex::Atom(Atom::PlainVariable(c))),
+        PostMac::Standalone(sym) => Ok(Ex::Atom(Atom::Symbol(Symbol::Standalone(sym)))),
         PostMac::Op(o) => Err(ParseError::LoneOperator(o)),
         PostMac::Frac(top, bottom) => {
             let parsed_top = parse_operators(*top)?;
             let parsed_bottom = parse_operators(*bottom)?;
-            Ok(Expression::Division(box parsed_top, box parsed_bottom))
+            Ok(Ex::divide(parsed_top, parsed_bottom))
         }
         PostMac::Num(Numeric(natural, None)) => {
             i64::from_str_radix(natural.as_str(), 10)
                 .ok()
                 .ok_or(ParseError::InvalidNumericLiteral)
                 .map(Atom::Natural)
-                .map(Expression::Atom)
+                .map(Ex::Atom)
         }
         PostMac::Num(Numeric(natural, Some(dec))) => {
             let s = format!("{}.{}", natural, dec);
             f64::from_str(s.as_str())
                 .map_err(|e| ParseError::FPError(e))
                 .map(Atom::Floating)
-                .map(Expression::Atom)
+                .map(Ex::Atom)
         }
         PostMac::List(mut tokens) => {
             // We maintain an invariant that the `operator_stack` is non-empty
@@ -141,7 +142,16 @@ macro_rules! combine_associative {
     };
 }
 
-
+fn post_process_all(exprs: Vec<Expression>) -> Result<Vec<Expression>, ParseError> {
+    exprs.into_iter().fold(Ok(Vec::new()), |earlier, this| {
+        earlier.and_then(|mut vec| {
+            post_process(this).map(|post_this| {
+                vec.push(post_this);
+                vec
+            })
+        })
+    })
+}
 
 fn post_process(expr: Expression) -> Result<Expression, ParseError> {
     use self::post_process as post;
@@ -149,29 +159,8 @@ fn post_process(expr: Expression) -> Result<Expression, ParseError> {
     println!("Post processing {:#?}", expr);
     match expr {
         Negation(box e) => Ok(Negation(box post(e)?)),
-        Sum(es) => {
-            Ok(Sum(es.into_iter()
-                .fold(Ok(Vec::new()), |earlier, this| {
-                    earlier.and_then(|mut vec| {
-                        post(this).map(|post_this| {
-                            vec.push(post_this);
-                            vec
-                        })
-                    })
-                })?))
-        }
-        Product(es) => {
-            Ok(Product(es.into_iter()
-                .fold(Ok(Vec::new()), |earlier, this| {
-                    earlier.and_then(|mut vec| {
-                        post(this).map(|post_this| {
-                            vec.push(post_this);
-                            vec
-                        })
-                    })
-                })?))
-        }
-        Division(box e1, box e2) => Ok(Division(box post(e1)?, box post(e2)?)),
+        Sum(es) => Ok(Sum(post_process_all(es)?)),
+        Division(n, d) => Ok(Division(post_process_all(n)?, post_process_all(d)?)),
         Power(box e1, box e2) => Ok(Power(box post(e1)?, box post(e2)?)),
         Subscript(box e1, box e2) => Ok(Subscript(box post(e1)?, box post(e2)?)),
         LimitOp(OperatorSymbol::Function(f), sub, sup, box e) => {
@@ -229,10 +218,10 @@ fn combine2(left: Expression, op: UniOp, right: Expression) -> Expression {
     use self::Operator::*;
     use self::UniOp::*;
     match op {
-        Std(Times) => combine_associative!(left, Expression::Product, right),
+        Std(Times) => Expression::multiply(left, right),
         Std(Plus) => combine_associative!(left, Expression::Sum, right),
         Std(Minus) => combine2(left, Std(Operator::Plus), Expression::Negation(box right)),
-        Std(Div) => Expression::Division(box left, box right),
+        Std(Div) => Expression::divide(left, right),
         Std(Caret) => Expression::Power(box left, box right),
         Std(Underscore) => Expression::Subscript(box left, box right),
         _ => panic!("Combine2 called with non-binary operator"),
