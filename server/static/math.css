@@ -54,6 +54,12 @@ button.recover {
     border-radius: 1em;
 }
 
+button.getcode {
+    left-margin: fill;
+    font-family: monospace;
+    border-radius: 0.25em;
+}
+
 .algebra-dsl-error {
   border: 1px solid red;
   background-color: #fd8;

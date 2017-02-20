@@ -8,6 +8,8 @@ use khwarizmi::{Expression, TreeIdx, AlgebraDSLError, Indexable, EqOrExpr, Latex
 pub enum Return {
     EqOrExpr(EqOrExpr),
     LaTeXStr(String),
+    /// The code the use requested and the object it corresponds to
+    LaTeXInput(String, EqOrExpr),
     Response(String),
 }
 
@@ -27,6 +29,7 @@ pub enum Cmd {
     Map(Op, Expression),
     Output(Vec<usize>),
     Recover(usize),
+    GetCode(usize),
     Report(String),
 }
 
@@ -87,6 +90,12 @@ impl Cmd {
                 let latex_string = recover_math.as_inline_latex();
                 let parsed = EqOrExpr::from_str(latex_string.as_str().trim())?;
                 Cmd::New(parsed).execute(e, history)
+            }
+            (Cmd::GetCode(idx), _) => {
+                let recover_math = history.get(idx).ok_or(AlgebraDSLError::InvalidIdx)?;
+                let latex_string = recover_math.as_inline_latex();
+                let parsed = EqOrExpr::from_str(latex_string.as_str().trim())?;
+                Ok(Return::LaTeXInput(latex_string, parsed))
             }
             (Cmd::Report(s),_) => {
                 println!("Report is: {}", s);
@@ -173,6 +182,10 @@ impl str::FromStr for Cmd {
         } else if s.starts_with("report") {
             let report = &s[6..].trim();
             Ok(Cmd::Report(report.to_string()))
+        } else if s.starts_with("code") {
+            let rest = &s[4..].trim();
+            let idx = usize::from_str(rest).map_err(|_| AlgebraDSLError::InvalidIdx)?;
+            Ok(Cmd::GetCode(idx))
         } else {
             Err(AlgebraDSLError::UnrecognizedCmd)
         }

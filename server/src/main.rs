@@ -111,6 +111,11 @@ fn main() {
                             }
                             Ok(cmd::Return::LaTeXStr(s)) => format!("{}@LaTeX@{}", formula_num, s),
                             Ok(cmd::Return::Response(s)) => format!("{}@Re@{}", formula_num, s),
+                            Ok(cmd::Return::LaTeXInput(code, e)) => {
+                                let s = format!("{}@Input@{}@{}", formula_num, code, e);
+                                history.push(e);
+                                s
+                            }
                             Err(e) => format!("{}@Err@Error: {:?}", formula_num, e),
                         };
 

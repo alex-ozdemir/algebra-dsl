@@ -176,6 +176,8 @@ function removeMathCallbacks(where) {
 socket.onmessage = function(event) {
     var data = event.data;
 
+    var codeMirrorInitialContents = '';
+
     var atIdx = data.indexOf('@');
     if (atIdx === -1) {
         console.log("Server sent bad data: No @ symbol");
@@ -212,6 +214,14 @@ socket.onmessage = function(event) {
       reDiv.className += ' response-from-server';
       reDiv.innerHTML = rest;
       document.getElementById('repl').appendChild(reDiv);
+    } else if (type === 'Input') {
+        var atIdx = rest.indexOf('@');
+        if (atIdx === -1) {
+            console.log("Server sent bad data: Only two @ symbols in `Input`");
+            return;
+        }
+        codeMirrorInitialContents = "$ " + rest.substr(0, atIdx);
+        rest = rest.substr(atIdx + 1);
     }
 
     // Print the current math regardless
@@ -233,7 +243,7 @@ socket.onmessage = function(event) {
 
     fullDiv.appendChild(checkbox);
 
-    if (type === 'Math') {
+    if (type === 'Math' || type === 'Input') {
         var mathBox = document.createElement('span');
         mathBox.id = 'formula'+formulaNum;
         mathBox.className += ' output disable-highlight';
@@ -267,9 +277,20 @@ socket.onmessage = function(event) {
     }
 
     // Create a button which will recover what was just displayed.
+    createRecoverButtom(fullDiv);
+    createGetCodeButton(fullDiv);
+
+    createCM();
+
+    currentCM.setValue(codeMirrorInitialContents);
+    currentCM.setCursor({line: 0, ch: codeMirrorInitialContents.length});
+};
+
+function createRecoverButtom(fullDiv) {
     var recoverButton = document.createElement('button');
+    const recoverClass = "recover";
     recoverButton.innerHTML = "&#x27f2;";
-    recoverButton.className += " recover"
+    recoverButton.className += " " + recoverClass;
 
     recoverButton.addEventListener("click", function(e) {
         var tosend = "recover "
@@ -281,7 +302,12 @@ socket.onmessage = function(event) {
             if (cns[i].classList.contains('new-math-output')) {
                 eqnIdx++;
             }
-            if (e.target == cns[i].childNodes[2]) {
+            var buttonCandidates = cns[i].getElementsByClassName(recoverClass);
+            if (buttonCandidates.length >= 2) {
+                console.log("Too many " + recoverClass + " buttons!");
+                console.log(buttonCandidates);
+            }
+            if (buttonCandidates.length > 0 && e.target === buttonCandidates[0] ) {
                 tosend += eqnIdx;
                 break;
             }
@@ -292,10 +318,41 @@ socket.onmessage = function(event) {
         sendToServer(currentCM);
     });
     fullDiv.appendChild(recoverButton);
+}
 
+function createGetCodeButton(fullDiv) {
+    var getcodeButton = document.createElement('button');
+    const recoverClass = "getcode";
+    getcodeButton.innerHTML = "&lt;/&gt;";
+    getcodeButton.className += " " + recoverClass;
 
-    createCM();
-};
+    getcodeButton.addEventListener("click", function(e) {
+        var tosend = "code "
+
+        var cns = document.getElementById('repl').childNodes;
+
+        var eqnIdx = -1;
+        for (var i=0; i<cns.length; i++) {
+            if (cns[i].classList.contains('new-math-output')) {
+                eqnIdx++;
+            }
+            var buttonCandidates = cns[i].getElementsByClassName(recoverClass);
+            if (buttonCandidates.length >= 2) {
+                console.log("Too many " + recoverClass + " buttons!");
+                console.log(buttonCandidates);
+            }
+            if (buttonCandidates.length > 0 && e.target === buttonCandidates[0] ) {
+                tosend += eqnIdx;
+                break;
+            }
+        }
+
+        currentCM.setValue(tosend);
+
+        sendToServer(currentCM);
+    });
+    fullDiv.appendChild(getcodeButton);
+}
 
 function mathTreeNodeAbove(cur, topLevel) {
     while (!cur.hasAttribute('mathtreenode')) {
