@@ -22,6 +22,9 @@ mod cmd;
 
 use khwarizmi::EqOrExpr;
 
+//Where do we store our messages?
+const REPORTFILE : &'static str = "test.txt";
+
 // The HTTP server handler
 fn send_mainpage(_: &mut Request) -> IronResult<Response> {
 
@@ -107,6 +110,7 @@ fn main() {
                                 s
                             }
                             Ok(cmd::Return::LaTeXStr(s)) => format!("{}@LaTeX@{}", formula_num, s),
+                            Ok(cmd::Return::Response(s)) => format!("{}@Re@{}", formula_num, s),
                             Err(e) => format!("{}@Err@Error: {:?}", formula_num, e),
                         };
 

@@ -1,4 +1,6 @@
 use std::str;
+use std::fs::OpenOptions;
+use std::io::Write;
 
 use khwarizmi::{Expression, TreeIdx, AlgebraDSLError, Indexable, EqOrExpr, LatexWriter};
 
@@ -6,6 +8,7 @@ use khwarizmi::{Expression, TreeIdx, AlgebraDSLError, Indexable, EqOrExpr, Latex
 pub enum Return {
     EqOrExpr(EqOrExpr),
     LaTeXStr(String),
+    Response(String),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -24,6 +27,7 @@ pub enum Cmd {
     Map(Op, Expression),
     Output(Vec<usize>),
     Recover(usize),
+    Report(String),
 }
 
 impl Cmd {
@@ -83,6 +87,18 @@ impl Cmd {
                 let latex_string = recover_math.as_inline_latex();
                 let parsed = EqOrExpr::from_str(latex_string.as_str().trim())?;
                 Cmd::New(parsed).execute(e, history)
+            }
+            (Cmd::Report(s),_) => {
+                println!("Report is: {}", s);
+                let mut f = match OpenOptions::new().append(true).open(::REPORTFILE) {
+                    Ok(file) => file,
+                    Err(_) => return Err(AlgebraDSLError::InternalError),
+                };
+                match write!(f,"Start Report:\n{}\nEnd Report\n\n\n",s) {
+                    Ok(_) => {},
+                    Err(_) => return Err(AlgebraDSLError::InternalError),
+                }
+                Ok(Return::Response(String::from("Thanks for telling us! We'll take care of it!")))
             }
         }
     }
@@ -154,6 +170,9 @@ impl str::FromStr for Cmd {
             Ok(Cmd::Map(Op::Times, expr))
         } else if s.starts_with("$") {
             Ok(Cmd::New(EqOrExpr::from_str(&s[1..].trim())?))
+        } else if s.starts_with("report") {
+            let report = &s[6..].trim();
+            Ok(Cmd::Report(report.to_string()))
         } else {
             Err(AlgebraDSLError::UnrecognizedCmd)
         }

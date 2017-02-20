@@ -36,6 +36,7 @@ function createCM() {
     CMhistory.push(currentCM);
     currentCM.loc = 0; //helps us keep track of where we are in history
     currentCM.history = CMhistory.map(x => x.getValue()); //needed for bash-like continuity
+    currentCM.is_report = ""; //this is not a report CM, so do not prepend anything.
 
     // Scroll down
     document.getElementById('repl').lastElementChild.scrollIntoView({
@@ -57,7 +58,7 @@ var socket = new WebSocket("ws://" + location.hostname + ':2794', "rust-websocke
 function sendToServer(cmBox) {
     currentCM.setOption('readOnly', true);
     currentCM.setOption('cursorBlinkRate', -1);
-    socket.send(cmBox.getValue());
+    socket.send(cmBox.is_report + cmBox.getValue());
 }
 
 socket.onmessage = function(event) {
@@ -79,7 +80,7 @@ socket.onmessage = function(event) {
     var type = rest.substr(0, atIdx);
     var rest = rest.substr(atIdx+1);
 
-    // Print out the latex or error
+    // Print out the latex or error or text response from server
 
     if (type === 'LaTeX') {
         var CM = CodeMirror(document.getElementById('repl'),
@@ -93,6 +94,12 @@ socket.onmessage = function(event) {
         errDiv.className += ' algebra-dsl-error';
         errDiv.innerHTML = rest;
         document.getElementById('repl').appendChild(errDiv);
+    } else if (type === 'Re') {
+      var reDiv = document.createElement('div');
+      reDiv.className = 'output';
+      reDiv.className += ' response-from-server';
+      reDiv.innerHTML = rest;
+      document.getElementById('repl').appendChild(reDiv);
     }
 
     // Print the current math regardless
@@ -409,4 +416,39 @@ function reclaimUp() {
         currentCM.setValue(currentCM.history[len-1-currentCM.loc]);
         currentCM.setCursor({line: 0, ch: currentCM.getValue().length});
     }
+}
+
+function sendFeedback() {
+    var heading = document.createElement('div');
+        heading.className = 'response-heading';
+        heading.innerHTML = '<br>We\'d love to hear your feedback.'
+    document.getElementById('repl').appendChild(heading);
+
+    var form = CodeMirror(document.getElementById('repl'));
+        form.setValue("> ");
+        currentCM.setCursor({line: 0, ch: 2});
+
+    var fullDiv = document.createElement('div');
+        fullDiv.className = 'response-button';
+
+    document.getElementById('repl').appendChild(fullDiv);
+
+    var sendButton = document.createElement('button');
+        sendButton.innerHTML = "SEND";
+        sendButton.className += " send"
+        sendButton.addEventListener("click", function(e) {
+            form.is_report = "report "
+              sendToServer(form);
+            });
+    fullDiv.appendChild(sendButton);
+    var spaceDiv = document.createElement('div');
+        spaceDiv.className = 'space-after-button';
+        spaceDiv.innerHTML = '<br>';
+    fullDiv.appendChild(spaceDiv);
+
+    // Scroll down
+    document.getElementById('repl').lastElementChild.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+    });
 }
