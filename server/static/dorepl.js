@@ -251,7 +251,7 @@ socket.onmessage = function(event) {
         MathJax.Hub.Queue([onFinishTypesetting, fullDiv.id]);
     } else {
         var prevOut = document.getElementById('mathout'+(formulaNum-1));
-        if (prevOut && (prevOut.tagName.toLowerCase() == "div" && prevOut.childNodes.length > 1)) {
+        if (prevOut && (prevOut.childNodes[1].tagName.toLowerCase() == "span" && prevOut.childNodes.length > 1)) {
             var mathBox = prevOut.childNodes[1].cloneNode(true);
             var subNodes = mathBox.getElementsByTagName('*');
 
