@@ -134,6 +134,77 @@ fn replace_siblings() {
 }
 
 #[test]
+fn replace_division_all_top() {
+    let mut before = Ex::Division(vec![Ex::Atom(Atom::Natural(3)),
+                                      Ex::Atom(Atom::Natural(4)),
+                                      Ex::Atom(Atom::Natural(7))], vec![]);
+    let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,2)"];
+    let after = Ex::Atom(Atom::Natural(84));
+    let indices: Vec<_> =
+        index_strings.into_iter().map(TreeIdx::from_str).map(Result::unwrap).collect();
+    let siblings = before.make_siblings(indices.as_slice()).unwrap();
+    let replacement = Ex::Atom(Atom::Natural(84));
+    before.replace_siblings(siblings, replacement).unwrap();
+    assert_expected_eq_actual!(after, before);
+}
+
+#[test]
+fn replace_division_end_of_top() {
+    let mut before = Ex::Division(vec![Ex::Atom(Atom::Natural(3)),
+                                      Ex::Atom(Atom::Natural(4)),
+                                      Ex::Atom(Atom::Natural(7))], vec![]);
+    let index_strings = vec!["#(mtn:0,1)", "#(mtn:0,2)"];
+    let after = Ex::Division(vec![Ex::Atom(Atom::Natural(3)),
+                                   Ex::Atom(Atom::Natural(21))], vec![]);
+    let indices: Vec<_> =
+        index_strings.into_iter().map(TreeIdx::from_str).map(Result::unwrap).collect();
+    let siblings = before.make_siblings(indices.as_slice()).unwrap();
+    let replacement = Ex::Atom(Atom::Natural(21));
+    before.replace_siblings(siblings, replacement).unwrap();
+    assert_expected_eq_actual!(after, before);
+}
+
+#[test]
+fn replace_division_all_bottom() {
+    let mut before = Ex::Division(vec![Ex::Atom(Atom::Natural(3)),
+                                       Ex::Atom(Atom::Natural(4))],
+                                  vec![Ex::Atom(Atom::Natural(6)),
+                                       Ex::Atom(Atom::Natural(7))]);
+    let index_strings = vec!["#(mtn:0,2)", "#(mtn:0,3)"];
+    let after = Ex::Division(vec![Ex::Atom(Atom::Natural(3)),
+                                  Ex::Atom(Atom::Natural(4))],
+                             vec![Ex::Atom(Atom::Natural(42))]);
+    let indices: Vec<_> =
+        index_strings.into_iter().map(TreeIdx::from_str).map(Result::unwrap).collect();
+    let siblings = before.make_siblings(indices.as_slice()).unwrap();
+    let replacement = Ex::Atom(Atom::Natural(42));
+    before.replace_siblings(siblings, replacement).unwrap();
+    assert_expected_eq_actual!(after, before);
+}
+
+#[test]
+fn replace_division_mid_top_mid_bottom() {
+    let mut before = Ex::Division(vec![Ex::Atom(Atom::Natural(3)),
+                                       Ex::Atom(Atom::Natural(4)),
+                                       Ex::Atom(Atom::Natural(4))],
+                                  vec![Ex::Atom(Atom::Natural(6)),
+                                       Ex::Atom(Atom::Natural(4)),
+                                       Ex::Atom(Atom::Natural(7))]);
+    let index_strings = vec!["#(mtn:0,1)", "#(mtn:0,4)"];
+    let after = Ex::Division(vec![Ex::Atom(Atom::Natural(3)),
+                                  Ex::Atom(Atom::Natural(42)),
+                                  Ex::Atom(Atom::Natural(4))],
+                             vec![Ex::Atom(Atom::Natural(6)),
+                                  Ex::Atom(Atom::Natural(7))]);
+    let indices: Vec<_> =
+        index_strings.into_iter().map(TreeIdx::from_str).map(Result::unwrap).collect();
+    let siblings = before.make_siblings(indices.as_slice()).unwrap();
+    let replacement = Ex::Atom(Atom::Natural(42));
+    before.replace_siblings(siblings, replacement).unwrap();
+    assert_expected_eq_actual!(after, before);
+}
+
+#[test]
 fn replace_siblings_sum() {
     let mut before = Ex::Sum(vec![Ex::Atom(Atom::Natural(3)),
                                   Ex::Atom(Atom::Natural(4)),

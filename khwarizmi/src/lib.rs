@@ -210,6 +210,9 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
     }
 
     /// May eat the structure on error
+    ///
+    /// If `expr` is present, puts it in the first location indicated by `indices`. If not, it just
+    /// removes the locations specified by indices.
     fn replace_with_inner(&mut self,
                           indices: &SiblingIndices,
                           expr: Option<Expression>,
@@ -229,6 +232,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 Ex::sum_many(new_exprs).ok_or(gen_err)
             }
             Ex::Division(top, bottom) => {
+                let original_top_len = top.len();
                 let bottom_indices = children.iter()
                     .cloned()
                     .filter_map(|i| {
@@ -246,10 +250,10 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 let mut new_top = delete_prod(top, top_indices.as_slice());
                 let mut new_bottom = delete_prod(bottom, bottom_indices.as_slice());
                 expr.map(|e| {
-                    if insert_idx < new_top.len() {
+                    if insert_idx < original_top_len {
                         new_top.insert(insert_idx, e);
                     } else {
-                        new_bottom.insert(insert_idx - new_top.len(), e);
+                        new_bottom.insert(insert_idx - original_top_len, e);
                     }
                 });
                 Ok(Ex::divide_products(new_top, new_bottom))
