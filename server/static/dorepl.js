@@ -14,6 +14,7 @@ MathJax.Hub.Config({
 });
 
 var currentCM = null;
+var CMhistory = []; //stores references to all the old CM instances
 
 window.onload = function() {
     createCM();
@@ -27,8 +28,14 @@ function createCM() {
         autofocus: true,
         extraKeys: {
             'Enter': sendToServer,
+            'Up': reclaimUp,
+            'Down': reclaimDown,
         },
     });
+
+    CMhistory.push(currentCM);
+    currentCM.loc = 0; //helps us keep track of where we are in history
+    currentCM.history = CMhistory.map(x => x.getValue()); //needed for bash-like continuity
 
     // Scroll down
     document.getElementById('repl').lastElementChild.scrollIntoView({
@@ -370,4 +377,36 @@ function sendOutputLatex() {
     currentCM.setValue(tosend);
 
     sendToServer(currentCM);
+}
+
+function reclaimDown() {
+    var len = currentCM.history.length;
+    //don't try this on the first box
+    if (len < 2) {
+        return
+    }
+    currentCM.loc += -1;
+    if (currentCM.loc < 0) {
+        currentCM.loc = 0;
+    } else {
+        currentCM.history[len-2-currentCM.loc] = currentCM.getValue();
+        currentCM.setValue(currentCM.history[len-1-currentCM.loc]);
+        currentCM.setCursor({line: 0, ch: currentCM.getValue().length});
+    }
+}
+
+function reclaimUp() {
+    var len = currentCM.history.length;
+    //don't try this on the first box
+    if (len < 2) {
+        return
+    }
+    currentCM.loc += 1;
+    if (currentCM.loc >= len){
+        currentCM.loc = len - 1;
+    } else {
+        currentCM.history[len-currentCM.loc] = currentCM.getValue();
+        currentCM.setValue(currentCM.history[len-1-currentCM.loc]);
+        currentCM.setCursor({line: 0, ch: currentCM.getValue().length});
+    }
 }
