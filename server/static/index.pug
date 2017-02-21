@@ -1,29 +1,48 @@
 doctype html
 html
   head
+    //- JQuery
+    script(src="https://code.jquery.com/jquery-3.1.1.min.js" integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" crossorigin="anonymous")
+
     //- mathjax js
     script(type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=MML_CHTML")
 
     //- codemirror  js
     //- script(type="text/javascript" src="https://cdn.rawgit.com/codemirror/CodeMirror/master/lib/codemirror.js")
     script(type="text/javascript" src="static/codemirror.js")
+    //- codemirror css
+    link(rel="stylesheet" type="text/css" href="static/codemirror.css")
+
+    //- Bootstrap
+    link(rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous")
+
+    link(rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous")
+
+    script(src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous")
 
     //- my js
     //- script(type="text/javascript" src="static/equation-highlight.js")
     script(type="text/javascript" src="static/dorepl.js")
-
-    //- codemirror css
-    link(rel="stylesheet" type="text/css" href="static/codemirror.css")
 
     //- my css
     link(rel="stylesheet" type="text/css" href="static/disable-highlight.css")
     link(rel="stylesheet" type="text/css" href="static/math.css")
   body
     #repl
-    label
-      button(onclick="sendOutputLatex()") Get Selected LaTeX Code
-    label
-      button(onclick="sendFeedback()") Send us your feedback!
+    button(type="button" class="btn btn-default btn-sm" onclick="sendOutputLatex()") Get Checked Math as LaTeX
+    button(type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#feedbackModal") Send feedback!
 
-//- vim: sw=2 sts=2
+    div(class="modal fade" id="feedbackModal" tabindex="-1" role="dialog" aria-labelledby="feedbackModalLabel")
+      div(class="modal-dialog" role="document")
+        div(class="modal-content")
+          div(class="modal-header")
+            button(type="button" class="close" data-dismiss="modal" aria-label="Close")
+              span(aria-hidden="true") &times;
+            h4(class="modal-title" id="feedbackModalLabel") Feedback
+          div(class="modal-body")
+            textarea.form-control#feedbackText
+          div(class="modal-footer")
+            button(type="button" class="btn btn-primary" data-dismiss="modal" onclick="sendFeedback()") Submit Feedback
+
+//- vim: sw=2 sts=2 tw=0
 //- au BufWritePost * !pug -P index.pug

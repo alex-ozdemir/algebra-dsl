@@ -23,7 +23,7 @@ mod cmd;
 use khwarizmi::EqOrExpr;
 
 //Where do we store our messages?
-const REPORTFILE : &'static str = "test.txt";
+const REPORTFILE : &'static str = "feedback.txt";
 
 // The HTTP server handler
 fn send_mainpage(_: &mut Request) -> IronResult<Response> {
@@ -107,22 +107,24 @@ fn main() {
                                 let simpler = auto_simplify(e);
                                 let s = format!("{}@Math@{}", formula_num, simpler);
                                 history.push(simpler);
-                                s
+                                Some(s)
                             }
-                            Ok(cmd::Return::LaTeXStr(s)) => format!("{}@LaTeX@{}", formula_num, s),
-                            Ok(cmd::Return::Response(s)) => format!("{}@Re@{}", formula_num, s),
+                            Ok(cmd::Return::LaTeXStr(s)) => Some(format!("{}@LaTeX@{}", formula_num, s)),
                             Ok(cmd::Return::LaTeXInput(code, e)) => {
                                 let s = format!("{}@Input@{}@{}", formula_num, code, e);
                                 history.push(e);
-                                s
+                                Some(s)
                             }
-                            Err(e) => format!("{}@Err@Error: {:?}", formula_num, e),
+                            Ok(_) => None,
+                            Err(e) => Some(format!("{}@Err@Error: {:?}", formula_num, e)),
                         };
 
-                        formula_num += 1;
-                        println!("Output: {:#?}", msg);
-                        println!("The current formula is {:#?}", history.last());
-                        sender.send_message(&Message::text(msg)).unwrap();
+                        if let Some(msg) = msg {
+                            formula_num += 1;
+                            println!("Output: {:#?}", msg);
+                            println!("The current formula is {:#?}", history.last());
+                            sender.send_message(&Message::text(msg)).unwrap();
+                        }
                     }
                     _ => {
                         println!("Got unknown mesage.Closing connection");
