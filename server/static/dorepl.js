@@ -10,6 +10,17 @@ MathJax.Hub.Config({
         linebreaks: {
             automatic: true
         }
+    },
+    MathML: {
+        extensions: ["content-mathml.js"]
+    },
+    "content-mathml": {
+        //collapsePlusMinus: true, // TODO(aozdemir) Do we want to use this?
+        cistyles: {
+            texttt: '',
+            vector: 'bold-italic',
+            matrix: 'bold-upright'
+        },
     }
 });
 

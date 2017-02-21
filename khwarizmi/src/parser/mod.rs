@@ -43,6 +43,7 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                          box Ex::Atom(Atom::Floating(0.5))))
         }
         PostMac::Char(c) => Ok(Ex::Atom(Atom::PlainVariable(c))),
+        PostMac::Escaped(string) => Ok(Ex::Atom(Atom::Escaped(string))),
         PostMac::Standalone(sym) => Ok(Ex::Atom(Atom::Symbol(Symbol::Standalone(sym)))),
         PostMac::Op(o) => Err(ParseError::LoneOperator(o)),
         PostMac::Frac(top, bottom) => {

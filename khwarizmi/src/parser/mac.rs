@@ -98,6 +98,7 @@ pub enum PostMac {
     Standalone(StandaloneSymbol),
     Op(UniOp),
     Char(char),
+    Escaped(String),
     Num(Numeric),
 }
 
@@ -137,26 +138,28 @@ impl PostMac {
     pub fn expects_op_after(&self) -> bool {
         match self {
             &PostMac::List(ref list) => list.last().expect("No empty lists!").expects_op_after(),
-            &PostMac::Frac(_, _) => true,
-            &PostMac::Sqrt(_) => true,
-            &PostMac::Op(UniOp::Std(Operator::RGroup)) => true,
-            &PostMac::Standalone(_) => true,
-            &PostMac::Op(_) => false,
-            &PostMac::Char(_) => true,
+            &PostMac::Frac(_, _) |
+            &PostMac::Sqrt(_) |
+            &PostMac::Op(UniOp::Std(Operator::RGroup)) |
+            &PostMac::Standalone(_) |
+            &PostMac::Char(_) |
+            &PostMac::Escaped(_) |
             &PostMac::Num(_) => true,
+            &PostMac::Op(_) => false,
         }
     }
     /// Return whether there should be an operator before this type of LaTeX construct.
     pub fn expects_op_before(&self) -> bool {
         match self {
-            &PostMac::Frac(_, _) => true,
-            &PostMac::Sqrt(_) => true,
             &PostMac::List(ref list) => list.first().expect("No empty lists!").expects_op_before(),
-            &PostMac::Op(UniOp::Std(Operator::LGroup)) => true,
-            &PostMac::Op(_) => false,
-            &PostMac::Standalone(_) => true,
-            &PostMac::Char(_) => true,
+            &PostMac::Frac(_, _) |
+            &PostMac::Sqrt(_) |
+            &PostMac::Op(UniOp::Std(Operator::LGroup)) |
+            &PostMac::Standalone(_) |
+            &PostMac::Char(_) |
+            &PostMac::Escaped(_) |
             &PostMac::Num(_) => true,
+            &PostMac::Op(_) => false,
         }
     }
 }
@@ -176,6 +179,7 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
         Token::Special(Special::Period) => {
             Ok(PostMac::Num(Numeric("".to_string(), Some("".to_string()))))
         }
+        Token::Escaped(string) => Ok(PostMac::Escaped(string)),
         Token::Special(x) => Err(ParseError::UnknownSpecialChar(x)),
         Token::Char(c) if c.is_alphabetic() => Ok(PostMac::Char(c)),
         Token::Char(c) if c.is_numeric() => Ok(PostMac::Num(Numeric(c.to_string(), None))),

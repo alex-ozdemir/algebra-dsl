@@ -63,6 +63,7 @@ pub enum Token {
     Char(char),
     ControlSequence(String),
     List(Vec<Token>),
+    Escaped(String),
 }
 
 named!(special_character<Special>,
@@ -70,7 +71,7 @@ named!(special_character<Special>,
         value!(Special::Tilde, char!('~')) |
         value!(Special::Backtick, char!('`')) |
         value!(Special::Exclamation, char!('!')) |
-        value!(Special::Percent, char!('%')) |
+        value!(Special::Percent, tag!("\\%")) |
         value!(Special::Caret, char!('^')) |
         value!(Special::Star, char!('*')) |
         value!(Special::LParen, char!('(')) |
@@ -98,12 +99,26 @@ named!(special_character<Special>,
 named!(open<char>, preceded!(sp, char!('{')));
 named!(close<char>, preceded!(sp, char!('}')));
 
+named!(open_escape<char>, preceded!(sp, char!('%')));
+named!(close_escape<char>, char!('%'));
+
+named!(escaped<String>,
+    fold_many0!(
+        none_of!("%"),
+        String::new(),
+        |mut s: String, c: char| {
+            s.push(c);
+            s
+        }
+    )
+);
+
 named!(token<Token>,
     alt!(
         map!(special_character, Token::Special) |
         map!(control_sequence, Token::ControlSequence) |
         map!(single_char, Token::Char) |
-        //map!(number, Token::Natural) |
+        map!(delimited!(open_escape, escaped, close_escape), Token::Escaped) |
         map!(delimited!(open, many0!(token), close), Token::List)
     )
 );
@@ -141,33 +156,54 @@ mod tests {
     fn test_ident() {
         let input = &b"hi"[..];
         let expected = IResult::Done(&b""[..], String::from("hi"));
-        assert_expected_eq_actual!(identifier(input), expected);
+        assert_expected_eq_actual!(expected, identifier(input));
     }
 
     #[test]
     fn test_ident_break_space() {
         let expected = IResult::Done(&b" there"[..], String::from("hi"));
-        assert_expected_eq_actual!(identifier(&b"hi there"[..]), expected);
+        assert_expected_eq_actual!(expected, identifier(&b"hi there"[..]));
     }
 
     #[test]
     fn test_ident_break_number() {
         let expected = IResult::Done(&b"1"[..], String::from("hi"));
-        assert_expected_eq_actual!(identifier(&b"hi1"[..]), expected);
+        assert_expected_eq_actual!(expected, identifier(&b"hi1"[..]));
     }
 
     #[test]
     fn test_control_sequence() {
         let input = &b"\\hi"[..];
         let expected = IResult::Done(&b""[..], String::from("hi"));
-        assert_expected_eq_actual!(control_sequence(input), expected);
+        assert_expected_eq_actual!(expected, control_sequence(input));
     }
 
     #[test]
     fn test_control_sequence_break_number() {
         let input = &b"\\hi1"[..];
         let expected = IResult::Done(&b"1"[..], String::from("hi"));
-        assert_expected_eq_actual!(control_sequence(input), expected);
+        assert_expected_eq_actual!(expected, control_sequence(input));
+    }
+
+    #[test]
+    fn test_escaped() {
+        let input = &b" %hi%"[..];
+        let expected = IResult::Done(&b""[..], Token::List(vec![Token::Escaped(String::from("hi"))]));
+        assert_expected_eq_actual!(expected, tokens(input));
+    }
+
+    #[test]
+    fn test_multi_escaped() {
+        let input = &b" 5 %hi% \\hi%% h % hi\t\n % %!@#$^&*()_+%"[..];
+        let expected = IResult::Done(&b""[..], Token::List(vec![
+            Token::Char('5'),
+            Token::Escaped(String::from("hi")),
+            Token::ControlSequence(String::from("hi")),
+            Token::Escaped(String::from("")),
+            Token::Char('h'),
+            Token::Escaped(String::from(" hi\t\n ")),
+            Token::Escaped(String::from("!@#$^&*()_+")) ]));
+        assert_expected_eq_actual!(expected, tokens(input));
     }
 
     #[test]
@@ -177,7 +213,7 @@ mod tests {
                                      Token::List(vec![Token::Char('h'),
                                                                 Token::Char('i'),
                                                                 Token::Char('1')]));
-        assert_expected_eq_actual!(tokens(input), expected);
+        assert_expected_eq_actual!(expected, tokens(input));
     }
 
     #[test]
@@ -187,7 +223,7 @@ mod tests {
                                       Token::Char('1'),
                                       Token::Char('2')]);
         let expected = IResult::Done(&b""[..], answer);
-        assert_expected_eq_actual!(tokens(input), expected);
+        assert_expected_eq_actual!(expected, tokens(input));
     }
 
     #[test]
@@ -197,7 +233,7 @@ mod tests {
                                      Token::List(vec![Token::Char('1'),
                                                                 Token::Char('3'),
                                                                 Token::Char('4')]));
-        assert_expected_eq_actual!(tokens(input), expected);
+        assert_expected_eq_actual!(expected, tokens(input));
     }
 
     #[test]
@@ -211,7 +247,7 @@ mod tests {
                                                        Token::Char('3')]),
                                       Token::Char('4')]);
         let expected = IResult::Done(&b""[..], answer);
-        assert_expected_eq_actual!(tokens(input), expected);
+        assert_expected_eq_actual!(expected, tokens(input));
     }
 
     #[test]
@@ -227,6 +263,6 @@ mod tests {
                                                        Token::Special(Special::Dash),
                                                        Token::Char('5')])]);
         let expected = IResult::Done(&b""[..], answer);
-        assert_expected_eq_actual!(tokens(input), expected);
+        assert_expected_eq_actual!(expected, tokens(input));
     }
 }

@@ -752,7 +752,6 @@ pub enum AlgebraDSLError {
 pub enum Expression {
     Negation(Box<Expression>),
     Sum(Vec<Expression>),
-    // Product(Vec<Expression>),
     /// Division(numerator_prod, denominator_prod)
     Division(Vec<Expression>, Vec<Expression>),
     Power(Box<Expression>, Box<Expression>),
@@ -764,9 +763,10 @@ pub enum Expression {
     Atom(Atom),
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Atom {
     PlainVariable(char),
+    Escaped(String),
     Natural(i64),
     Floating(f64),
     Symbol(Symbol),

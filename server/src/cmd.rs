@@ -87,13 +87,13 @@ impl Cmd {
             (Cmd::Recover(idx), e) => {
                 println!("History is index {:?}: {:#?}", idx, history);
                 let recover_math = history.get(idx).ok_or(AlgebraDSLError::InvalidIdx)?;
-                let latex_string = recover_math.as_inline_latex();
+                let latex_string = recover_math.as_khwarizmi_latex();
                 let parsed = EqOrExpr::from_str(latex_string.as_str().trim())?;
                 Cmd::New(parsed).execute(e, history)
             }
             (Cmd::GetCode(idx), _) => {
                 let recover_math = history.get(idx).ok_or(AlgebraDSLError::InvalidIdx)?;
-                let latex_string = recover_math.as_inline_latex();
+                let latex_string = recover_math.as_khwarizmi_latex();
                 let parsed = EqOrExpr::from_str(latex_string.as_str().trim())?;
                 Ok(Return::LaTeXInput(latex_string, parsed))
             }

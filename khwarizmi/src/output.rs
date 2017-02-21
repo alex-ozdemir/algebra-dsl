@@ -38,24 +38,25 @@ impl fmt::Display for Atom {
             &Atom::Natural(n) => write!(f, "<mn>{}</mn>", n),
             &Atom::Floating(r) => write!(f, "<mn>{}</mn>", r),
             &Atom::Symbol(sym) => write!(f, "<mo>{}</mo>", sym.as_math_ml()),
+            &Atom::Escaped(ref s) => write!(f, "<mi mathvariant=\"monospace\">{}</mi>", s),
         }
     }
 }
 
 impl EqOrExpr {
-    pub fn as_inline_latex(&self) -> String {
+    pub fn as_khwarizmi_latex(&self) -> String {
         struct DisplaysAsLatex<'a>(&'a EqOrExpr);
         impl<'a> fmt::Display for DisplaysAsLatex<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 write!(f, "")?;
                 match self.0 {
                     &EqOrExpr::Eq(ref eq) => {
-                        fmt_as_latex(&eq.left, f, (&eq.left, false, true))?;
+                        fmt_as_latex(&eq.left, f, (&eq.left, false, true), false)?;
                         write!(f, " = ")?;
-                        fmt_as_latex(&eq.right, f, (&eq.right, false, true))?;
+                        fmt_as_latex(&eq.right, f, (&eq.right, false, true), false)?;
                     }
                     &EqOrExpr::Ex(ref ex) => {
-                        fmt_as_latex(&ex, f, (&ex, false, true))?;
+                        fmt_as_latex(&ex, f, (&ex, false, true), false)?;
                     }
                 }
                 write!(f, "")
@@ -81,12 +82,12 @@ impl LatexWriter {
                 write!(f, "  ")?;
                 match self.0 {
                     &EqOrExpr::Eq(ref eq) => {
-                        fmt_as_latex(&eq.left, f, (&eq.left, false, true))?;
+                        fmt_as_latex(&eq.left, f, (&eq.left, false, true), true)?;
                         write!(f, " &= ")?;
-                        fmt_as_latex(&eq.right, f, (&eq.right, false, true))?;
+                        fmt_as_latex(&eq.right, f, (&eq.right, false, true), true)?;
                     }
                     &EqOrExpr::Ex(ref ex) => {
-                        fmt_as_latex(&ex, f, (&ex, false, true))?;
+                        fmt_as_latex(&ex, f, (&ex, false, true), true)?;
                     }
                 }
                 write!(f, " \\\\\n")
@@ -258,18 +259,18 @@ fn fmt_as_math_ml(expr: &Expression,
         write!(f, "<mo form=\"prefix\">(</mo>")?;
     }
     match expr {
-        &Expression::Atom(atom) => {
+        &Expression::Atom(ref atom) => {
             match prev_precedence.0 {
                 &Expression::Sum(_) => {
                     match atom {
-                        Atom::Natural(n) => {
+                        &Atom::Natural(n) => {
                             if n < 0 {
                                 write!(f, "<mo>-</mo><mn>{}</mn>", -n)?
                             } else {
                                 write!(f, "{}", atom)?
                             }
                         }
-                        Atom::Floating(n) => {
+                        &Atom::Floating(n) => {
                             if n < 0.0 {
                                 write!(f, "<mo>-</mo><mn>{}</mn>", -n)?
                             } else {
@@ -428,15 +429,16 @@ fn fmt_as_math_ml(expr: &Expression,
 
 fn fmt_prod_as_latex(exprs: &[Expression],
                      f: &mut fmt::Formatter,
-                     prev_precedence: (&Expression, bool, bool))
+                     prev_precedence: (&Expression, bool, bool),
+                     output: bool)
                      -> Result<(), fmt::Error> {
     let len = exprs.len();
     let iter = exprs.iter().enumerate();
     for (i, e) in iter {
         if i == len - 1 {
-            fmt_as_latex(e, f, prev_precedence)?;
+            fmt_as_latex(e, f, prev_precedence, output)?;
         } else {
-            fmt_as_latex(e, f, prev_precedence)?;
+            fmt_as_latex(e, f, prev_precedence, output)?;
             let e_next = &exprs[i + 1];
             match e_next {
                 &Expression::Atom(Atom::Floating(_)) |
@@ -448,9 +450,13 @@ fn fmt_prod_as_latex(exprs: &[Expression],
     Ok(())
 }
 
+/// Format this expression as LaTeX.
+///
+///    * `output`: whether this is bound for a LaTeX compiler (true) or our system (false)
 fn fmt_as_latex(expr: &Expression,
                 f: &mut fmt::Formatter,
-                prev_precedence: (&Expression, bool, bool))
+                prev_precedence: (&Expression, bool, bool),
+                output: bool)
                 -> Result<(), fmt::Error> {
     if capture(prev_precedence.0,
                expr,
@@ -459,41 +465,46 @@ fn fmt_as_latex(expr: &Expression,
         write!(f, "\\left(")?;
     }
     match expr {
-        &Expression::Atom(atom) => {
-            match &atom {
+        &Expression::Atom(ref atom) => {
+            match atom {
                 &Atom::PlainVariable(c) => write!(f, "{}", c)?,
                 &Atom::Natural(n) => write!(f, "{}", n)?,
                 &Atom::Floating(r) => write!(f, "{}", r)?,
                 &Atom::Symbol(sym) => write!(f, "{} ", sym.as_latex())?,
+                &Atom::Escaped(ref s) => if output {
+                    write!(f, "{}", s)
+                } else {
+                    write!(f, "%{}%", s)
+                }?,
             }
         }
         &Expression::Power(ref b, ref p) => {
             write!(f, "{{")?;
-            fmt_as_latex(b, f, (expr, false, false))?;
+            fmt_as_latex(b, f, (expr, false, false), output)?;
             write!(f, "}}^{{")?;
-            fmt_as_latex(p, f, (expr, true, false))?;
+            fmt_as_latex(p, f, (expr, true, false), output)?;
             write!(f, "}}")?;
         }
         &Expression::Negation(ref n) => {
             write!(f, "-")?;
-            fmt_as_latex(n, f, (expr, false, false))?;
+            fmt_as_latex(n, f, (expr, false, false), output)?;
         }
         &Expression::Division(ref n, ref d) => {
             if d.len() == 0 {
-                fmt_prod_as_latex(n, f, (expr, false, false))?;
+                fmt_prod_as_latex(n, f, (expr, false, false), output)?;
             } else {
                 write!(f, "\\frac{{")?;
-                fmt_prod_as_latex(n, f, (expr, true, false))?;
+                fmt_prod_as_latex(n, f, (expr, true, false), output)?;
                 write!(f, "}}{{")?;
-                fmt_prod_as_latex(d, f, (expr, false, false))?;
+                fmt_prod_as_latex(d, f, (expr, false, false), output)?;
                 write!(f, "}}")?;
             }
         }
         &Expression::Subscript(ref e, ref s) => {
             write!(f, "{{")?;
-            fmt_as_latex(e, f, (expr, false, false))?;
+            fmt_as_latex(e, f, (expr, false, false), output)?;
             write!(f, "}}_{{")?;
-            fmt_as_latex(s, f, (expr, true, false))?;
+            fmt_as_latex(s, f, (expr, true, false), output)?;
             write!(f, "}}")?;
         }
         &Expression::Sum(ref s) => {
@@ -501,9 +512,9 @@ fn fmt_as_latex(expr: &Expression,
             let iter = s.iter().enumerate();
             for (i, e) in iter {
                 if i == len - 1 {
-                    fmt_as_latex(e, f, (expr, false, false))?;
+                    fmt_as_latex(e, f, (expr, false, false), output)?;
                 } else {
-                    fmt_as_latex(e, f, (expr, false, false))?;
+                    fmt_as_latex(e, f, (expr, false, false), output)?;
                     let e_next = &s[i + 1];
                     match e_next {
                         &Expression::Negation(_) => {}
@@ -523,36 +534,36 @@ fn fmt_as_latex(expr: &Expression,
             }
         }
         &Expression::Application(ref func, ref arg) => {
-            fmt_as_latex(func, f, (expr, false, false))?;
+            fmt_as_latex(func, f, (expr, false, false), output)?;
             write!(f, " ")?;
-            fmt_as_latex(arg, f, (expr, true, false))?;
+            fmt_as_latex(arg, f, (expr, true, false), output)?;
         }
         &Expression::LimitOp(ref op, None, None, ref expr) => {
             write!(f, "{}", op.as_latex())?;
-            fmt_as_latex(expr, f, (expr, false, false))?;
+            fmt_as_latex(expr, f, (expr, false, false), output)?;
         }
         &Expression::LimitOp(ref op, Some(ref sub), None, ref expr) => {
             write!(f, "{}", op.as_latex())?;
             write!(f, "_{{")?;
-            fmt_as_latex(sub, f, (expr, false, false))?;
+            fmt_as_latex(sub, f, (expr, false, false), output)?;
             write!(f, "}} ")?;
-            fmt_as_latex(expr, f, (expr, false, false))?;
+            fmt_as_latex(expr, f, (expr, false, false), output)?;
         }
         &Expression::LimitOp(ref op, None, Some(ref sup), ref expr) => {
             write!(f, "{}", op.as_latex())?;
             write!(f, "^{{")?;
-            fmt_as_latex(sup, f, (expr, false, false))?;
+            fmt_as_latex(sup, f, (expr, false, false), output)?;
             write!(f, "}} ")?;
-            fmt_as_latex(expr, f, (expr, false, false))?;
+            fmt_as_latex(expr, f, (expr, false, false), output)?;
         }
         &Expression::LimitOp(ref op, Some(ref sub), Some(ref sup), ref expr) => {
             write!(f, "{}", op.as_latex())?;
             write!(f, "_{{")?;
-            fmt_as_latex(sub, f, (expr, false, false))?;
+            fmt_as_latex(sub, f, (expr, false, false), output)?;
             write!(f, "}}^{{")?;
-            fmt_as_latex(sup, f, (expr, false, false))?;
+            fmt_as_latex(sup, f, (expr, false, false), output)?;
             write!(f, "}} ")?;
-            fmt_as_latex(expr, f, (expr, false, false))?;
+            fmt_as_latex(expr, f, (expr, false, false), output)?;
         }
     }
     if capture(prev_precedence.0,
