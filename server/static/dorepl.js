@@ -238,26 +238,23 @@ socket.onmessage = function(event) {
         rest = rest.substr(atIdx + 1);
     }
 
-    // Print the current math regardless
-
-    var fullDiv = document.createElement('div');
-    fullDiv.className = 'output math-output';
-    fullDiv.id = 'mathout'+formulaNum;
-
-    document.getElementById('repl').appendChild(fullDiv);
-
     if (formulaNum > 0) {
-        removeMathCallbacks(document.getElementById('mathout'+(formulaNum-1)));
+        var prevFormula = document.getElementById('formula'+(formulaNum-1));
+        if (prevFormula) {
+            removeMathCallbacks(prevFormula);
+        }
     }
 
-
-    var checkbox = document.createElement('input');
-    checkbox.setAttribute('type', 'checkbox');
-    //checkbox.style = "float: left;";
-
-    fullDiv.appendChild(checkbox);
-
     if (type === 'Math' || type === 'Input') {
+        var fullDiv = document.createElement('div');
+        fullDiv.className = 'output math-output';
+        fullDiv.id = 'mathout'+formulaNum;
+        document.getElementById('repl').appendChild(fullDiv);
+
+        var checkbox = document.createElement('input');
+        checkbox.setAttribute('type', 'checkbox');
+        fullDiv.appendChild(checkbox);
+
         var mathBox = document.createElement('span');
         mathBox.id = 'formula'+formulaNum;
         mathBox.className += ' output disable-highlight';
@@ -272,11 +269,26 @@ socket.onmessage = function(event) {
 
         // Handle Actual Formula
         MathJax.Hub.Queue(["Typeset", MathJax.Hub, mathBox.id]);
-        MathJax.Hub.Queue([onFinishTypesetting, fullDiv.id]);
+        MathJax.Hub.Queue([onFinishTypesetting, mathBox.id]);
+
+
+        createRecoverButtom(fullDiv);
+        createGetCodeButton(fullDiv);
     } else {
         var prevOut = document.getElementById('mathout'+(formulaNum-1));
         if (prevOut && (prevOut.childNodes[1].tagName.toLowerCase() == "span" && prevOut.childNodes.length > 1)) {
+            var fullDiv = document.createElement('div');
+            fullDiv.className = 'output math-output';
+            fullDiv.id = 'mathout'+formulaNum;
+            document.getElementById('repl').appendChild(fullDiv);
+
+            var checkbox = document.createElement('input');
+            checkbox.setAttribute('type', 'checkbox');
+            fullDiv.appendChild(checkbox);
+
             var mathBox = prevOut.childNodes[1].cloneNode(true);
+            mathBox.id = 'formula'+formulaNum;
+
             var subNodes = mathBox.getElementsByTagName('*');
 
             for (var i=0; i<subNodes.length; i++) {
@@ -284,15 +296,16 @@ socket.onmessage = function(event) {
                 subNodes[i].removeAttribute('highlighted');
             }
 
-            addMathCallbacks(fullDiv);
+            addMathCallbacks(mathBox);
 
             fullDiv.appendChild(mathBox);
+
+            createRecoverButtom(fullDiv);
+            createGetCodeButton(fullDiv);
+        } else {
+            codeMirrorInitialContents = "$ ";
         }
     }
-
-    // Create a button which will recover what was just displayed.
-    createRecoverButtom(fullDiv);
-    createGetCodeButton(fullDiv);
 
     createCM();
 
