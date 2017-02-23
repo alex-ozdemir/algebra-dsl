@@ -43,6 +43,7 @@ $(document).ready(function() {
 function createCM() {
     currentCM = CodeMirror(document.getElementById('repl'), {
         autofocus: true,
+        matchBrackets: true,
         extraKeys: {
             'Enter': sendToServer,
             'Up': reclaimUp,
