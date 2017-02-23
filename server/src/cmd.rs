@@ -97,11 +97,15 @@ impl Cmd {
                 let parsed = EqOrExpr::from_str(latex_string.as_str().trim())?;
                 Ok(Return::LaTeXInput(latex_string, parsed))
             }
-            (Cmd::Feedback(text, html),_) => {
-                let mut f = OpenOptions::new().create(true).append(true).open(::REPORTFILE)
-                        .map_err(|_|AlgebraDSLError::InternalError)?;
-                write!(f,"Feedback text:\n{}\nFeedback html:\n{}\n\n\n",
-                       text, html).map_err(|_|AlgebraDSLError::InternalError)?;
+            (Cmd::Feedback(text, html), _) => {
+                let mut f = OpenOptions::new().create(true)
+                    .append(true)
+                    .open(::REPORTFILE)
+                    .map_err(|_| AlgebraDSLError::InternalError)?;
+                write!(f,
+                       "Feedback text:\n{}\nFeedback html:\n{}\n\n\n",
+                       text,
+                       html).map_err(|_| AlgebraDSLError::InternalError)?;
                 Ok(Return::NoReturn)
             }
         }
@@ -148,7 +152,8 @@ impl str::FromStr for Cmd {
                                      .map_err(|_|AlgebraDSLError::InvalidIdx)?);
                         rest = rest[comma_idx + 1..].trim();
                     } else {
-                        indices.push(usize::from_str(rest).map_err(|_| AlgebraDSLError::InvalidIdx)?);
+                        indices.push(usize::from_str(rest)
+                                     .map_err(|_| AlgebraDSLError::InvalidIdx)?);
                         break;
                     }
                 }
@@ -186,7 +191,7 @@ impl str::FromStr for Cmd {
             let s = &s[9..];
             let end_of_text_idx = s.find('\0').ok_or(AlgebraDSLError::IllFormattedCommand)?;
             let text = &s[..end_of_text_idx];
-            let html = &s[end_of_text_idx+1..];
+            let html = &s[end_of_text_idx + 1..];
             Ok(Cmd::Feedback(text.to_string(), html.to_string()))
         } else {
             Err(AlgebraDSLError::IllFormattedCommand)

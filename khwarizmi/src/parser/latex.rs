@@ -188,14 +188,16 @@ mod tests {
     #[test]
     fn test_escaped() {
         let input = &b" %hi%"[..];
-        let expected = IResult::Done(&b""[..], Token::List(vec![Token::Escaped(String::from("hi"))]));
+        let expected = IResult::Done(&b""[..],
+                                     Token::List(vec![Token::Escaped(String::from("hi"))]));
         assert_expected_eq_actual!(expected, tokens(input));
     }
 
     #[test]
     fn test_multi_escaped() {
         let input = &b" 5 %hi% \\hi%% h % hi\t\n % %!@#$^&*()_+%"[..];
-        let expected = IResult::Done(&b""[..], Token::List(vec![
+        let expected = IResult::Done(&b""[..],
+                                     Token::List(vec![
             Token::Char('5'),
             Token::Escaped(String::from("hi")),
             Token::ControlSequence(String::from("hi")),

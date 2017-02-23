@@ -471,11 +471,13 @@ fn fmt_as_latex(expr: &Expression,
                 &Atom::Natural(n) => write!(f, "{}", n)?,
                 &Atom::Floating(r) => write!(f, "{}", r)?,
                 &Atom::Symbol(sym) => write!(f, "{} ", sym.as_latex())?,
-                &Atom::Escaped(ref s) => if output {
-                    write!(f, "{}", s)
-                } else {
-                    write!(f, "%{}%", s)
-                }?,
+                &Atom::Escaped(ref s) => {
+                    if output {
+                        write!(f, "{}", s)
+                    } else {
+                        write!(f, "%{}%", s)
+                    }?
+                }
             }
         }
         &Expression::Power(ref b, ref p) => {

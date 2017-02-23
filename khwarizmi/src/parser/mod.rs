@@ -105,7 +105,7 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                     expr => expression_stack.push(parse_operators(expr)?),
                 };
                 if let &[_.., UniOp::Std(Operator::LGroup), UniOp::Std(Operator::RGroup)] =
-                    operator_stack.as_slice() {
+                       operator_stack.as_slice() {
                     operator_stack.pop();
                     operator_stack.pop();
                 }

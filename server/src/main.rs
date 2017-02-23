@@ -22,8 +22,8 @@ mod cmd;
 
 use khwarizmi::EqOrExpr;
 
-//Where do we store our messages?
-const REPORTFILE : &'static str = "feedback.txt";
+// Where do we store our messages?
+const REPORTFILE: &'static str = "feedback.txt";
 
 // The HTTP server handler
 fn send_mainpage(_: &mut Request) -> IronResult<Response> {
@@ -109,7 +109,9 @@ fn main() {
                                 history.push(simpler);
                                 Some(s)
                             }
-                            Ok(cmd::Return::LaTeXStr(s)) => Some(format!("{}@LaTeX@{}", formula_num, s)),
+                            Ok(cmd::Return::LaTeXStr(s)) => {
+                                Some(format!("{}@LaTeX@{}", formula_num, s))
+                            }
                             Ok(cmd::Return::LaTeXInput(code, e)) => {
                                 let s = format!("{}@Input@{}@{}", formula_num, code, e);
                                 history.push(e);

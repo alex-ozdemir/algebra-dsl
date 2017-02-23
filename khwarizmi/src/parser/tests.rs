@@ -74,7 +74,8 @@ fn double_negation_and_addition() {
 
 #[test]
 fn single_multiplication() {
-    let expected = Ex::Division(vec![Ex::Atom(At::PlainVariable('x')), Ex::Atom(At::Natural(2))], vec![]);
+    let expected = Ex::Division(vec![Ex::Atom(At::PlainVariable('x')), Ex::Atom(At::Natural(2))],
+                                vec![]);
     assert_expected_eq_actual!(Ok(expected), parse_expr("x \\times  2"));
 }
 
@@ -83,7 +84,8 @@ fn multi_multiplication() {
     let expected = Ex::Division(vec![Ex::Atom(At::PlainVariable('x')),
                                     Ex::Atom(At::Natural(2)),
                                     Ex::Atom(At::Natural(9)),
-                                    Ex::Atom(At::Natural(8))], vec![]);
+                                    Ex::Atom(At::Natural(8))],
+                                vec![]);
     assert_expected_eq_actual!(Ok(expected), parse_expr("x \\times  2 \\cdot 9 * 8"));
 }
 
@@ -92,7 +94,8 @@ fn implicit_multiplication() {
     let expected = Ex::Division(vec![Ex::Atom(At::Natural(2)),
                                     Ex::Atom(At::PlainVariable('x')),
                                     Ex::Atom(At::Natural(9)),
-                                    Ex::Atom(At::Natural(8))], vec![]);
+                                    Ex::Atom(At::Natural(8))],
+                                vec![]);
     assert_expected_eq_actual!(Ok(expected), parse_expr("2x9(8)"));
 }
 
@@ -101,7 +104,8 @@ fn implicit_multiplication_adjacent_parens() {
     let expected = Ex::Division(vec![Ex::Atom(At::Natural(2)),
                                     Ex::Atom(At::PlainVariable('x')),
                                     Ex::Atom(At::Natural(9)),
-                                    Ex::Atom(At::Natural(8))], vec![]);
+                                    Ex::Atom(At::Natural(8))],
+                                vec![]);
     assert_expected_eq_actual!(Ok(expected), parse_expr("2x(9)(8)"));
 }
 
@@ -117,7 +121,8 @@ fn addition_and_multiplication() {
 fn addition_and_multiplication_grouping() {
     let expected = Ex::Division(vec![Ex::Sum(vec![Ex::Atom(At::Natural(4)),
                                                  Ex::Atom(At::PlainVariable('x'))]),
-                                    Ex::Atom(At::Natural(2))], vec![]);
+                                    Ex::Atom(At::Natural(2))],
+                                vec![]);
     assert_expected_eq_actual!(Ok(expected), parse_expr("(4 + x)2"));
 }
 
@@ -243,7 +248,8 @@ fn integral_with_bounds() {
                                Some(box Ex::Atom(At::Natural(2))),
                                box Ex::Division(vec![Ex::Atom(At::PlainVariable('x')),
                                                     Ex::Atom(At::PlainVariable('d')),
-                                                    Ex::Atom(At::PlainVariable('x'))], vec![]));
+                                                    Ex::Atom(At::PlainVariable('x'))],
+                                                vec![]));
     assert_expected_eq_actual!(Ok(expected), parse_expr("\\int_0^2 x dx"));
 }
 
@@ -288,6 +294,7 @@ fn negation_and_multiplication() {
     let expected = Ex::Negation(box Ex::Division(vec![Ex::Atom(At::PlainVariable('x')),
                                 Ex::Atom(At::Natural(2)),
                                 Ex::Atom(At::Natural(9)),
-                                Ex::Atom(At::Natural(7))], vec![]));
+                                Ex::Atom(At::Natural(7))],
+                                                 vec![]));
     assert_expected_eq_actual!(Ok(expected), parse_expr("-x*2*9*7"));
 }

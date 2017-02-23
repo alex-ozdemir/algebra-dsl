@@ -365,8 +365,9 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             &Expression::Sum(ref args) => {
                 if branches.iter().any(|idx| {
                     if idx.as_ref().len() != 1 {
-                        if let Some(&Expression::Negation(_)) =
-                            idx.as_ref().first().and_then(|i| args.get(i)) {
+                        if let Some(&Expression::Negation(_)) = idx.as_ref()
+                            .first()
+                            .and_then(|i| args.get(i)) {
                             idx.as_ref().len() > 2
                         } else {
                             true
