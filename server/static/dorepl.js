@@ -492,7 +492,7 @@ function sendOutputLatex() {
         if (cns[i].classList.contains('new-math-output')) {
             eqnIdx++;
         }
-        if (cns[i].classList.contains('math-output')) {
+        if (cns[i].classList.contains('math-output') && cns[i].childNodes.length > 1) {
             var checkbox = cns[i].childNodes[0];
             if (checkbox.checked) {
                 if (!firstPrint) {

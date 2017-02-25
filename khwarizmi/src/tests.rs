@@ -86,6 +86,20 @@ fn format_add() {
 }
 
 #[test]
+fn format_add_w_paren() {
+    let expr = Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('x')),
+                            Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('y')),
+                            Ex::Atom(Atom::PlainVariable('z'))])]);
+    let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
+                    mathTreeNode=\"0\"><mrow \
+                    mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
+                    mathTreeNode=\"0,1\"><mo form=\"prefix\">(</mo><mrow \
+                    mathTreeNode\"0,1,0\"><mi>y</mi></mrow><mo>+</mo><mrow \
+                    mathTreeNode\"0,1,1\"><mi>z</mi></mrow></mrow><mo form=\"postfix\">)</mo></mrow></math>";
+    let test = format!("{}", expr);
+}
+
+#[test]
 fn format_prod() {
     let expr = Ex::Division(vec![Ex::Atom(Atom::PlainVariable('x')),
                                  Ex::Atom(Atom::PlainVariable('y')),
@@ -98,6 +112,20 @@ fn format_prod() {
                     mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
     let test = format!("{}", expr);
     assert_expected_eq_actual!(expected, test);
+}
+
+#[test]
+fn format_prod_w_paren() {
+    let expr = Ex::Division(vec![Ex::Atom(Atom::PlainVariable('x')),
+                            Ex::Division(vec![Ex::Atom(Atom::PlainVariable('y')),
+                            Ex::Atom(Atom::PlainVariable('z'))],vec![])],vec![]);
+    let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
+                    mathTreeNode=\"0\"><mrow \
+                    mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
+                    mathTreeNode=\"0,1\"><mo form=\"prefix\">(</mo><mrow \
+                    mathTreeNode\"0,1,0\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow \
+                    mathTreeNode\"0,1,1\"><mi>z</mi></mrow></mrow><mo form=\"postfix\">)</mo></mrow></math>";
+    let test = format!("{}", expr);
 }
 
 #[test]

@@ -119,11 +119,13 @@ fn capture(expr1: &Expression, expr2: &Expression, alt: bool, top: bool) -> bool
         match expr1 {
             &Expression::Sum(_) => {
                 match expr2 {
+                    &Expression::Sum(_) => true,
                     _ => false,
                 }
             }
             ref d @ &Expression::Division(_, _) if d.is_product() => {
                 match expr2 {
+                    ref d2 @ &Expression::Division(_,_) if d2.is_product() => true,
                     &Expression::Sum(_) => true,
                     &Expression::Negation(_) => true,
                     _ => false,
@@ -147,6 +149,7 @@ fn capture(expr1: &Expression, expr2: &Expression, alt: bool, top: bool) -> bool
             }
             &Expression::Division(_, ref d) => {
                 match expr2 {
+                    ref d2 @ &Expression::Division(_,_) if d2.is_product() => true,
                     &Expression::Sum(_) |
                     &Expression::Negation(_) => d.len() > 1,
                     _ => false,
@@ -199,6 +202,7 @@ fn capture(expr1: &Expression, expr2: &Expression, alt: bool, top: bool) -> bool
             }
             &Expression::Division(ref n, _) => {
                 match expr2 {
+                    ref d2 @ &Expression::Division(_,_) if d2.is_product() => true,
                     &Expression::Sum(_) |
                     &Expression::Negation(_) => n.len() > 1,
                     _ => false,
