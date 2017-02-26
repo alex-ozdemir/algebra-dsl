@@ -105,7 +105,7 @@ impl LatexWriter {
 }
 
 // alt is usually for right expressions, when they need different rules (power & subscript)
-// Outputs whether expr1 captures expr2 with parenthesis
+// Outputs whether expr1 captures expr2 with parentheses. I.e. whether to output (Expr2) vs Expr2.
 //
 // If `expr1` is a Divsion, `alt` is true when `expr2` is in the numerator. otherwise it is in the
 // denominators and `alt` should be false.
@@ -240,15 +240,16 @@ fn fmt_prod_as_math_ml(exprs: &[Expression],
             fmt_as_math_ml(e, f, &base_string, prev_precedence)?;
             let e_next = &exprs[i + 1];
             match e_next {
-                &Expression::Atom(Atom::Floating(_)) => write!(f, "<mo>&#x022C5;</mo>")?,
-                &Expression::Atom(Atom::Natural(_)) => write!(f, "<mo>&#x022C5;</mo>")?,
+                &Expression::Atom(Atom::Floating(_)) |
+                &Expression::Atom(Atom::Natural(_)) |
+                &Expression::Power(box Expression::Atom(Atom::Floating(_)),_) |
+                &Expression::Power(box Expression::Atom(Atom::Natural(_)),_) => write!(f, "<mo>&#x022C5;</mo>")?,
                 _ => write!(f, "<mo>&#8290;</mo>")?,
             };
         }
     }
     Ok(())
 }
-
 
 fn fmt_as_math_ml(expr: &Expression,
                   f: &mut fmt::Formatter,
@@ -446,7 +447,9 @@ fn fmt_prod_as_latex(exprs: &[Expression],
             let e_next = &exprs[i + 1];
             match e_next {
                 &Expression::Atom(Atom::Floating(_)) |
-                &Expression::Atom(Atom::Natural(_)) => write!(f, "\\cdot")?,
+                &Expression::Atom(Atom::Natural(_)) |
+                &Expression::Power(box Expression::Atom(Atom::Floating(_)),_) |
+                &Expression::Power(box Expression::Atom(Atom::Natural(_)),_) => write!(f, "\\cdot")?,
                 _ => {}
             };
         }
