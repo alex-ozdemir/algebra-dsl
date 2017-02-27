@@ -103,9 +103,10 @@ fn format_add_w_paren() {
                     mathTreeNode=\"0\"><mrow \
                     mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
                     mathTreeNode=\"0,1\"><mo form=\"prefix\">(</mo><mrow \
-                    mathTreeNode\"0,1,0\"><mi>y</mi></mrow><mo>+</mo><mrow \
-                    mathTreeNode\"0,1,1\"><mi>z</mi></mrow></mrow><mo form=\"postfix\">)</mo></mrow></math>";
+                    mathTreeNode=\"0,1,0\"><mi>y</mi></mrow><mo>+</mo><mrow \
+                    mathTreeNode=\"0,1,1\"><mi>z</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
     let test = format!("{}", expr);
+    assert_expected_eq_actual!(expected, test);
 }
 
 #[test]
@@ -132,9 +133,10 @@ fn format_prod_w_paren() {
                     mathTreeNode=\"0\"><mrow \
                     mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
                     mathTreeNode=\"0,1\"><mo form=\"prefix\">(</mo><mrow \
-                    mathTreeNode\"0,1,0\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow \
-                    mathTreeNode\"0,1,1\"><mi>z</mi></mrow></mrow><mo form=\"postfix\">)</mo></mrow></math>";
+                    mathTreeNode=\"0,1,0\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow \
+                    mathTreeNode=\"0,1,1\"><mi>z</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
     let test = format!("{}", expr);
+    assert_expected_eq_actual!(expected, test);
 }
 
 #[test]
