@@ -31,6 +31,7 @@ pub enum Cmd {
     Recover(usize),
     GetCode(usize),
     Feedback(String, String),
+    Replace(Vec<TreeIdx>, Expression),
 }
 
 impl Cmd {
@@ -108,6 +109,14 @@ impl Cmd {
                        html).map_err(|_| AlgebraDSLError::InternalError)?;
                 Ok(Return::NoReturn)
             }
+            (Cmd::Replace(indices, new_expr), Some(old_eqorexpr)) => {
+                let mut eqorexpr = old_eqorexpr.clone();
+                for ind in &indices {
+                    eqorexpr.replace(ind, new_expr.clone())?;
+                }
+                Ok(Return::EqOrExpr(eqorexpr))
+            }
+            (Cmd::Replace(_, _), None) => Err(AlgebraDSLError::NeedsExpression),
         }
     }
 }
@@ -184,6 +193,20 @@ impl str::FromStr for Cmd {
                 let rest = &s[4..].trim();
                 let idx = usize::from_str(rest).map_err(|_| AlgebraDSLError::InvalidIdx)?;
                 Ok(Cmd::GetCode(idx))
+            } else if s.starts_with("replace") {
+                let mut indices = Vec::new();
+                let mut rest: &str = &s[7..].trim();
+                while rest.starts_with("#") {
+                    let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
+                    let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
+                    indices.push(idx);
+                    rest = &rest[(idx_end + 1)..].trim();
+                }
+                if indices.len() == 0 {
+                    return Err(AlgebraDSLError::IllFormattedCommand);
+                }
+                let expr = Expression::from_str(rest)?;
+                Ok(Cmd::Replace(indices, expr))
             } else {
                 Err(AlgebraDSLError::UnrecognizedCmd)
             }
