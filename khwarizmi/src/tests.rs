@@ -379,3 +379,47 @@ fn subtract_to_0() {
     b = b.simplify_constants();
     assert_expected_eq_actual!(a, b);
 }
+
+#[test]
+fn simple_ex_iter_test() {
+    let expr = Ex::Power(box var('x'), box nat(2));
+    let mut count = 0;
+    for (idx, e) in expr.expr_iter() {
+        count += 1;
+        assert_eq!(e, expr.get(idx.as_ref()).unwrap());
+    }
+    assert_expected_eq_actual!(3, count);
+}
+
+#[test]
+fn simple_eq_iter_test() {
+    let equation = Eq{ left: var('x'), right: nat(5)};
+    let mut count = 0;
+    for (idx, e) in equation.expr_iter() {
+        count += 1;
+        assert_eq!(e, equation.get(idx.as_ref()).unwrap());
+    }
+    assert_expected_eq_actual!(2, count);
+}
+
+#[test]
+fn complex_eq_iter_test() {
+    let sum = OperatorSymbol::sum;
+    let equation = Eq {
+        left: Ex::Power(box Ex::Subscript(box var('x'), box nat(0)), box nat(2)),
+        right: Ex::Sum(vec![Ex::Division(vec![nat(7), var('y')], vec![]),
+                            nat(8),
+                            Ex::LimitOp(sum, None, None, box nat(9)),
+                            Ex::LimitOp(sum, Some(box nat(5)), None, box nat(8)),
+                            Ex::LimitOp(sum, None, Some(box nat(6)), box nat(7)),
+                            Ex::LimitOp(sum, Some(box nat(4)), Some(box nat(3)), box nat(2))]),
+    };
+    let mut count = 0;
+    println!("eq:\n{:#?}\n", equation);
+    for (idx, e) in equation.expr_iter() {
+        count += 1;
+        println!("Idx `{:?}`, Expr:\n{:#?}\n", idx, e);
+        assert_eq!(e, equation.get(idx.as_ref()).unwrap());
+    }
+    assert_expected_eq_actual!(5 + 4 + 1 + 2 + 3 + 3 + 4, count);
+}

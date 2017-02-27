@@ -5,10 +5,13 @@ extern crate nom;
 mod parser;
 mod output;
 mod symbols;
+mod iter;
 
 pub use output::LatexWriter;
 
 pub use symbols::{Symbol, StandaloneSymbol, OperatorSymbol, FunctionSymbol};
+
+pub use iter::{ChildIter, ExpressionIter};
 
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -46,6 +49,9 @@ impl TreeIdx {
             Ok(TreeIdx(v))
         }
     }
+    fn from_vec(v: Vec<TreeInt>) -> Self {
+        TreeIdx(v)
+    }
     fn as_ref<'a>(&'a self) -> TreeIdxRef<'a> {
         TreeIdxRef(&self.0[..])
     }
@@ -62,7 +68,6 @@ impl TreeIdx {
 
 
 type TreeInt = usize;
-
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct TreeIdx(Vec<TreeInt>);
@@ -130,6 +135,9 @@ impl<'a> TreeIdxRef<'a> {
 }
 
 impl Equation {
+    pub fn expr_iter(&self) -> ExpressionIter {
+        ExpressionIter::new(EqOrExprRef::Eq(self))
+    }
     pub fn from_str(eq: &str) -> Result<Self, AlgebraDSLError> {
         parser::parse_equation(eq).map_err(AlgebraDSLError::Parse)
     }
@@ -460,6 +468,9 @@ impl Expression {
     }
     pub fn take(&mut self) -> Self {
         mem::replace(self, Expression::Atom(Atom::Natural(0)))
+    }
+    pub fn expr_iter(&self) -> ExpressionIter {
+        ExpressionIter::new(EqOrExprRef::Ex(self))
     }
     pub fn inflate_addition(self, expr: Expression) -> Self {
         match self {
@@ -814,6 +825,18 @@ pub enum EqOrExpr {
     Ex(Expression),
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum EqOrExprRef<'a> {
+    Eq(&'a Equation),
+    Ex(&'a Expression),
+}
+
+impl<'a> EqOrExprRef<'a> {
+    pub fn expr_iter(self) -> ExpressionIter<'a> {
+        ExpressionIter::new(self)
+    }
+}
+
 impl Indexable for EqOrExpr {
     fn get(&self, index: TreeIdxRef) -> Result<&Expression, AlgebraDSLError> {
         match self {
@@ -844,6 +867,15 @@ impl EqOrExpr {
             let ex = Expression::from_str(s)?;
             Ok(EqOrExpr::Ex(ex))
         }
+    }
+    pub fn as_ref(&self) -> EqOrExprRef {
+        match self {
+            &EqOrExpr::Ex(ref e) => EqOrExprRef::Ex(e),
+            &EqOrExpr::Eq(ref e) => EqOrExprRef::Eq(e),
+        }
+    }
+    pub fn expr_iter(&self) -> ExpressionIter {
+        self.as_ref().expr_iter()
     }
 }
 
