@@ -20,7 +20,7 @@ use websocket::{Server, Message, Sender, Receiver};
 
 mod cmd;
 
-use khwarizmi::EqOrExpr;
+use khwarizmi::Math;
 
 // Where do we store our messages?
 const REPORTFILE: &'static str = "feedback.txt";
@@ -37,7 +37,7 @@ fn send_mainpage(_: &mut Request) -> IronResult<Response> {
 /// Perform the simplifications that should happen automatically
 ///
 /// For now, just constant simplification
-fn auto_simplify(e: EqOrExpr) -> EqOrExpr {
+fn auto_simplify(e: Math) -> Math {
     e.simplify_constants()
 }
 
@@ -81,7 +81,7 @@ fn main() {
             let (mut sender, mut receiver) = client.split();
 
             let mut formula_num = 0;
-            let mut history: Vec<EqOrExpr> = vec![];
+            let mut history: Vec<Math> = vec![];
             for message in receiver.incoming_messages() {
                 let message: Message = message.unwrap();
 
@@ -103,7 +103,7 @@ fn main() {
                             Err(e) => Err(e),
                         };
                         let msg = match output {
-                            Ok(cmd::Return::EqOrExpr(e)) => {
+                            Ok(cmd::Return::Math(e)) => {
                                 let simpler = auto_simplify(e);
                                 let s = format!("{}@Math@{}", formula_num, simpler);
                                 history.push(simpler);

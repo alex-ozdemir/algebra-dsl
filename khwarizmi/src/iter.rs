@@ -1,12 +1,12 @@
-use super::{EqOrExprRef, Expression, TreeIdx};
+use super::{MathRef, Expression, TreeIdx};
 
 pub struct ChildIter<'a> {
-    parent: EqOrExprRef<'a>,
+    parent: MathRef<'a>,
     next_idx: usize,
 }
 
 impl<'a> ChildIter<'a> {
-    pub fn new(parent: EqOrExprRef<'a>) -> Self {
+    pub fn new(parent: MathRef<'a>) -> Self {
         ChildIter {
             parent: parent,
             next_idx: 0,
@@ -23,32 +23,32 @@ impl<'a> Iterator for ChildIter<'a> {
         let mut override_idx = None;
         let idx = self.next_idx;
         let res = match self.parent {
-            EqOrExprRef::Eq(eq) if idx == 0 => Some(&eq.left),
-            EqOrExprRef::Eq(eq) if idx == 1 => Some(&eq.right),
-            EqOrExprRef::Ex(&Ex::Negation(box ref e)) if idx == 0 => Some(e),
-            EqOrExprRef::Ex(&Ex::Sum(ref es)) if idx < es.len() => Some(&es[idx]),
-            EqOrExprRef::Ex(&Ex::Division(ref t, _)) if idx < t.len() => Some(&t[idx]),
-            EqOrExprRef::Ex(&Ex::Division(ref t, ref b)) if idx - t.len() < b.len() =>
+            MathRef::Eq(eq) if idx == 0 => Some(&eq.left),
+            MathRef::Eq(eq) if idx == 1 => Some(&eq.right),
+            MathRef::Ex(&Ex::Negation(box ref e)) if idx == 0 => Some(e),
+            MathRef::Ex(&Ex::Sum(ref es)) if idx < es.len() => Some(&es[idx]),
+            MathRef::Ex(&Ex::Division(ref t, _)) if idx < t.len() => Some(&t[idx]),
+            MathRef::Ex(&Ex::Division(ref t, ref b)) if idx - t.len() < b.len() =>
                 Some(&b[idx - t.len()]),
-            EqOrExprRef::Ex(&Ex::Power(box ref b, _)) if idx == 0 => Some(b),
-            EqOrExprRef::Ex(&Ex::Power(_, box ref e)) if idx == 1 => Some(e),
-            EqOrExprRef::Ex(&Ex::Subscript(box ref b, _)) if idx == 0 => Some(b),
-            EqOrExprRef::Ex(&Ex::Subscript(_, box ref e)) if idx == 1 => Some(e),
-            EqOrExprRef::Ex(&Ex::LimitOp(_, None, None, box ref arg)) if idx == 0 => {
+            MathRef::Ex(&Ex::Power(box ref b, _)) if idx == 0 => Some(b),
+            MathRef::Ex(&Ex::Power(_, box ref e)) if idx == 1 => Some(e),
+            MathRef::Ex(&Ex::Subscript(box ref b, _)) if idx == 0 => Some(b),
+            MathRef::Ex(&Ex::Subscript(_, box ref e)) if idx == 1 => Some(e),
+            MathRef::Ex(&Ex::LimitOp(_, None, None, box ref arg)) if idx == 0 => {
                 override_idx = Some(2);
                 Some(arg)
             }
-            EqOrExprRef::Ex(&Ex::LimitOp(_, None, Some(box ref e), _)) if idx == 0 => {
+            MathRef::Ex(&Ex::LimitOp(_, None, Some(box ref e), _)) if idx == 0 => {
                 override_idx = Some(1);
                 Some(e)
             }
-            EqOrExprRef::Ex(&Ex::LimitOp(_, Some(box ref e), _, _)) if idx == 0 => Some(e),
-            EqOrExprRef::Ex(&Ex::LimitOp(_, _, None, box ref arg)) if idx == 1 => {
+            MathRef::Ex(&Ex::LimitOp(_, Some(box ref e), _, _)) if idx == 0 => Some(e),
+            MathRef::Ex(&Ex::LimitOp(_, _, None, box ref arg)) if idx == 1 => {
                 override_idx = Some(2);
                 Some(arg)
             }
-            EqOrExprRef::Ex(&Ex::LimitOp(_, _, Some(box ref e), _)) if idx == 1 => Some(e),
-            EqOrExprRef::Ex(&Ex::LimitOp(_, _, _, box ref arg)) if idx == 2 => Some(arg),
+            MathRef::Ex(&Ex::LimitOp(_, _, Some(box ref e), _)) if idx == 1 => Some(e),
+            MathRef::Ex(&Ex::LimitOp(_, _, _, box ref arg)) if idx == 2 => Some(arg),
             _ => None,
         };
         let idx_and_res = res.map(|r| (override_idx.clone().unwrap_or(idx), r));
@@ -65,13 +65,13 @@ pub struct ExpressionIter<'a> {
 }
 
 impl<'a> ExpressionIter<'a> {
-    pub fn new(e: EqOrExprRef<'a>) -> Self {
+    pub fn new(e: MathRef<'a>) -> Self {
         ExpressionIter {
             iter_stack: vec![ChildIter::new(e)],
             idx_stack: TreeIdx::from_vec(vec![]),
             unemitted_root: match e {
-                EqOrExprRef::Ex(ex) => Some(ex),
-                EqOrExprRef::Eq(_) => None,
+                MathRef::Ex(ex) => Some(ex),
+                MathRef::Eq(_) => None,
             }
         }
     }
@@ -86,7 +86,7 @@ impl<'a> Iterator for ExpressionIter<'a> {
         loop {
             let new_child_iter = match self.iter_stack.last_mut() {
                 None => return None,
-                Some(last) => last.next().map(|(i, e)| (i, ChildIter::new(EqOrExprRef::Ex(e)), e)),
+                Some(last) => last.next().map(|(i, e)| (i, ChildIter::new(MathRef::Ex(e)), e)),
             };
             match new_child_iter {
                 None => {

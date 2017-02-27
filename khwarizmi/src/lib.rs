@@ -136,7 +136,7 @@ impl<'a> TreeIdxRef<'a> {
 
 impl Equation {
     pub fn expr_iter(&self) -> ExpressionIter {
-        ExpressionIter::new(EqOrExprRef::Eq(self))
+        ExpressionIter::new(MathRef::Eq(self))
     }
     pub fn from_str(eq: &str) -> Result<Self, AlgebraDSLError> {
         parser::parse_equation(eq).map_err(AlgebraDSLError::Parse)
@@ -470,7 +470,7 @@ impl Expression {
         mem::replace(self, Expression::Atom(Atom::Natural(0)))
     }
     pub fn expr_iter(&self) -> ExpressionIter {
-        ExpressionIter::new(EqOrExprRef::Ex(self))
+        ExpressionIter::new(MathRef::Ex(self))
     }
     pub fn inflate_addition(self, expr: Expression) -> Self {
         match self {
@@ -820,41 +820,41 @@ pub enum Atom {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum EqOrExpr {
+pub enum Math {
     Eq(Equation),
     Ex(Expression),
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum EqOrExprRef<'a> {
+pub enum MathRef<'a> {
     Eq(&'a Equation),
     Ex(&'a Expression),
 }
 
-impl<'a> EqOrExprRef<'a> {
+impl<'a> MathRef<'a> {
     pub fn expr_iter(self) -> ExpressionIter<'a> {
         ExpressionIter::new(self)
     }
 }
 
-impl Indexable for EqOrExpr {
+impl Indexable for Math {
     fn get(&self, index: TreeIdxRef) -> Result<&Expression, AlgebraDSLError> {
         match self {
-            &EqOrExpr::Eq(ref eq) => eq.get(index),
-            &EqOrExpr::Ex(ref ex) => ex.get(index),
+            &Math::Eq(ref eq) => eq.get(index),
+            &Math::Ex(ref ex) => ex.get(index),
         }
     }
     fn get_mut(&mut self, index: TreeIdxRef) -> Result<&mut Expression, AlgebraDSLError> {
         match self {
-            &mut EqOrExpr::Eq(ref mut eq) => eq.get_mut(index),
-            &mut EqOrExpr::Ex(ref mut ex) => ex.get_mut(index),
+            &mut Math::Eq(ref mut eq) => eq.get_mut(index),
+            &mut Math::Ex(ref mut ex) => ex.get_mut(index),
         }
     }
 }
 
-impl EqOrExpr {
+impl Math {
     pub fn simplify_constants(self) -> Self {
-        use self::EqOrExpr::*;
+        use self::Math::*;
         match self {
             Eq(eq) => Eq(eq.simplify_constants()),
             Ex(ex) => Ex(ex.simplify_constants()),
@@ -862,16 +862,16 @@ impl EqOrExpr {
     }
     pub fn from_str(s: &str) -> Result<Self, AlgebraDSLError> {
         if let Ok(eq) = Equation::from_str(s) {
-            Ok(EqOrExpr::Eq(eq))
+            Ok(Math::Eq(eq))
         } else {
             let ex = Expression::from_str(s)?;
-            Ok(EqOrExpr::Ex(ex))
+            Ok(Math::Ex(ex))
         }
     }
-    pub fn as_ref(&self) -> EqOrExprRef {
+    pub fn as_ref(&self) -> MathRef {
         match self {
-            &EqOrExpr::Ex(ref e) => EqOrExprRef::Ex(e),
-            &EqOrExpr::Eq(ref e) => EqOrExprRef::Eq(e),
+            &Math::Ex(ref e) => MathRef::Ex(e),
+            &Math::Eq(ref e) => MathRef::Eq(e),
         }
     }
     pub fn expr_iter(&self) -> ExpressionIter {

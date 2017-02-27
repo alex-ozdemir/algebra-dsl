@@ -2,14 +2,14 @@ use std::str;
 use std::fs::OpenOptions;
 use std::io::Write;
 
-use khwarizmi::{Expression, TreeIdx, AlgebraDSLError, Indexable, EqOrExpr, LatexWriter};
+use khwarizmi::{Expression, TreeIdx, AlgebraDSLError, Indexable, Math, LatexWriter};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Return {
-    EqOrExpr(EqOrExpr),
+    Math(Math),
     LaTeXStr(String),
     /// The code the use requested and the object it corresponds to
-    LaTeXInput(String, EqOrExpr),
+    LaTeXInput(String, Math),
     NoReturn,
 }
 
@@ -23,7 +23,7 @@ pub enum Op {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Cmd {
-    New(EqOrExpr),
+    New(Math),
     Make(Vec<TreeIdx>, Expression),
     Delete(Vec<TreeIdx>),
     Map(Op, Expression),
@@ -36,11 +36,11 @@ pub enum Cmd {
 
 impl Cmd {
     pub fn execute(self,
-                   e: Option<&EqOrExpr>,
-                   history: &Vec<EqOrExpr>)
+                   e: Option<&Math>,
+                   history: &Vec<Math>)
                    -> Result<Return, AlgebraDSLError> {
         match (self, e) {
-            (Cmd::New(e), _) => Ok(Return::EqOrExpr(e)),
+            (Cmd::New(e), _) => Ok(Return::Math(e)),
             (Cmd::Make(indices, new_expr), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
                 if indices.len() == 1 {
@@ -50,18 +50,18 @@ impl Cmd {
                     println!("Make location {:?} into {:?}", sibs, new_expr);
                     expr.replace_siblings(sibs, new_expr)?;
                 }
-                Ok(Return::EqOrExpr(expr))
+                Ok(Return::Math(expr))
             }
             (Cmd::Make(_, _), None) => Err(AlgebraDSLError::NeedsExpression),
             (Cmd::Delete(indices), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
                 let sibs = old_expr.make_siblings(indices.as_slice())?;
                 expr.delete(sibs)?;
-                Ok(Return::EqOrExpr(expr))
+                Ok(Return::Math(expr))
             }
             (Cmd::Delete(_), None) => Err(AlgebraDSLError::NeedsExpression),
             (Cmd::Map(op, new_expr), Some(e)) => {
-                if let &EqOrExpr::Eq(ref e) = e {
+                if let &Math::Eq(ref e) = e {
                     let mut eq = e.clone();
                     match op {
                         Op::Times => eq.times_to_both(new_expr),
@@ -69,7 +69,7 @@ impl Cmd {
                         Op::Div => eq.div_to_both(new_expr),
                         Op::Minus => eq.minus_to_both(new_expr),
                     }
-                    Ok(Return::EqOrExpr(EqOrExpr::Eq(eq)))
+                    Ok(Return::Math(Math::Eq(eq)))
                 } else {
                     Err(AlgebraDSLError::MapExpression)
                 }
@@ -89,13 +89,13 @@ impl Cmd {
                 println!("History is index {:?}: {:#?}", idx, history);
                 let recover_math = history.get(idx).ok_or(AlgebraDSLError::InvalidIdx)?;
                 let latex_string = recover_math.as_khwarizmi_latex();
-                let parsed = EqOrExpr::from_str(latex_string.as_str().trim())?;
+                let parsed = Math::from_str(latex_string.as_str().trim())?;
                 Cmd::New(parsed).execute(e, history)
             }
             (Cmd::GetCode(idx), _) => {
                 let recover_math = history.get(idx).ok_or(AlgebraDSLError::InvalidIdx)?;
                 let latex_string = recover_math.as_khwarizmi_latex();
-                let parsed = EqOrExpr::from_str(latex_string.as_str().trim())?;
+                let parsed = Math::from_str(latex_string.as_str().trim())?;
                 Ok(Return::LaTeXInput(latex_string, parsed))
             }
             (Cmd::Feedback(text, html), _) => {
@@ -114,7 +114,7 @@ impl Cmd {
                 for ind in &indices {
                     eqorexpr.replace(ind, new_expr.clone())?;
                 }
-                Ok(Return::EqOrExpr(eqorexpr))
+                Ok(Return::Math(eqorexpr))
             }
             (Cmd::Replace(_, _), None) => Err(AlgebraDSLError::NeedsExpression),
         }
@@ -188,7 +188,7 @@ impl str::FromStr for Cmd {
                 let expr = Expression::from_str(rest)?;
                 Ok(Cmd::Map(Op::Times, expr))
             } else if s.starts_with("$") {
-                Ok(Cmd::New(EqOrExpr::from_str(&s[1..].trim())?))
+                Ok(Cmd::New(Math::from_str(&s[1..].trim())?))
             } else if s.starts_with("code") {
                 let rest = &s[4..].trim();
                 let idx = usize::from_str(rest).map_err(|_| AlgebraDSLError::InvalidIdx)?;

@@ -1,13 +1,13 @@
 use std::fmt::{self, Write};
-use super::{Expression, Atom, EqOrExpr, Equation};
+use super::{Expression, Atom, Math, Equation};
 
 const MROW: &'static str = "mrow";
 
-impl fmt::Display for EqOrExpr {
+impl fmt::Display for Math {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            &EqOrExpr::Eq(ref eq) => write!(f, "{}", eq),
-            &EqOrExpr::Ex(ref ex) => write!(f, "{}", ex),
+            &Math::Eq(ref eq) => write!(f, "{}", eq),
+            &Math::Ex(ref ex) => write!(f, "{}", ex),
         }
     }
 }
@@ -43,19 +43,19 @@ impl fmt::Display for Atom {
     }
 }
 
-impl EqOrExpr {
+impl Math {
     pub fn as_khwarizmi_latex(&self) -> String {
-        struct DisplaysAsLatex<'a>(&'a EqOrExpr);
+        struct DisplaysAsLatex<'a>(&'a Math);
         impl<'a> fmt::Display for DisplaysAsLatex<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 write!(f, "")?;
                 match self.0 {
-                    &EqOrExpr::Eq(ref eq) => {
+                    &Math::Eq(ref eq) => {
                         fmt_as_latex(&eq.left, f, (&eq.left, false, true), false)?;
                         write!(f, " = ")?;
                         fmt_as_latex(&eq.right, f, (&eq.right, false, true), false)?;
                     }
-                    &EqOrExpr::Ex(ref ex) => {
+                    &Math::Ex(ref ex) => {
                         fmt_as_latex(&ex, f, (&ex, false, true), false)?;
                     }
                 }
@@ -73,20 +73,20 @@ impl LatexWriter {
         LatexWriter("\\begin{align*}\n".to_string())
     }
 
-    pub fn add_math(&mut self, e: &EqOrExpr) -> fmt::Result {
+    pub fn add_math(&mut self, e: &Math) -> fmt::Result {
         use std::fmt::Write;
 
-        struct DisplaysAsLatex<'a>(&'a EqOrExpr);
+        struct DisplaysAsLatex<'a>(&'a Math);
         impl<'a> fmt::Display for DisplaysAsLatex<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 write!(f, "  ")?;
                 match self.0 {
-                    &EqOrExpr::Eq(ref eq) => {
+                    &Math::Eq(ref eq) => {
                         fmt_as_latex(&eq.left, f, (&eq.left, false, true), true)?;
                         write!(f, " &= ")?;
                         fmt_as_latex(&eq.right, f, (&eq.right, false, true), true)?;
                     }
-                    &EqOrExpr::Ex(ref ex) => {
+                    &Math::Ex(ref ex) => {
                         fmt_as_latex(&ex, f, (&ex, false, true), true)?;
                     }
                 }
