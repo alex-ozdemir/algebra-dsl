@@ -4,8 +4,11 @@
 extern crate nom;
 mod parser;
 mod output;
+mod symbols;
 
 pub use output::LatexWriter;
+
+pub use symbols::{Symbol, StandaloneSymbol, OperatorSymbol, FunctionSymbol};
 
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -197,7 +200,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             *subtree = expr;
             old
         };
-        index.as_ref().parent().map(|idx| self.maybe_assoc_merge(idx));
+        index.as_ref().parent().map(|idx| self.flatten(idx));
         Ok(old)
     }
     fn delete(&mut self, indices: SiblingIndices) -> Result<(), AlgebraDSLError> {
@@ -218,6 +221,11 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                           expr: Option<Expression>,
                           gen_err: AlgebraDSLError)
                           -> Result<(), AlgebraDSLError> {
+        fn insert_many<T, I: IntoIterator<Item = T>>(v: &mut Vec<T>, idx: usize, i: I) {
+            let back = v.split_off(idx);
+            v.extend(i.into_iter());
+            v.extend(back.into_iter());
+        }
         use Expression as Ex;
         let &SiblingIndices { ref parent_idx, ref children } = indices;
         let parent_ref = self.get_mut(parent_idx.as_ref())?;
@@ -228,7 +236,12 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                     return Err(gen_err);
                 }
                 let mut new_exprs = delete_prod(args, children.as_slice());
-                expr.map(|e| new_exprs.insert(insert_idx, e));
+                expr.map(|e| match e {
+                    Ex::Sum(args) => {
+                        insert_many(&mut new_exprs, insert_idx, args);
+                    }
+                    e => new_exprs.insert(insert_idx, e),
+                });
                 Ex::sum_many(new_exprs).ok_or(gen_err)
             }
             Ex::Division(top, bottom) => {
@@ -249,11 +262,25 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                     .collect::<Vec<_>>();
                 let mut new_top = delete_prod(top, top_indices.as_slice());
                 let mut new_bottom = delete_prod(bottom, bottom_indices.as_slice());
+
                 expr.map(|e| {
+                    // TODO
+                    fn insert_division(prod: &mut Vec<Ex>, idx: usize, e: Ex) {
+                        match e {
+                            Ex::Division(t, b) => {
+                                if b.len() == 0 {
+                                    insert_many(prod, idx, t);
+                                } else {
+                                    prod.insert(idx, Ex::Division(t, b));
+                                }
+                            }
+                            e => prod.insert(idx, e),
+                        }
+                    }
                     if insert_idx < original_top_len {
-                        new_top.insert(insert_idx, e);
+                        insert_division(&mut new_top, insert_idx, e);
                     } else {
-                        new_bottom.insert(insert_idx - original_top_len, e);
+                        insert_division(&mut new_bottom, insert_idx - original_top_len, e);
                     }
                 });
                 Ok(Ex::divide_products(new_top, new_bottom))
@@ -275,7 +302,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         if let Err(_) = res {
             *self = cp;
         }
-        self.maybe_assoc_merge(indices.parent())?;
+        self.flatten(indices.parent())?;
         res
     }
     fn replace_with_str(&mut self,
@@ -289,7 +316,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
     /// the same type.
     ///
     /// Reports whether a merge occured, or if the index was invalid
-    fn maybe_assoc_merge(&mut self, idx: TreeIdxRef) -> Result<(), AlgebraDSLError> {
+    fn flatten(&mut self, idx: TreeIdxRef) -> Result<(), AlgebraDSLError> {
         let expr = self.get_mut(idx)?;
         let replacement = match expr.take() {
             Expression::Sum(summands) => {
@@ -301,6 +328,29 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                         }
                     })
                     .collect())
+            }
+            Expression::Division(top, bottom) => {
+                let mut new_top = vec![];
+                let mut new_bottom = vec![];
+                top.into_iter()
+                    .map(|e| match e {
+                        Expression::Division(t, b) => {
+                            new_top.extend(t.into_iter());
+                            new_bottom.extend(b.into_iter());
+                        }
+                        e => new_top.push(e),
+                    })
+                    .count();
+                bottom.into_iter()
+                    .map(|e| match e {
+                        Expression::Division(t, b) => {
+                            new_bottom.extend(t.into_iter());
+                            new_top.extend(b.into_iter());
+                        }
+                        e => new_bottom.push(e),
+                    })
+                    .count();
+                Expression::Division(new_top, new_bottom)
             }
             e => e,
         };
@@ -343,7 +393,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         let (mut trunk, mut branches) =
             stem(indices).ok_or(AlgebraDSLError::InvalidSiblingIndices)?;
 
-        // Makre sure there is at least one branch, pushing back the trunk if needed
+        // Make sure there is at least one branch, pushing back the trunk if needed
         if branches.len() == 0 {
             // If there is only one index, push the trunk up one.
             match trunk.pop() {
@@ -403,21 +453,6 @@ fn remove_args(args: &mut Vec<Expression>, idxs: &[TreeInt]) {
         args.remove(*idx);
     }
 }
-
-// fn make_division(mut top: Vec<Expression>, mut bottom: Vec<Expression>) -> Expression {
-//    use Expression as Ex;
-//    match (top.len(), bottom.len()) {
-//        (0, 0) => Ex::Atom(Atom::Natural(1)),
-//        (0, 1) => Ex::Division(box Ex::Atom(Atom::Natural(1)), box bottom.remove(0)),
-//        (1, 0) => top.remove(0),
-//        (1, 1) => Ex::Division(box top.remove(0), box bottom.remove(0)),
-//        (0, _) => Ex::Division(box Ex::Atom(Atom::Natural(1)), box Ex::Product(bottom)),
-//        (_, 0) => Ex::Product(top),
-//        (1, _) => Ex::Division(box top.remove(0), box Ex::Product(bottom)),
-//        (_, 1) => Ex::Division(box Ex::Product(top), box bottom.remove(0)),
-//        (_, _) => Ex::Division(box Ex::Product(top), box Ex::Product(bottom)),
-//    }
-//
 
 impl Expression {
     pub fn from_str(expr: &str) -> Result<Self, AlgebraDSLError> {
@@ -517,7 +552,7 @@ impl Expression {
                 if f_acc != 0. {
                     new_exprs.push(Ex::Atom(Atom::Floating(f_acc + n_acc as f64)));
                 } else {
-                    if n_acc != 0 {
+                    if n_acc != 0 || new_exprs.len() == 0 {
                         new_exprs.push(Ex::Atom(Atom::Natural(n_acc)));
                     }
                 }
@@ -773,390 +808,6 @@ pub enum Atom {
     Symbol(Symbol),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Symbol {
-    /// Symbols which are effectively variable names
-    Standalone(StandaloneSymbol),
-    /// Symbols which act as operators -- they expect something after them
-    Operator(OperatorSymbol),
-}
-
-impl Symbol {
-    pub fn expects_op_after(&self) -> bool {
-        match self {
-            &Symbol::Standalone(_) => true,
-            &Symbol::Operator(_) => false,
-        }
-    }
-    pub fn expects_op_before(&self) -> bool {
-        true
-    }
-}
-
-#[allow(non_camel_case_types)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StandaloneSymbol {
-    // Lowercase Greek Letters
-    alpha,
-    beta,
-    gamma,
-    delta,
-    epsilon,
-    zeta,
-    eta,
-    theta,
-    iota,
-    kappa,
-    lambda,
-    mu,
-    nu,
-    omicron,
-    pi,
-    rho,
-    sigma,
-    tau,
-    upsilon,
-    phi,
-    chi,
-    psi,
-    omega,
-    // Uppercase Greek Letters
-    Gamma,
-    Delta,
-    Theta,
-    Lambda,
-    Pi,
-    Sigma,
-    Upsilon,
-    Phi,
-    Psi,
-    Omega,
-    // Other Lone Symbols
-    partial,
-}
-
-#[allow(non_camel_case_types)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OperatorSymbol {
-    // Operators
-    int,
-    oint,
-    sum,
-    prod,
-    limsup,
-    min,
-    gcd,
-    sup,
-    det,
-    lim,
-    inf,
-    liminf,
-    max,
-    pm,
-    Function(FunctionSymbol),
-}
-
-#[allow(non_camel_case_types)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FunctionSymbol {
-    // Superscriptable
-    sin,
-    cos,
-    tan,
-    csc,
-    sec,
-    cot,
-    arcsin,
-    arccos,
-    arctan,
-    sinh,
-    cosh,
-    tanh,
-    coth,
-
-    // Subscriptable & superscriptable
-    lg,
-    ln,
-    log,
-
-    // Neither
-    exp,
-}
-
-impl FunctionSymbol {
-    fn as_latex(&self) -> &'static str {
-        match self {
-            &FunctionSymbol::arccos => "\\arccos",
-            &FunctionSymbol::cos => "\\cos",
-            &FunctionSymbol::csc => "\\csc",
-            &FunctionSymbol::exp => "\\exp",
-            &FunctionSymbol::sinh => "\\sinh",
-            &FunctionSymbol::arcsin => "\\arcsin",
-            &FunctionSymbol::cosh => "\\cosh",
-            &FunctionSymbol::lg => "\\lg",
-            &FunctionSymbol::ln => "\\ln",
-            &FunctionSymbol::arctan => "\\arctan",
-            &FunctionSymbol::cot => "\\cot",
-            &FunctionSymbol::log => "\\log",
-            &FunctionSymbol::sec => "\\sec",
-            &FunctionSymbol::tan => "\\tan",
-            &FunctionSymbol::coth => "\\coth",
-            &FunctionSymbol::sin => "\\sin",
-            &FunctionSymbol::tanh => "\\tanh",
-        }
-    }
-    fn as_math_ml(&self) -> &'static str {
-        match self {
-            &FunctionSymbol::arccos => "<mi>arccos</mi>",
-            &FunctionSymbol::cos => "<mi>cos</mi>",
-            &FunctionSymbol::csc => "<mi>csc</mi>",
-            &FunctionSymbol::exp => "<mi>exp</mi>",
-            &FunctionSymbol::sinh => "<mi>sinh</mi>",
-            &FunctionSymbol::arcsin => "<mi>arcsin</mi>",
-            &FunctionSymbol::cosh => "<mi>cosh</mi>",
-            &FunctionSymbol::lg => "<mi>lg</mi>",
-            &FunctionSymbol::ln => "<mi>ln</mi>",
-            &FunctionSymbol::arctan => "<mi>arctan</mi>",
-            &FunctionSymbol::cot => "<mi>cot</mi>",
-            &FunctionSymbol::log => "<mi>log</mi>",
-            &FunctionSymbol::sec => "<mi>sec</mi>",
-            &FunctionSymbol::tan => "<mi>tan</mi>",
-            &FunctionSymbol::coth => "<mi>coth</mi>",
-            &FunctionSymbol::sin => "<mi>sin</mi>",
-            &FunctionSymbol::tanh => "<mi>tanh</mi>",
-        }
-    }
-    fn as_expr(self) -> Expression {
-        Expression::Atom(Atom::Symbol(Symbol::Operator(OperatorSymbol::Function(self))))
-    }
-    fn accepts_subscripts(self) -> bool {
-        use FunctionSymbol::*;
-        match self {
-            lg | ln | log => true,
-            exp => false,
-            sin | cos | tan | csc | sec | cot | arcsin | arccos | arctan | sinh | cosh | tanh |
-            coth => false,
-        }
-    }
-    fn accepts_superscripts(self) -> bool {
-        use FunctionSymbol::*;
-        match self {
-            lg | ln | log => true,
-            exp => false,
-            sin | cos | tan | csc | sec | cot | arcsin | arccos | arctan | sinh | cosh | tanh |
-            coth => true,
-        }
-    }
-}
-
-impl OperatorSymbol {
-    fn as_math_ml(&self) -> &'static str {
-        match self {
-            &OperatorSymbol::int => "<mo>&int;</mo>",
-            &OperatorSymbol::oint => "<mo>&oint;</mo>",
-            &OperatorSymbol::sum => "<mo>&sum;</mo>",
-            &OperatorSymbol::prod => "<mo>&prod;</mo>",
-            &OperatorSymbol::limsup => "<mi>limsup</mi>",
-            &OperatorSymbol::min => "<mi>min</mi>",
-            &OperatorSymbol::gcd => "<mi>gcd</mi>",
-            &OperatorSymbol::sup => "<mi>sup</mi>",
-            &OperatorSymbol::det => "<mi>det</mi>",
-            &OperatorSymbol::lim => "<mi>lim</mi>",
-            &OperatorSymbol::inf => "<mi>inf</mi>",
-            &OperatorSymbol::liminf => "<mi>liminf</mi>",
-            &OperatorSymbol::max => "<mi>max</mi>",
-            &OperatorSymbol::pm => "<mi>pm</mi>",
-            &OperatorSymbol::Function(ref f) => f.as_math_ml(),
-        }
-    }
-    fn as_latex(&self) -> &'static str {
-        match self {
-            &OperatorSymbol::int => "\\int",
-            &OperatorSymbol::oint => "\\oint",
-            &OperatorSymbol::sum => "\\sum",
-            &OperatorSymbol::prod => "\\prod",
-            &OperatorSymbol::limsup => "\\limsup",
-            &OperatorSymbol::min => "\\min",
-            &OperatorSymbol::gcd => "\\gcd",
-            &OperatorSymbol::sup => "\\sup",
-            &OperatorSymbol::det => "\\det",
-            &OperatorSymbol::lim => "\\lim",
-            &OperatorSymbol::inf => "\\inf",
-            &OperatorSymbol::liminf => "\\liminf",
-            &OperatorSymbol::max => "\\max",
-            &OperatorSymbol::pm => "\\pm",
-            &OperatorSymbol::Function(ref f) => f.as_latex(),
-        }
-    }
-    fn as_expr(self) -> Expression {
-        Expression::Atom(Atom::Symbol(Symbol::Operator(self)))
-    }
-}
-
-impl StandaloneSymbol {
-    fn as_math_ml(&self) -> &'static str {
-        match self {
-            &StandaloneSymbol::alpha => "&alpha;",
-            &StandaloneSymbol::beta => "&beta;",
-            &StandaloneSymbol::gamma => "&gamma;",
-            &StandaloneSymbol::delta => "&delta;",
-            &StandaloneSymbol::epsilon => "&epsilon;",
-            &StandaloneSymbol::zeta => "&zeta;",
-            &StandaloneSymbol::eta => "&eta;",
-            &StandaloneSymbol::theta => "&theta;",
-            &StandaloneSymbol::iota => "&iota;",
-            &StandaloneSymbol::kappa => "&kappa;",
-            &StandaloneSymbol::lambda => "&lambda;",
-            &StandaloneSymbol::mu => "&mu;",
-            &StandaloneSymbol::nu => "&nu;",
-            &StandaloneSymbol::omicron => "&omicron;",
-            &StandaloneSymbol::pi => "&pi;",
-            &StandaloneSymbol::rho => "&rho;",
-            &StandaloneSymbol::sigma => "&sigma;",
-            &StandaloneSymbol::tau => "&tau;",
-            &StandaloneSymbol::upsilon => "&upsilon;",
-            &StandaloneSymbol::phi => "&phi;",
-            &StandaloneSymbol::chi => "&chi;",
-            &StandaloneSymbol::psi => "&psi;",
-            &StandaloneSymbol::omega => "&omega;",
-            &StandaloneSymbol::Gamma => "&Gamma;",
-            &StandaloneSymbol::Delta => "&Delta;",
-            &StandaloneSymbol::Theta => "&Theta;",
-            &StandaloneSymbol::Lambda => "&Lambda;",
-            &StandaloneSymbol::Pi => "&Pi;",
-            &StandaloneSymbol::Sigma => "&Sigma;",
-            &StandaloneSymbol::Upsilon => "&Upsilon;",
-            &StandaloneSymbol::Phi => "&Phi;",
-            &StandaloneSymbol::Psi => "&Psi;",
-            &StandaloneSymbol::Omega => "&Omega;",
-            &StandaloneSymbol::partial => "&partial;",
-        }
-    }
-    fn as_latex(&self) -> &'static str {
-        match self {
-            &StandaloneSymbol::alpha => "\\alpha",
-            &StandaloneSymbol::beta => "\\beta",
-            &StandaloneSymbol::gamma => "\\gamma",
-            &StandaloneSymbol::delta => "\\delta",
-            &StandaloneSymbol::epsilon => "\\epsilon",
-            &StandaloneSymbol::zeta => "\\zeta",
-            &StandaloneSymbol::eta => "\\eta",
-            &StandaloneSymbol::theta => "\\theta",
-            &StandaloneSymbol::iota => "\\iota",
-            &StandaloneSymbol::kappa => "\\kappa",
-            &StandaloneSymbol::lambda => "\\lambda",
-            &StandaloneSymbol::mu => "\\mu",
-            &StandaloneSymbol::nu => "\\nu",
-            &StandaloneSymbol::omicron => "\\omicron",
-            &StandaloneSymbol::pi => "\\pi",
-            &StandaloneSymbol::rho => "\\rho",
-            &StandaloneSymbol::sigma => "\\sigma",
-            &StandaloneSymbol::tau => "\\tau",
-            &StandaloneSymbol::upsilon => "\\upsilon",
-            &StandaloneSymbol::phi => "\\phi",
-            &StandaloneSymbol::chi => "\\chi",
-            &StandaloneSymbol::psi => "\\psi",
-            &StandaloneSymbol::omega => "\\omega",
-            &StandaloneSymbol::Gamma => "\\Gamma",
-            &StandaloneSymbol::Delta => "\\Delta",
-            &StandaloneSymbol::Theta => "\\Theta",
-            &StandaloneSymbol::Lambda => "\\Lambda",
-            &StandaloneSymbol::Pi => "\\Pi",
-            &StandaloneSymbol::Sigma => "\\Sigma",
-            &StandaloneSymbol::Upsilon => "\\Upsilon",
-            &StandaloneSymbol::Phi => "\\Phi",
-            &StandaloneSymbol::Psi => "\\Psi",
-            &StandaloneSymbol::Omega => "\\Omega",
-            &StandaloneSymbol::partial => "\\partial",
-        }
-    }
-}
-
-impl Symbol {
-    fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "alpha" => Some(Symbol::Standalone(StandaloneSymbol::alpha)),
-            "beta" => Some(Symbol::Standalone(StandaloneSymbol::beta)),
-            "gamma" => Some(Symbol::Standalone(StandaloneSymbol::gamma)),
-            "delta" => Some(Symbol::Standalone(StandaloneSymbol::delta)),
-            "epsilon" => Some(Symbol::Standalone(StandaloneSymbol::epsilon)),
-            "zeta" => Some(Symbol::Standalone(StandaloneSymbol::zeta)),
-            "eta" => Some(Symbol::Standalone(StandaloneSymbol::eta)),
-            "theta" => Some(Symbol::Standalone(StandaloneSymbol::theta)),
-            "iota" => Some(Symbol::Standalone(StandaloneSymbol::iota)),
-            "kappa" => Some(Symbol::Standalone(StandaloneSymbol::kappa)),
-            "lambda" => Some(Symbol::Standalone(StandaloneSymbol::lambda)),
-            "mu" => Some(Symbol::Standalone(StandaloneSymbol::mu)),
-            "nu" => Some(Symbol::Standalone(StandaloneSymbol::nu)),
-            "omicron" => Some(Symbol::Standalone(StandaloneSymbol::omicron)),
-            "pi" => Some(Symbol::Standalone(StandaloneSymbol::pi)),
-            "rho" => Some(Symbol::Standalone(StandaloneSymbol::rho)),
-            "sigma" => Some(Symbol::Standalone(StandaloneSymbol::sigma)),
-            "tau" => Some(Symbol::Standalone(StandaloneSymbol::tau)),
-            "upsilon" => Some(Symbol::Standalone(StandaloneSymbol::upsilon)),
-            "phi" => Some(Symbol::Standalone(StandaloneSymbol::phi)),
-            "chi" => Some(Symbol::Standalone(StandaloneSymbol::chi)),
-            "psi" => Some(Symbol::Standalone(StandaloneSymbol::psi)),
-            "omega" => Some(Symbol::Standalone(StandaloneSymbol::omega)),
-            "Gamma" => Some(Symbol::Standalone(StandaloneSymbol::Gamma)),
-            "Delta" => Some(Symbol::Standalone(StandaloneSymbol::Delta)),
-            "Theta" => Some(Symbol::Standalone(StandaloneSymbol::Theta)),
-            "Lambda" => Some(Symbol::Standalone(StandaloneSymbol::Lambda)),
-            "Pi" => Some(Symbol::Standalone(StandaloneSymbol::Pi)),
-            "Sigma" => Some(Symbol::Standalone(StandaloneSymbol::Sigma)),
-            "Upsilon" => Some(Symbol::Standalone(StandaloneSymbol::Upsilon)),
-            "Phi" => Some(Symbol::Standalone(StandaloneSymbol::Phi)),
-            "Psi" => Some(Symbol::Standalone(StandaloneSymbol::Psi)),
-            "Omega" => Some(Symbol::Standalone(StandaloneSymbol::Omega)),
-            "partial" => Some(Symbol::Standalone(StandaloneSymbol::partial)),
-            "int" => Some(Symbol::Operator(OperatorSymbol::int)),
-            "oint" => Some(Symbol::Operator(OperatorSymbol::oint)),
-            "sum" => Some(Symbol::Operator(OperatorSymbol::sum)),
-            "prod" => Some(Symbol::Operator(OperatorSymbol::prod)),
-            "limsup" => Some(Symbol::Operator(OperatorSymbol::limsup)),
-            "min" => Some(Symbol::Operator(OperatorSymbol::min)),
-            "gcd" => Some(Symbol::Operator(OperatorSymbol::gcd)),
-            "sup" => Some(Symbol::Operator(OperatorSymbol::sup)),
-            "det" => Some(Symbol::Operator(OperatorSymbol::det)),
-            "lim" => Some(Symbol::Operator(OperatorSymbol::lim)),
-            "inf" => Some(Symbol::Operator(OperatorSymbol::inf)),
-            "liminf" => Some(Symbol::Operator(OperatorSymbol::liminf)),
-            "max" => Some(Symbol::Operator(OperatorSymbol::max)),
-            "pm" => Some(Symbol::Operator(OperatorSymbol::pm)),
-            "arccos" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::arccos))),
-            "cos" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::cos))),
-            "csc" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::csc))),
-            "exp" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::exp))),
-            "sinh" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::sinh))),
-            "arcsin" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::arcsin))),
-            "cosh" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::cosh))),
-            "lg" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::lg))),
-            "ln" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::ln))),
-            "arctan" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::arctan))),
-            "cot" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::cot))),
-            "log" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::log))),
-            "sec" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::sec))),
-            "tan" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::tan))),
-            "coth" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::coth))),
-            "sin" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::sin))),
-            "tanh" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::tanh))),
-            _ => None,
-        }
-    }
-    fn as_math_ml(&self) -> &'static str {
-        match self {
-            &Symbol::Standalone(ref sym) => sym.as_math_ml(),
-            &Symbol::Operator(ref sym) => sym.as_math_ml(),
-        }
-    }
-    fn as_latex(&self) -> &'static str {
-        match self {
-            &Symbol::Standalone(ref sym) => sym.as_latex(),
-            &Symbol::Operator(ref sym) => sym.as_latex(),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum EqOrExpr {
     Eq(Equation),
@@ -1195,7 +846,6 @@ impl EqOrExpr {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests;
