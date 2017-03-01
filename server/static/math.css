@@ -30,7 +30,7 @@ body {
     border-style: solid;
 }
 [highlighted][selected] {
-    outline-style: solid;
+    outline-style: dotted;
     outline-width: 4px;
 }
 

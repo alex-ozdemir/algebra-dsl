@@ -69,9 +69,11 @@ function createCM() {
     cm.prevMath = null;
 
     cm.on('change', replaceAllMathTags);
+    cm.on('keydown',  solidifySelection);
+    cm.on('mousedown',  solidifySelection);
 
-    cm.on('keydown',  solidifyCurrent);
-    cm.on('mousedown',  solidifyCurrent);
+    //cm.on('keydown',  solidifyCurrent);
+    //cm.on('mousedown',  solidifyCurrent);
     return cm;
 }
 
@@ -83,87 +85,87 @@ function sendToServer(cmBox) {
     socket.send("cmd@" + cmBox.getValue());
 }
 
-function addMathToCM(toAdd) {
+//function addMathToCM(toAdd) {
+//
+//    if (toAdd !== null) {
+//        //var copy = toAdd.cloneNode(true);
+//
+//        //toAdd.setAttribute('highlighted',
+//        //    currentCM.availColors[currentCM.availColors.length - 1]);
+//        //toAdd.setAttribute('selected', 'true');
+//
+//        //var subTreeNodes = copy.getElementsByTagName("*");
+//        //for (var i=0; i<subTreeNodes.length; i++) {
+//        //    subTreeNodes[i].removeAttribute('highlighted');
+//        //}
+//
+//        //var toInsert = document.createElement('span');
+//        //toInsert.className = 'mjx-math mjx-chtml mathinequation';
+//        //toInsert.appendChild(copy);
+//
+//        //toInsert.setAttribute('highlighted',
+//        //    currentCM.availColors[currentCM.availColors.length - 1]);
+//
+//        //toInsert.mouseEnterListener = function() {
+//        //    toAdd.setAttribute('hoverednode', true);
+//        //}
+//        //toInsert.addEventListener("mouseenter", toInsert.mouseEnterListener);
+//
+//        //toInsert.mouseLeaveListener = function() {
+//        //    toAdd.removeAttribute('hoverednode');
+//        //}
+//        //toInsert.addEventListener("mouseleave", toInsert.mouseLeaveListener);
+//
+//        //var literaltext = '#(mtn:' + copy.getAttribute('mathtreenode') + ')';
+//
+//        //var start_of_literal_loc = currentCM.getCursor();
+//        //currentCM.replaceRange(literaltext, start_of_literal_loc);
+//        //var end_of_literal_loc = currentCM.getCursor();
+//
+//        //currentCM.selectedTextMarker = currentCM.markText(
+//        //    start_of_literal_loc, end_of_literal_loc,
+//        //    { replacedWith: toInsert });
+//
+//        var start_of_literal_loc = currentCM.getCursor();
+//        var literaltext = '#(mtn:' + toAdd.getAttribute('mathtreenode') + ')';
+//        currentCM.replaceRange(literaltext, start_of_literal_loc);
+//        currentCM.selectedDOM = toAdd;
+//    }
+//
+//    currentCM.focus();
+//}
 
-    if (toAdd !== null) {
-        //var copy = toAdd.cloneNode(true);
-
-        //toAdd.setAttribute('highlighted',
-        //    currentCM.availColors[currentCM.availColors.length - 1]);
-        //toAdd.setAttribute('selected', 'true');
-
-        //var subTreeNodes = copy.getElementsByTagName("*");
-        //for (var i=0; i<subTreeNodes.length; i++) {
-        //    subTreeNodes[i].removeAttribute('highlighted');
-        //}
-
-        //var toInsert = document.createElement('span');
-        //toInsert.className = 'mjx-math mjx-chtml mathinequation';
-        //toInsert.appendChild(copy);
-
-        //toInsert.setAttribute('highlighted',
-        //    currentCM.availColors[currentCM.availColors.length - 1]);
-
-        //toInsert.mouseEnterListener = function() {
-        //    toAdd.setAttribute('hoverednode', true);
-        //}
-        //toInsert.addEventListener("mouseenter", toInsert.mouseEnterListener);
-
-        //toInsert.mouseLeaveListener = function() {
-        //    toAdd.removeAttribute('hoverednode');
-        //}
-        //toInsert.addEventListener("mouseleave", toInsert.mouseLeaveListener);
-
-        //var literaltext = '#(mtn:' + copy.getAttribute('mathtreenode') + ')';
-
-        //var start_of_literal_loc = currentCM.getCursor();
-        //currentCM.replaceRange(literaltext, start_of_literal_loc);
-        //var end_of_literal_loc = currentCM.getCursor();
-
-        //currentCM.selectedTextMarker = currentCM.markText(
-        //    start_of_literal_loc, end_of_literal_loc,
-        //    { replacedWith: toInsert });
-
-        var start_of_literal_loc = currentCM.getCursor();
-        var literaltext = '#(mtn:' + toAdd.getAttribute('mathtreenode') + ')';
-        currentCM.replaceRange(literaltext, start_of_literal_loc);
-        currentCM.selectedDOM = toAdd;
-    }
-
-    currentCM.focus();
-}
-
-function mouseClickCallback(event, mathBox) {
-    var toAdd = mathTreeNodeAbove(event.target, mathBox);
-
-    // Remove the other highlighted stuff
-    if (currentCM.selectedDOM !== null) {
-        var cur = event.target;
-        while (cur !== mathBox && cur !== currentCM.selectedDOM) {
-            cur = cur.parentNode;
-        }
-
-        if (cur === currentCM.selectedDOM) {
-            currentCM.selectedDOM.removeAttribute('highlighted');
-
-            // Delete the old stuff
-            var oldfromto = currentCM.selectedTextMarker.find();
-            currentCM.replaceRange('', oldfromto.from, oldfromto.to);
-
-            // Re-click: expand!
-            toAdd = mathTreeNodeAbove(currentCM.selectedDOM.parentNode, mathBox);
-
-            if (toAdd === null) {
-                currentCM.selectedDOM = null;
-                currentCM.selectedTextMarker = null;
-            }
-        } else {
-            // New click
-            solidifyCurrent(currentCM.selectedDOM);
-        }
-    }
-    addMathToCM(toAdd);
-}
+//function mouseClickCallback(event, mathBox) {
+//    var toAdd = mathTreeNodeAbove(event.target, mathBox);
+//
+//    // Remove the other highlighted stuff
+//    if (currentCM.selectedDOM !== null) {
+//        var cur = event.target;
+//        while (cur !== mathBox && cur !== currentCM.selectedDOM) {
+//            cur = cur.parentNode;
+//        }
+//
+//        if (cur === currentCM.selectedDOM) {
+//            currentCM.selectedDOM.removeAttribute('highlighted');
+//
+//            // Delete the old stuff
+//            var oldfromto = currentCM.selectedTextMarker.find();
+//            currentCM.replaceRange('', oldfromto.from, oldfromto.to);
+//
+//            // Re-click: expand!
+//            toAdd = mathTreeNodeAbove(currentCM.selectedDOM.parentNode, mathBox);
+//
+//            if (toAdd === null) {
+//                currentCM.selectedDOM = null;
+//                currentCM.selectedTextMarker = null;
+//            }
+//        } else {
+//            // New click
+//            solidifyCurrent(currentCM.selectedDOM);
+//        }
+//    }
+//    addMathToCM(toAdd);
+//}
 
 function mouseDownCallback(event) {
     isMousePressed = true;
@@ -171,19 +173,70 @@ function mouseDownCallback(event) {
 }
 
 function mouseUpCallback(event) {
-    if (mousePressAnchor !== null) {
-        var mousePressHead = mathTreeNodeAbove(event.target);
-        if (mousePressHead === mousePressAnchor) {
-            mouseClickCallback(event, this);
-        } else {
-            solidifyCurrent();
+    if (mousePressAnchor === null) return;
 
-            var parent = mathTreeNodeAboveBoth(mousePressAnchor, mousePressHead, this);
-            addMathToCM(parent);
-            solidifyCurrent();
+    var cm = currentCM;
+
+    var mousePressHead = mathTreeNodeAbove(event.target);
+    if (mousePressHead === mousePressAnchor) {
+        if (cm.selectedDOM !== null) {
+            var cur = event.target;
+            while (cur !== this && cur !== cm.selectedDOM) {
+                cur = cur.parentNode;
+            }
+
+            if (cur === cm.selectedDOM) {
+                // Click is on same place -- expand
+
+                var oldMarkerLoc = cm.selectedTextMarker.find();
+
+                cm.selectedDOM.removeAttribute('highlighted');
+                cm.selectedDOM.removeAttribute('selected');
+
+                var oneHigher = mathTreeNodeAbove(cur.parentNode, this);
+                if (oneHigher === null) {
+                    // We hit the limit: just get rid of it
+                    cm.replaceRange('', oldMarkerLoc.from, oldMarkerLoc.to, 'click-remove');
+                    cm.selectedDOM = null;
+                    cm.selectedTextMarker = null;
+                } else {
+                    var insertText = '#(mtn:'+oneHigher.getAttribute('mathtreenode')+')';
+                    cm.replaceRange(insertText, oldMarkerLoc.from, oldMarkerLoc.to, 'click');
+                }
+            } else {
+                // Click is on different place, so solidify old location
+                solidifySelection();
+
+                var cursorPos = cm.getCursor();
+                var mtn = mathTreeNodeAbove(event.target, this);
+                var insertText = '#(mtn:'+mtn.getAttribute('mathtreenode')+')';
+                cm.replaceRange(insertText, cursorPos, cursorPos, 'click');
+            }
+        } else {
+            var cursorPos = cm.getCursor();
+            var mtn = mathTreeNodeAbove(event.target, this);
+            var insertText = '#(mtn:'+mtn.getAttribute('mathtreenode')+')';
+            cm.replaceRange(insertText, cursorPos, cursorPos, 'click');
         }
-        mousePressAnchor = null;
+    } else {
+        var parent = mathTreeNodeAboveBoth(mousePressAnchor, mousePressHead, this);
+        if (cm.selectedDOM !== null) {
+            var oldMarkerLoc = cm.selectedTextMarker.find();
+            cm.replaceRange('', oldMarkerLoc.from, oldMarkerLoc.to, 'click-remove');
+        }
+
+        var cursorPos = cm.getCursor();
+        var insertText = '#(mtn:'+parent.getAttribute('mathtreenode')+')';
+        cm.replaceRange(insertText, cursorPos);
+
+        //solidifyCurrent();
+
+        //var parent = mathTreeNodeAboveBoth(mousePressAnchor, mousePressHead, this);
+        //addMathToCM(parent);
+        //solidifyCurrent();
     }
+    mousePressAnchor = null;
+    cm.focus();
 }
 
 function globalMouseUpCallback(event) {
@@ -435,62 +488,68 @@ function mathTreeNodeAboveBoth(n1, n2, topLevel) {
     return cur;
 }
 
-function solidifyCurrent() {
-    return;
-    if (!currentCM.selectedDOM) {
-        return;
+function solidifySelection(cm) {
+    if (cm.selectedDOM) {
+        cm.selectedDOM = null;
+        cm.selectedTextMarker = null;
+        replaceAllMathTags(cm, {origin: 'solidify'});
     }
-    currentCM.selectedDOM.removeAttribute('selected');
-
-    var thisColor = currentCM.selectedDOM.getAttribute('highlighted');
-    currentCM.selectedDOM.removeAttribute('highlighted');
-
-    // Put a span inside that has a highlight color and has all of
-    // curSelected's children
-    var newspan = document.createElement('span');
-    newspan.setAttribute('highlighted', thisColor);
-
-    while (currentCM.selectedDOM.children.length > 0) {
-        // This (re)moves the child from curSelected
-        newspan.appendChild(currentCM.selectedDOM.children[0]);
-    }
-
-    currentCM.selectedDOM.appendChild(newspan);
-
-    // Add listeners in case it's deleted
-    (function(correspondingDOM, itscolor) {
-        currentCM.selectedTextMarker.on('hide', function() {
-            correspondingDOM.removeAttribute('selected');
-            correspondingDOM.removeAttribute('highlighted');
-        });
-        currentCM.selectedTextMarker.on('unhide', function() {
-            correspondingDOM.setAttribute('highlighted', itscolor);
-        });
-
-        var insertedSpan = currentCM.selectedTextMarker.replacedWith;
-
-        insertedSpan.removeEventListener("mouseenter", insertedSpan.mouseEnterListener);
-        insertedSpan.removeEventListener("mouseleave", insertedSpan.mouseLeaveListener);
-
-        if (currentCM.selectedDOM.hasAttribute('hoverednode')) {
-            currentCM.selectedDOM.removeAttribute('hoverednode');
-            correspondingDOM.setAttribute('hoverednode', true);
-        }
-
-        insertedSpan.addEventListener("mouseenter", function() {
-            correspondingDOM.setAttribute('hoverednode', true);
-        });
-
-        insertedSpan.addEventListener("mouseleave", function() {
-            correspondingDOM.removeAttribute('hoverednode', true);
-        });
-    })(newspan, thisColor);
-
-
-    //currentCM.availColors.pop();
-    currentCM.selectedDOM = null;
-    currentCM.selectedTextMarker = null;
 }
+//function solidifyCurrent() {
+//    return;
+//    if (!currentCM.selectedDOM) {
+//        return;
+//    }
+//    currentCM.selectedDOM.removeAttribute('selected');
+//
+//    var thisColor = currentCM.selectedDOM.getAttribute('highlighted');
+//    currentCM.selectedDOM.removeAttribute('highlighted');
+//
+//    // Put a span inside that has a highlight color and has all of
+//    // curSelected's children
+//    var newspan = document.createElement('span');
+//    newspan.setAttribute('highlighted', thisColor);
+//
+//    while (currentCM.selectedDOM.children.length > 0) {
+//        // This (re)moves the child from curSelected
+//        newspan.appendChild(currentCM.selectedDOM.children[0]);
+//    }
+//
+//    currentCM.selectedDOM.appendChild(newspan);
+//
+//    // Add listeners in case it's deleted
+//    (function(correspondingDOM, itscolor) {
+//        currentCM.selectedTextMarker.on('hide', function() {
+//            correspondingDOM.removeAttribute('selected');
+//            correspondingDOM.removeAttribute('highlighted');
+//        });
+//        currentCM.selectedTextMarker.on('unhide', function() {
+//            correspondingDOM.setAttribute('highlighted', itscolor);
+//        });
+//
+//        var insertedSpan = currentCM.selectedTextMarker.replacedWith;
+//
+//        insertedSpan.removeEventListener("mouseenter", insertedSpan.mouseEnterListener);
+//        insertedSpan.removeEventListener("mouseleave", insertedSpan.mouseLeaveListener);
+//
+//        if (currentCM.selectedDOM.hasAttribute('hoverednode')) {
+//            currentCM.selectedDOM.removeAttribute('hoverednode');
+//            correspondingDOM.setAttribute('hoverednode', true);
+//        }
+//
+//        insertedSpan.addEventListener("mouseenter", function() {
+//            correspondingDOM.setAttribute('hoverednode', true);
+//        });
+//
+//        insertedSpan.addEventListener("mouseleave", function() {
+//            correspondingDOM.removeAttribute('hoverednode', true);
+//        });
+//    })(newspan, thisColor);
+//
+//
+//    currentCM.selectedDOM = null;
+//    currentCM.selectedTextMarker = null;
+//}
 
 function onFinishTypesetting(where) {
     var element = document.getElementById(where);
@@ -505,13 +564,16 @@ function onFinishTypesetting(where) {
     currentCM.prevMath = element.cloneNode(true);
 }
 
-function replaceAllMathTags(cm) {
+function replaceAllMathTags(cm, changeObj) {
     if (!cm.prevMath) return;
+    cm.autoSelectionChange = true;
+
+    // TODO: Use changeObj intelligently to do less work
+    // TODO: Keep colors consistent
 
     var prevOutput = $(cm.prevOutput).children(".output")[0];
     var prevMathBoxClone = cm.prevMath.cloneNode(true);
     addMathCallbacks(prevMathBoxClone);
-    cm.prevOutput.replaceChild(prevMathBoxClone, prevOutput);
 
     var oldMarks = cm.getAllMarks();
     for (var i=0; i<oldMarks.length; i++) {
@@ -550,15 +612,27 @@ function replaceAllMathTags(cm) {
         // Put the math in a span and highlight it
         var mathInOut = mathInOutAry[0];
 
-        var newspan = document.createElement('span');
-        newspan.setAttribute('highlighted', color);
+        var tagStartPos = cm.posFromIndex(tagStartIdx);
 
-        while (mathInOut.children.length > 0) {
-            // This (re)moves the child
-            newspan.appendChild(mathInOut.children[0]);
+        var elementToAddHoverTo;
+
+        if (changeObj.origin === 'click' && tagStartPos.line === changeObj.from.line && tagStartPos.ch === changeObj.from.ch) {
+            mathInOut.setAttribute('selected', 'true');
+            mathInOut.setAttribute('highlighted', color);
+            cm.selectedDOM = mathInOut;
+            elementToAddHoverTo = mathInOut;
+        } else {
+            var newspan = document.createElement('span');
+            newspan.setAttribute('highlighted', color);
+
+            while (mathInOut.children.length > 0) {
+                // This (re)moves the child
+                newspan.appendChild(mathInOut.children[0]);
+            }
+
+            mathInOut.appendChild(newspan);
+            elementToAddHoverTo = newspan;
         }
-
-        mathInOut.appendChild(newspan);
 
         // Replace the text with a copy of the math
         var mathCopy = mathForTagAry[0].cloneNode(true);
@@ -567,7 +641,7 @@ function replaceAllMathTags(cm) {
         toInsert.className = 'mjx-math mjx-chtml mathinequation';
         toInsert.appendChild(mathCopy);
 
-        toInsert .setAttribute('highlighted', color);
+        toInsert.setAttribute('highlighted', color);
 
         (function(themath) {
             toInsert.mouseEnterListener = function() {
@@ -579,78 +653,18 @@ function replaceAllMathTags(cm) {
                 themath.removeAttribute('hoverednode');
             }
             toInsert.addEventListener("mouseleave", toInsert.mouseLeaveListener);
-        })(newspan);
+        })(elementToAddHoverTo);
 
-        cm.selectedTextMarker = cm.markText(
-                cm.posFromIndex(tagStartIdx),
+        var marker = cm.selectedTextMarker = cm.markText(
+                tagStartPos,
                 cm.posFromIndex(tagEndIdx+1),
                 {replacedWith: toInsert});
-
-        continue;
-
-
-
-
-
-
-//        var full = s;
-//        var tagTillEnd = s.slice(tagIdx + tagstartlen);
-//
-//        var endIdx = tagTillEnd.indexOf(')');
-//        if (endIdx == -1) break;
-//        var nextTagIdx = tagTillEnd.indexOf('#(mtn:');
-//        if (nextTagIdx != -1 && nextTagIdx < endIdx) {
-//            s = tagTillEnd.slice(nextTagIdx);
-//            currentOffset += tagIdx + nextTagIdx + tagstartlen;
-//            continue;
-//        }
-//
-//        var tag = tagTillEnd.slice(0, endIdx);
-//
-//        // Find the tag in the math
-//        var mathForTagAry = $(cm.prevOutput).find("[mathtreenode='" + tag + "']");
-//        if (mathForTagAry.length != 1) {
-//            s = tagTillEnd.slice(endIdx);
-//            currentOffset += tagIdx + endIdx + tagstartlen;
-//            continue;
-//        }
-//        var mathForTag = mathForTagAry[0];
-//
-//        var mathCopy = mathForTag.cloneNode(true);
-//        mathCopy.removeAttribute('highlighted');
-//        var mathCopyChildren = $(mathCopy).find("*");
-//        for (var i=0; i<mathCopyChildren.length; i++) {
-//            mathCopyChildren[i].removeAttribute('highlighted');
-//        }
-//
-//        var toInsert = document.createElement('span');
-//        toInsert.className = 'mjx-math mjx-chtml mathinequation';
-//        toInsert.appendChild(mathCopy);
-//
-//        var color = availColors.pop();
-//        mathForTag.setAttribute('highlighted', color);
-//        toInsert  .setAttribute('highlighted', color);
-//
-//        (function(themath) {
-//            toInsert.mouseEnterListener = function() {
-//                themath.setAttribute('hoverednode', true);
-//            }
-//            toInsert.addEventListener("mouseenter", toInsert.mouseEnterListener);
-//
-//            toInsert.mouseLeaveListener = function() {
-//                themath.removeAttribute('hoverednode');
-//            }
-//            toInsert.addEventListener("mouseleave", toInsert.mouseLeaveListener);
-//        })(mathForTag);
-//
-//        cm.selectedTextMarker = cm.markText(
-//                {line:0, ch:tagIdx + currentOffset},
-//                {line:0, ch:tagIdx + currentOffset + endIdx + tagstartlen + 1},
-//                {replacedWith: toInsert});
-//
-//        s = tagTillEnd.slice(endIdx);
-//        currentOffset += tagIdx + endIdx + tagstartlen;
+        if (changeObj.origin === 'click' && tagStartIdx === changeObj.from) {
+            cm.selectedTextMarker = marker;
+        }
     }
+
+    cm.prevOutput.replaceChild(prevMathBoxClone, prevOutput);
 }
 
 function sendOutputLatex() {
