@@ -34,7 +34,7 @@ $(document).ready(function() {
         $('#feedbackText').focus();
     })
 
-    var cm = createCM(null);
+    var cm = createCM();
 
     cm.setValue("$ ");
     cm.setCursor({line: 0, ch: 2});
