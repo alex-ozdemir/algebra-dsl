@@ -770,7 +770,6 @@ impl Indexable for Expression {
                     &mut Expression::Negation(ref mut e) if first == 0 => e.get_mut(rest),
                     &mut Expression::Sum(ref mut e) if first < e.len() => e[first].get_mut(rest),
                     &mut Expression::Division(ref mut t, _) if first == 0 => {
-                        println!("Getting mut for devision numerator. t: {:?} rest: {:?}", t, rest);
                         if t.len() == 1 {
                             t[0].get_mut(rest)
                         } else {
