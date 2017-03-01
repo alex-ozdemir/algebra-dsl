@@ -1,4 +1,4 @@
-#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from)]
+#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from, pub_restricted)]
 #![allow(dead_code)]
 #[macro_use]
 extern crate nom;
@@ -142,20 +142,19 @@ impl Equation {
         parser::parse_equation(eq).map_err(AlgebraDSLError::Parse)
     }
     pub fn plus_to_both(&mut self, expr: Expression) {
-        self.left = mem::replace(&mut self.left, NULL_EXPRESSION).inflate_addition(expr.clone());
-        self.right = mem::replace(&mut self.right, NULL_EXPRESSION).inflate_addition(expr);
+        self.left = self.left.take().inflate_addition(expr.clone());
+        self.right = self.right.take().inflate_addition(expr);
     }
     pub fn minus_to_both(&mut self, expr: Expression) {
         self.plus_to_both(Expression::Negation(box expr))
     }
     pub fn times_to_both(&mut self, expr: Expression) {
-        self.left = mem::replace(&mut self.left, NULL_EXPRESSION)
-            .inflate_multiplication(expr.clone());
-        self.right = mem::replace(&mut self.right, NULL_EXPRESSION).inflate_multiplication(expr);
+        self.left = self.left.take().inflate_multiplication(expr.clone());
+        self.right = self.right.take().inflate_multiplication(expr);
     }
     pub fn div_to_both(&mut self, expr: Expression) {
-        self.left = mem::replace(&mut self.left, NULL_EXPRESSION).inflate_division(expr.clone());
-        self.right = mem::replace(&mut self.right, NULL_EXPRESSION).inflate_division(expr);
+        self.left = self.left.take().inflate_division(expr.clone());
+        self.right = self.right.take().inflate_division(expr);
     }
     pub fn simplify_constants(self) -> Self {
         Equation {
@@ -449,6 +448,20 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             children: single_indices,
         })
     }
+    fn swap(&mut self, a: &TreeIdx, b: &TreeIdx) -> Result<(),AlgebraDSLError> {
+        // Detect errors early and fail. Necessary because we don't have a concept of disjoint
+        // borrows, so we can't mutably borrow a and
+        let min_len = a.0.iter().zip(b.0.iter()).count();
+        if self.get_mut(a.as_ref()).is_err() || self.get_mut(b.as_ref()).is_err() ||
+           a.0.iter().zip(b.0.iter()).filter(|&(a, b)| a == b).count() >= min_len {
+            return Err(AlgebraDSLError::InvalidIdx);
+        }
+        let tmp_a = self.get_mut(a.as_ref()).expect(UNREACH).take();
+        let tmp_b = self.get_mut(b.as_ref()).expect(UNREACH).take();
+        *self.get_mut(a.as_ref()).expect(UNREACH) = tmp_b;
+        *self.get_mut(b.as_ref()).expect(UNREACH) = tmp_a;
+        Ok(())
+    }
 }
 
 fn delete_prod(mut p: Vec<Expression>, is: &[TreeInt]) -> Vec<Expression> {
@@ -467,7 +480,7 @@ impl Expression {
         parser::parse_expr(expr).map_err(AlgebraDSLError::Parse)
     }
     pub fn take(&mut self) -> Self {
-        mem::replace(self, Expression::Atom(Atom::Natural(0)))
+        mem::replace(self, NULL_EXPRESSION)
     }
     pub fn expr_iter(&self) -> ExpressionIter {
         ExpressionIter::new(MathRef::Ex(self))
@@ -914,8 +927,7 @@ impl Math {
         if let Ok(eq) = Equation::from_str(s) {
             Ok(Math::Eq(eq))
         } else {
-            let ex = Expression::from_str(s)?;
-            Ok(Math::Ex(ex))
+            Ok(Math::Ex(Expression::from_str(s)?))
         }
     }
     pub fn as_ref(&self) -> MathRef {

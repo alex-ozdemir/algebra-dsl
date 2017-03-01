@@ -423,3 +423,32 @@ fn complex_eq_iter_test() {
     }
     assert_expected_eq_actual!(5 + 4 + 1 + 2 + 3 + 3 + 4, count);
 }
+
+#[test]
+fn simple_swap() {
+    let mut e1 = Ex::Sum(vec![nat(1), nat(2)]);
+    let e2 = Ex::Sum(vec![nat(2), nat(1)]);
+    let i1 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
+    let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
+    e1.swap(&i1, &i2).unwrap();
+    assert_expected_eq_actual!(e2, e1);
+}
+
+#[test]
+fn non_sibling_swap() {
+    let mut e1 = Ex::Sum(vec![Ex::Power(box nat(5), box nat(1)), nat(2)]);
+    let e2 = Ex::Sum(vec![Ex::Power(box nat(2), box nat(1)), nat(5)]);
+    let i1 = TreeIdx::from_str("#(mtn:0,0,0)").unwrap();
+    let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
+    e1.swap(&i1, &i2).unwrap();
+    assert_expected_eq_actual!(e2, e1);
+}
+
+#[test]
+fn nested_swap() {
+    let mut e1 = Ex::Sum(vec![Ex::Power(box nat(5), box nat(1)), nat(2)]);
+    let i1 = TreeIdx::from_str("#(mtn:0,0,0)").unwrap();
+    let i2 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
+    assert!(e1.swap(&i1, &i2).is_err());
+    assert!(e1.swap(&i2, &i1).is_err());
+}
