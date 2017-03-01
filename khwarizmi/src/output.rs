@@ -15,11 +15,11 @@ impl fmt::Display for Math {
 impl fmt::Display for Equation {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
-        write!(f, "<mrow mathTreeNode=\"0\">")?;
+        write!(f, "<{} mathTreeNode=\"0\">", MROW)?;
         fmt_as_math_ml(&self.left, f, "0,0", (&self.left, false, true))?;
         write!(f, "<mo>=</mo>")?;
         fmt_as_math_ml(&self.right, f, "0,1", (&self.right, false, true))?;
-        write!(f, "</mrow>")?;
+        write!(f, "</{}>", MROW)?;
         write!(f, "</math>")
     }
 }
@@ -308,12 +308,35 @@ fn fmt_as_math_ml(expr: &Expression,
             if d.len() == 0 {
                 fmt_prod_as_math_ml(n.as_slice(), f, prev_index, (expr, false, false), 0)?;
             } else {
+
                 write!(f, "<mfrac>")?;
-                write!(f, "<{}>", MROW)?;
-                fmt_prod_as_math_ml(n.as_slice(), f, prev_index, (expr, true, false), 0)?;
+
+                let mut base_string = String::from(prev_index);
+                base_string.push_str(",0");
+
+                write!(f, "<{}{}>", MROW, if n.len() > 1 {
+                    let s = format!(" mathTreeNode=\"{}\"", &base_string);
+                    base_string.push_str(",0");
+                    s
+                } else {
+                    String::new()
+                })?;
+
+                fmt_prod_as_math_ml(n.as_slice(), f, &base_string, (expr, true, false), 0)?;
                 write!(f, "</{}>", MROW)?;
-                write!(f, "<{}>", MROW)?;
-                fmt_prod_as_math_ml(d.as_slice(), f, prev_index, (expr, false, false), n.len())?;
+
+                let mut base_string = String::from(prev_index);
+                base_string.push_str(",1");
+
+                write!(f, "<{}{}>", MROW, if d.len() > 1 {
+                    let s = format!(" mathTreeNode=\"{}\"", &base_string);
+                    base_string.push_str(",0");
+                    s
+                } else {
+                    String::new()
+                })?;
+
+                fmt_prod_as_math_ml(d.as_slice(), f, &base_string, (expr, false, false), n.len())?;
                 write!(f, "</{}>", MROW)?;
                 write!(f, "</mfrac>")?;
             }
@@ -429,7 +452,7 @@ fn fmt_as_math_ml(expr: &Expression,
                prev_precedence.2) {
         write!(f, "<mo form=\"postfix\">)</mo>")?;
     }
-    write!(f, "</mrow>")
+    write!(f, "</{}>", MROW)
 }
 
 fn fmt_prod_as_latex(exprs: &[Expression],
