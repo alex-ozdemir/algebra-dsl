@@ -302,46 +302,48 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 });
                 Ex::sum_many(new_exprs).ok_or(gen_err)
             }
-            Ex::Division(top, bottom) => {
-                let original_top_len = top.len();
-                let bottom_indices = children.iter()
-                    .cloned()
-                    .filter_map(|i| {
-                        if i >= top.len() && i < top.len() + bottom.len() {
-                            Some(i - top.len())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                let top_indices = children.iter()
-                    .cloned()
-                    .filter_map(|i| { if i < top.len() { Some(i) } else { None } })
-                    .collect::<Vec<_>>();
-                let mut new_top = delete_prod(top, top_indices.as_slice());
-                let mut new_bottom = delete_prod(bottom, bottom_indices.as_slice());
+            //Ex::Division(top, bottom) => {
+            Ex::Division(_,_) => {
+                return Err(AlgebraDSLError::Unimplemented);
+                //let original_top_len = top.len();
+                //let bottom_indices = children.iter()
+                //    .cloned()
+                //    .filter_map(|i| {
+                //        if i >= top.len() && i < top.len() + bottom.len() {
+                //            Some(i - top.len())
+                //        } else {
+                //            None
+                //        }
+                //    })
+                //    .collect::<Vec<_>>();
+                //let top_indices = children.iter()
+                //    .cloned()
+                //    .filter_map(|i| { if i < top.len() { Some(i) } else { None } })
+                //    .collect::<Vec<_>>();
+                //let mut new_top = delete_prod(top, top_indices.as_slice());
+                //let mut new_bottom = delete_prod(bottom, bottom_indices.as_slice());
 
-                expr.map(|e| {
-                    // TODO
-                    fn insert_division(prod: &mut Vec<Ex>, idx: usize, e: Ex) {
-                        match e {
-                            Ex::Division(t, b) => {
-                                if b.len() == 0 {
-                                    insert_many(prod, idx, t);
-                                } else {
-                                    prod.insert(idx, Ex::Division(t, b));
-                                }
-                            }
-                            e => prod.insert(idx, e),
-                        }
-                    }
-                    if insert_idx < original_top_len {
-                        insert_division(&mut new_top, insert_idx, e);
-                    } else {
-                        insert_division(&mut new_bottom, insert_idx - original_top_len, e);
-                    }
-                });
-                Ok(Ex::divide_products(new_top, new_bottom))
+                //expr.map(|e| {
+                //    // TODO
+                //    fn insert_division(prod: &mut Vec<Ex>, idx: usize, e: Ex) {
+                //        match e {
+                //            Ex::Division(t, b) => {
+                //                if b.len() == 0 {
+                //                    insert_many(prod, idx, t);
+                //                } else {
+                //                    prod.insert(idx, Ex::Division(t, b));
+                //                }
+                //            }
+                //            e => prod.insert(idx, e),
+                //        }
+                //    }
+                //    if insert_idx < original_top_len {
+                //        insert_division(&mut new_top, insert_idx, e);
+                //    } else {
+                //        insert_division(&mut new_bottom, insert_idx - original_top_len, e);
+                //    }
+                //});
+                //Ok(Ex::divide_products(new_top, new_bottom))
             }
             _ => Err(gen_err),
         };
@@ -442,11 +444,9 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             Some((TreeIdx(v), tails))
         }
 
-        if indices.len() < 1 ||
-           indices.iter().map(|i| i.as_ref().len()).min().expect(UNREACH) == 0 {
+        if indices.iter().map(|i| i.as_ref().len()).min().map(|m|m == 0).unwrap_or(true) {
             return Err(AlgebraDSLError::InvalidSiblingIndices);
         }
-
 
         let (mut trunk, mut branches) =
             stem(indices).ok_or(AlgebraDSLError::InvalidSiblingIndices)?;
@@ -454,10 +454,8 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         // Make sure there is at least one branch, pushing back the trunk if needed
         if branches.len() == 0 {
             // If there is only one index, push the trunk up one.
-            match trunk.pop() {
-                Some(last) => branches.push(TreeIdx(vec![last])),
-                None => return Err(AlgebraDSLError::InvalidSiblingIndices),
-            }
+            let last = trunk.pop().ok_or(AlgebraDSLError::InvalidSiblingIndices)?;
+            branches.push(TreeIdx(vec![last]));
         }
 
         // Collect the leading index for each branch.
