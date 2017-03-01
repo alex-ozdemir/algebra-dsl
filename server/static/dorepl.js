@@ -212,10 +212,16 @@ socket.onmessage = function(event) {
     // Print out the latex or error or text response from server
 
     if (type === 'LaTeX') {
-        var CM = CodeMirror(document.getElementById('repl'),
-                            {readOnly: true, cursorBlinkRate: -1});
+        var box = document.createElement('textarea');
+        box.className = 'latexoutputbox'
+        var text = document.createTextNode(rest);
+        box.appendChild(text);
+        box.readOnly = true;
 
-        CM.setValue(rest);
+        $(box).on('focus', function(){this.select()});
+        document.getElementById('repl').appendChild(box);
+
+        box.style.height = (box.scrollHeight)+"px";
     } else if (type === 'Err') {
         var errDiv = document.createElement('div');
         errDiv.className = 'output';
