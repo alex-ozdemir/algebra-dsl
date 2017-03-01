@@ -137,21 +137,13 @@ function mouseUpCallback(event) {
             cm.replaceRange(insertText, cursorPos, cursorPos, 'click');
         }
     } else {
+        solidifySelection();
+
         var parent = mathTreeNodeAboveBoth(mousePressAnchor, mousePressHead, this);
-        if (cm.selectedDOM !== null) {
-            var oldMarkerLoc = cm.selectedTextMarker.find();
-            cm.replaceRange('', oldMarkerLoc.from, oldMarkerLoc.to, 'click-remove');
-        }
 
         var cursorPos = cm.getCursor();
         var insertText = '#(mtn:'+parent.getAttribute('mathtreenode')+')';
         cm.replaceRange(insertText, cursorPos);
-
-        //solidifyCurrent();
-
-        //var parent = mathTreeNodeAboveBoth(mousePressAnchor, mousePressHead, this);
-        //addMathToCM(parent);
-        //solidifyCurrent();
     }
     mousePressAnchor = null;
     cm.focus();
