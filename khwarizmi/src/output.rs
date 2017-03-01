@@ -239,7 +239,9 @@ fn fmt_prod_as_math_ml(exprs: &[Expression],
     let iter = exprs.iter().enumerate();
     for (i, e) in iter {
         let mut base_string = String::from(prev_index);
-        write!(base_string, ",{}", i + start_idx)?;
+        if len > 1 {
+            write!(base_string, ",{}", i + start_idx)?;
+        }
         if i == len - 1 {
             fmt_as_math_ml(e, f, &base_string, prev_precedence)?;
         } else {
@@ -321,9 +323,7 @@ fn fmt_as_math_ml(expr: &Expression,
                 base_string.push_str(",0");
 
                 write!(f, "<{}{}>", MROW, if n.len() > 1 {
-                    let s = format!(" mathTreeNode=\"{}\"", &base_string);
-                    base_string.push_str(",0");
-                    s
+                    format!(" mathTreeNode=\"{}\"", &base_string)
                 } else {
                     String::new()
                 })?;
@@ -335,14 +335,12 @@ fn fmt_as_math_ml(expr: &Expression,
                 base_string.push_str(",1");
 
                 write!(f, "<{}{}>", MROW, if d.len() > 1 {
-                    let s = format!(" mathTreeNode=\"{}\"", &base_string);
-                    base_string.push_str(",0");
-                    s
+                    format!(" mathTreeNode=\"{}\"", &base_string)
                 } else {
                     String::new()
                 })?;
 
-                fmt_prod_as_math_ml(d.as_slice(), f, &base_string, (expr, false, false), n.len())?;
+                fmt_prod_as_math_ml(d.as_slice(), f, &base_string, (expr, false, false), 0)?;
                 write!(f, "</{}>", MROW)?;
                 write!(f, "</mfrac>")?;
             }

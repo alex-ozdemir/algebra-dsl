@@ -707,13 +707,38 @@ impl Indexable for Expression {
                 match self {
                     &Expression::Negation(ref e) if first == 0 => e.get(rest),
                     &Expression::Sum(ref e) if first < e.len() => e[first].get(rest),
-                    &Expression::Division(ref t, ref b) if first < t.len() + b.len() => {
-                        if first < t.len() {
-                            t[first].get(rest)
+                    &Expression::Division(ref t, _) if first == 0 => {
+                        if t.len() == 1 {
+                            t[0].get(rest)
                         } else {
-                            b[first - t.len()].get(rest)
+                            match rest.first() {
+                                Some(snd) if snd < t.len() => {
+                                    let rest = rest.rest();
+                                    t[snd].get(rest)
+                                }
+                                // XXX: user has selected entire top half,
+                                // but can't return that
+                                None => Err(AlgebraDSLError::Unimplemented),
+                                _ => Err(AlgebraDSLError::InvalidIdx),
+                            }
                         }
-                    }
+                    },
+                    &Expression::Division(_, ref b) if first == 1 => {
+                        if b.len() == 1 {
+                            b[0].get(rest)
+                        } else {
+                            match rest.first() {
+                                Some(snd) if snd < b.len() => {
+                                    let rest = rest.rest();
+                                    b[snd].get(rest)
+                                }
+                                // XXX: user has selected entire bottom half,
+                                // but can't return that
+                                None => Err(AlgebraDSLError::Unimplemented),
+                                _ => Err(AlgebraDSLError::InvalidIdx),
+                            }
+                        }
+                    },
                     &Expression::Power(ref base, _) if first == 0 => base.get(rest),
                     &Expression::Power(_, ref power) if first == 1 => power.get(rest),
                     &Expression::Subscript(ref base, _) if first == 0 => base.get(rest),
@@ -744,14 +769,39 @@ impl Indexable for Expression {
                 match self {
                     &mut Expression::Negation(ref mut e) if first == 0 => e.get_mut(rest),
                     &mut Expression::Sum(ref mut e) if first < e.len() => e[first].get_mut(rest),
-                    &mut Expression::Division(ref mut t, ref mut b) if first <
-                                                                       t.len() + b.len() => {
-                        if first < t.len() {
-                            t[first].get_mut(rest)
+                    &mut Expression::Division(ref mut t, _) if first == 0 => {
+                        println!("Getting mut for devision numerator. t: {:?} rest: {:?}", t, rest);
+                        if t.len() == 1 {
+                            t[0].get_mut(rest)
                         } else {
-                            b[first - t.len()].get_mut(rest)
+                            match rest.first() {
+                                Some(snd) if snd < t.len() => {
+                                    let rest = rest.rest();
+                                    t[snd].get_mut(rest)
+                                }
+                                // XXX: user has selected entire top half,
+                                // but can't return that
+                                None => Err(AlgebraDSLError::Unimplemented),
+                                _ => Err(AlgebraDSLError::InvalidIdx),
+                            }
                         }
-                    }
+                    },
+                    &mut Expression::Division(_, ref mut b) if first == 1 => {
+                        if b.len() == 1 {
+                            b[0].get_mut(rest)
+                        } else {
+                            match rest.first() {
+                                Some(snd) if snd < b.len() => {
+                                    let rest = rest.rest();
+                                    b[snd].get_mut(rest)
+                                }
+                                // XXX: user has selected entire bottom half,
+                                // but can't return that
+                                None => Err(AlgebraDSLError::Unimplemented),
+                                _ => Err(AlgebraDSLError::InvalidIdx),
+                            }
+                        }
+                    },
                     &mut Expression::Power(ref mut base, _) if first == 0 => base.get_mut(rest),
                     &mut Expression::Power(_, ref mut power) if first == 1 => power.get_mut(rest),
                     &mut Expression::Subscript(ref mut base, _) if first == 0 => base.get_mut(rest),
@@ -793,6 +843,7 @@ pub enum AlgebraDSLError {
     NeedsExpression,
     UnrecognizedCmd,
     InternalError,
+    Unimplemented,
 }
 
 #[derive(PartialEq, Debug, Clone)]
