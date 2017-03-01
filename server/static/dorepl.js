@@ -407,6 +407,7 @@ function mathTreeNodeAboveBoth(n1, n2, topLevel) {
 }
 
 function solidifySelection(cm) {
+    cm = cm || currentCM;
     if (cm.selectedDOM) {
         cm.selectedDOM = null;
         cm.selectedTextMarker = null;
