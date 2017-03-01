@@ -771,6 +771,8 @@ impl Indexable for Expression {
                 match self {
                     &Expression::Negation(ref e) if first == 0 => e.get(rest),
                     &Expression::Sum(ref e) if first < e.len() => e[first].get(rest),
+                    &Expression::Division(ref t, ref b) if b.len() == 0 =>
+                        t[first].get(rest),
                     &Expression::Division(ref t, _) if first == 0 => {
                         if t.len() == 1 {
                             t[0].get(rest)
@@ -833,6 +835,8 @@ impl Indexable for Expression {
                 match self {
                     &mut Expression::Negation(ref mut e) if first == 0 => e.get_mut(rest),
                     &mut Expression::Sum(ref mut e) if first < e.len() => e[first].get_mut(rest),
+                    &mut Expression::Division(ref mut t, ref mut b) if b.len() == 0 =>
+                        t[first].get_mut(rest),
                     &mut Expression::Division(ref mut t, _) if first == 0 => {
                         if t.len() == 1 {
                             t[0].get_mut(rest)
