@@ -3,6 +3,12 @@ use super::{Expression, Atom, Math, Equation};
 
 const MROW: &'static str = "mrow";
 
+#[derive(Clone, Copy)]
+enum LaTeXOutputType {
+    ForUs,
+    ForOther,
+}
+
 impl fmt::Display for Math {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -51,12 +57,12 @@ impl Math {
                 write!(f, "")?;
                 match self.0 {
                     &Math::Eq(ref eq) => {
-                        fmt_as_latex(&eq.left, f, (&eq.left, false, true), false)?;
+                        fmt_as_latex(&eq.left, f, (&eq.left, false, true), LaTeXOutputType::ForUs)?;
                         write!(f, " = ")?;
-                        fmt_as_latex(&eq.right, f, (&eq.right, false, true), false)?;
+                        fmt_as_latex(&eq.right, f, (&eq.right, false, true), LaTeXOutputType::ForUs)?;
                     }
                     &Math::Ex(ref ex) => {
-                        fmt_as_latex(&ex, f, (&ex, false, true), false)?;
+                        fmt_as_latex(&ex, f, (&ex, false, true), LaTeXOutputType::ForUs)?;
                     }
                 }
                 write!(f, "")
@@ -82,12 +88,12 @@ impl LatexWriter {
                 write!(f, "  ")?;
                 match self.0 {
                     &Math::Eq(ref eq) => {
-                        fmt_as_latex(&eq.left, f, (&eq.left, false, true), true)?;
+                        fmt_as_latex(&eq.left, f, (&eq.left, false, true), LaTeXOutputType::ForOther)?;
                         write!(f, " &= ")?;
-                        fmt_as_latex(&eq.right, f, (&eq.right, false, true), true)?;
+                        fmt_as_latex(&eq.right, f, (&eq.right, false, true), LaTeXOutputType::ForOther)?;
                     }
                     &Math::Ex(ref ex) => {
-                        fmt_as_latex(&ex, f, (&ex, false, true), true)?;
+                        fmt_as_latex(&ex, f, (&ex, false, true), LaTeXOutputType::ForOther)?;
                     }
                 }
                 write!(f, " \\\\\n")
@@ -458,7 +464,7 @@ fn fmt_as_math_ml(expr: &Expression,
 fn fmt_prod_as_latex(exprs: &[Expression],
                      f: &mut fmt::Formatter,
                      prev_precedence: (&Expression, bool, bool),
-                     output: bool)
+                     output: LaTeXOutputType)
                      -> Result<(), fmt::Error> {
     let len = exprs.len();
     let iter = exprs.iter().enumerate();
@@ -486,7 +492,7 @@ fn fmt_prod_as_latex(exprs: &[Expression],
 fn fmt_as_latex(expr: &Expression,
                 f: &mut fmt::Formatter,
                 prev_precedence: (&Expression, bool, bool),
-                output: bool)
+                output: LaTeXOutputType)
                 -> Result<(), fmt::Error> {
     if capture(prev_precedence.0,
                expr,
@@ -502,10 +508,9 @@ fn fmt_as_latex(expr: &Expression,
                 &Atom::Floating(r) => write!(f, "{}", r)?,
                 &Atom::Symbol(sym) => write!(f, "{} ", sym.as_latex())?,
                 &Atom::Escaped(ref s) => {
-                    if output {
-                        write!(f, "{}", s)
-                    } else {
-                        write!(f, "%{}%", s)
+                    match output {
+                        LaTeXOutputType::ForUs    => write!(f, "%{}%", s),
+                        LaTeXOutputType::ForOther => write!(f, "{}", s),
                     }?
                 }
             }
