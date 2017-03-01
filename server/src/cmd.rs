@@ -35,10 +35,7 @@ pub enum Cmd {
 }
 
 impl Cmd {
-    pub fn execute(self,
-                   e: Option<&Math>,
-                   history: &Vec<Math>)
-                   -> Result<Return, AlgebraDSLError> {
+    pub fn execute(self, e: Option<&Math>, history: &Vec<Math>) -> Result<Return, AlgebraDSLError> {
         match (self, e) {
             (Cmd::New(e), _) => Ok(Return::Math(e)),
             (Cmd::Make(indices, new_expr), Some(old_expr)) => {

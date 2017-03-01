@@ -9,6 +9,8 @@ enum LaTeXOutputType {
     ForOther,
 }
 
+pub struct LatexWriter(String);
+
 impl fmt::Display for Math {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -71,8 +73,6 @@ impl Math {
         format!("{}", DisplaysAsLatex(self))
     }
 }
-
-pub struct LatexWriter(String);
 
 impl LatexWriter {
     pub fn new() -> LatexWriter {

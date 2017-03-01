@@ -24,10 +24,77 @@ const NULL_IDX: &'static [TreeInt] = &[];
 const UNREACH: &'static str = "An option/result that was expected to be Some/Ok was not.\n\
                                This is a bug!";
 
+#[derive(Debug,PartialEq, Eq)]
+pub enum AlgebraDSLError {
+    Parse(ParseError),
+    InvalidIdx,
+    IllFormattedIndex,
+    IllFormattedCommand,
+    InvalidDelete,
+    InvalidMake,
+    InvalidSiblingIndices,
+    MapExpression,
+    NeedsExpression,
+    UnrecognizedCmd,
+    InternalError,
+    Unimplemented,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum Atom {
+    PlainVariable(char),
+    Escaped(String),
+    Natural(i64),
+    Floating(f64),
+    Symbol(Symbol),
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum Expression {
+    Negation(Box<Expression>),
+    Sum(Vec<Expression>),
+    /// Division(numerator_prod, denominator_prod)
+    Division(Vec<Expression>, Vec<Expression>),
+    Power(Box<Expression>, Box<Expression>),
+    Subscript(Box<Expression>, Box<Expression>),
+    /// Operator, Sub, Super, Operand
+    LimitOp(OperatorSymbol, Option<Box<Expression>>, Option<Box<Expression>>, Box<Expression>),
+    Application(Box<Expression>, Box<Expression>),
+    /// An indivisible unit, like a variable or numeric literal
+    Atom(Atom),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Math {
+    Eq(Equation),
+    Ex(Expression),
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum MathRef<'a> {
+    Eq(&'a Equation),
+    Ex(&'a Expression),
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct Equation {
     left: Expression,
     right: Expression,
+}
+
+type TreeInt = usize;
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct TreeIdx(Vec<TreeInt>);
+
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+pub struct TreeIdxRef<'a>(&'a [TreeInt]);
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct SiblingIndices {
+    parent_idx: TreeIdx,
+    // This list *must* be sorted. This is enforced by the constructor
+    children: Vec<TreeInt>,
 }
 
 impl TreeIdx {
@@ -65,15 +132,6 @@ impl TreeIdx {
         self.0.get(i).cloned()
     }
 }
-
-
-type TreeInt = usize;
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct TreeIdx(Vec<TreeInt>);
-
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub struct TreeIdxRef<'a>(&'a [TreeInt]);
 
 impl<'a> TreeIdxRef<'a> {
     pub fn first(&self) -> Option<TreeInt> {
@@ -179,13 +237,6 @@ impl Indexable for Equation {
             _ => Err(AlgebraDSLError::InvalidIdx),
         }
     }
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub struct SiblingIndices {
-    parent_idx: TreeIdx,
-    // This list *must* be sorted. This is enforced by the constructor
-    children: Vec<TreeInt>,
 }
 
 impl SiblingIndices {
@@ -840,58 +891,6 @@ impl Indexable for Expression {
             }
         }
     }
-}
-
-#[derive(Debug,PartialEq, Eq)]
-pub enum AlgebraDSLError {
-    Parse(ParseError),
-    InvalidIdx,
-    IllFormattedIndex,
-    IllFormattedCommand,
-    InvalidDelete,
-    InvalidMake,
-    InvalidSiblingIndices,
-    MapExpression,
-    NeedsExpression,
-    UnrecognizedCmd,
-    InternalError,
-    Unimplemented,
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum Expression {
-    Negation(Box<Expression>),
-    Sum(Vec<Expression>),
-    /// Division(numerator_prod, denominator_prod)
-    Division(Vec<Expression>, Vec<Expression>),
-    Power(Box<Expression>, Box<Expression>),
-    Subscript(Box<Expression>, Box<Expression>),
-    /// Operator, Sub, Super, Operand
-    LimitOp(OperatorSymbol, Option<Box<Expression>>, Option<Box<Expression>>, Box<Expression>),
-    Application(Box<Expression>, Box<Expression>),
-    /// An indivisible unit, like a variable or numeric literal
-    Atom(Atom),
-}
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum Atom {
-    PlainVariable(char),
-    Escaped(String),
-    Natural(i64),
-    Floating(f64),
-    Symbol(Symbol),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Math {
-    Eq(Equation),
-    Ex(Expression),
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum MathRef<'a> {
-    Eq(&'a Equation),
-    Ex(&'a Expression),
 }
 
 impl<'a> MathRef<'a> {
