@@ -34,14 +34,17 @@ $(document).ready(function() {
         $('#feedbackText').focus();
     })
 
-    createCM();
+    var cm = createCM(null);
 
-    currentCM.setValue("$ ");
-    currentCM.setCursor({line: 0, ch: 2});
+    cm.setValue("$ ");
+    cm.setCursor({line: 0, ch: 2});
+    currentCM = cm;
+
+    document.addEventListener("mouseup", globalMouseUpCallback);
 })
 
 function createCM() {
-    currentCM = CodeMirror(document.getElementById('repl'), {
+    var cm = CodeMirror(document.getElementById('repl'), {
         autofocus: true,
         matchBrackets: true,
         extraKeys: {
@@ -51,9 +54,9 @@ function createCM() {
         },
     });
 
-    CMhistory.push(currentCM);
-    currentCM.loc = 0; //helps us keep track of where we are in history
-    currentCM.history = CMhistory.map(x => x.getValue()); //needed for bash-like continuity
+    CMhistory.push(cm);
+    cm.loc = 0; //helps us keep track of where we are in history
+    cm.history = CMhistory.map(x => x.getValue()); //needed for bash-like continuity
 
     // Scroll down
     document.getElementById('repl').lastElementChild.scrollIntoView({
@@ -61,63 +64,69 @@ function createCM() {
         block: "end",
     });
 
-    // Use last colors first
-    currentCM.availColors = [9,8,7,6,5,4,3,2,1,0];
-    currentCM.selectedDOM = null;
-    currentCM.selectedTextMarker = null;
+    cm.selectedDOM = null;
+    cm.selectedTextMarker = null;
+    cm.prevMath = null;
 
-    currentCM.on('keydown',  solidifyCurrent);
-    currentCM.on('mousedown',  solidifyCurrent);
+    cm.on('change', replaceAllMathTags);
+
+    cm.on('keydown',  solidifyCurrent);
+    cm.on('mousedown',  solidifyCurrent);
+    return cm;
 }
 
 var socket = new WebSocket("ws://" + location.hostname + ':2794', "rust-websocket");
 
 function sendToServer(cmBox) {
-    currentCM.setOption('readOnly', true);
-    currentCM.setOption('cursorBlinkRate', -1);
+    cmBox.setOption('readOnly', true);
+    cmBox.setOption('cursorBlinkRate', -1);
     socket.send("cmd@" + cmBox.getValue());
 }
 
 function addMathToCM(toAdd) {
 
     if (toAdd !== null) {
-        var copy = toAdd.cloneNode(true);
+        //var copy = toAdd.cloneNode(true);
 
-        toAdd.setAttribute('highlighted',
-            currentCM.availColors[currentCM.availColors.length - 1]);
-        toAdd.setAttribute('selected', 'true');
+        //toAdd.setAttribute('highlighted',
+        //    currentCM.availColors[currentCM.availColors.length - 1]);
+        //toAdd.setAttribute('selected', 'true');
 
-        var subTreeNodes = copy.getElementsByTagName("*");
-        for (var i=0; i<subTreeNodes.length; i++) {
-            subTreeNodes[i].removeAttribute('highlighted');
-        }
+        //var subTreeNodes = copy.getElementsByTagName("*");
+        //for (var i=0; i<subTreeNodes.length; i++) {
+        //    subTreeNodes[i].removeAttribute('highlighted');
+        //}
 
-        var toInsert = document.createElement('span');
-        toInsert.className = 'mjx-math mjx-chtml mathinequation';
-        toInsert.appendChild(copy);
+        //var toInsert = document.createElement('span');
+        //toInsert.className = 'mjx-math mjx-chtml mathinequation';
+        //toInsert.appendChild(copy);
 
-        toInsert.setAttribute('highlighted',
-            currentCM.availColors[currentCM.availColors.length - 1]);
+        //toInsert.setAttribute('highlighted',
+        //    currentCM.availColors[currentCM.availColors.length - 1]);
 
-        toInsert.mouseEnterListener = function() {
-            toAdd.setAttribute('hoverednode', true);
-        }
-        toInsert.addEventListener("mouseenter", toInsert.mouseEnterListener);
+        //toInsert.mouseEnterListener = function() {
+        //    toAdd.setAttribute('hoverednode', true);
+        //}
+        //toInsert.addEventListener("mouseenter", toInsert.mouseEnterListener);
 
-        toInsert.mouseLeaveListener = function() {
-            toAdd.removeAttribute('hoverednode');
-        }
-        toInsert.addEventListener("mouseleave", toInsert.mouseLeaveListener);
+        //toInsert.mouseLeaveListener = function() {
+        //    toAdd.removeAttribute('hoverednode');
+        //}
+        //toInsert.addEventListener("mouseleave", toInsert.mouseLeaveListener);
 
-        var literaltext = '#(mtn:' + copy.getAttribute('mathtreenode') + ')';
+        //var literaltext = '#(mtn:' + copy.getAttribute('mathtreenode') + ')';
+
+        //var start_of_literal_loc = currentCM.getCursor();
+        //currentCM.replaceRange(literaltext, start_of_literal_loc);
+        //var end_of_literal_loc = currentCM.getCursor();
+
+        //currentCM.selectedTextMarker = currentCM.markText(
+        //    start_of_literal_loc, end_of_literal_loc,
+        //    { replacedWith: toInsert });
 
         var start_of_literal_loc = currentCM.getCursor();
+        var literaltext = '#(mtn:' + toAdd.getAttribute('mathtreenode') + ')';
         currentCM.replaceRange(literaltext, start_of_literal_loc);
-        var end_of_literal_loc = currentCM.getCursor();
-
-        currentCM.selectedTextMarker = currentCM.markText(
-            start_of_literal_loc, end_of_literal_loc,
-            { replacedWith: toInsert });
         currentCM.selectedDOM = toAdd;
     }
 
@@ -135,7 +144,6 @@ function mouseClickCallback(event, mathBox) {
         }
 
         if (cur === currentCM.selectedDOM) {
-            currentCM.selectedDOM.removeAttribute('selected');
             currentCM.selectedDOM.removeAttribute('highlighted');
 
             // Delete the old stuff
@@ -163,18 +171,23 @@ function mouseDownCallback(event) {
 }
 
 function mouseUpCallback(event) {
-    isMousePressed = false;
+    if (mousePressAnchor !== null) {
+        var mousePressHead = mathTreeNodeAbove(event.target);
+        if (mousePressHead === mousePressAnchor) {
+            mouseClickCallback(event, this);
+        } else {
+            solidifyCurrent();
 
-    var mousePressHead = mathTreeNodeAbove(event.target);
-    if (mousePressHead === mousePressAnchor) {
-        mouseClickCallback(event, this);
-    } else {
-        solidifyCurrent();
-
-        var parent = mathTreeNodeAboveBoth(mousePressAnchor, mousePressHead, this);
-        addMathToCM(parent);
-        solidifyCurrent();
+            var parent = mathTreeNodeAboveBoth(mousePressAnchor, mousePressHead, this);
+            addMathToCM(parent);
+            solidifyCurrent();
+        }
+        mousePressAnchor = null;
     }
+}
+
+function globalMouseUpCallback(event) {
+    isMousePressed = false;
     mousePressAnchor = null;
 }
 
@@ -252,6 +265,8 @@ socket.onmessage = function(event) {
         }
     }
 
+    var prevMath = null;
+
     if (type === 'Math' || type === 'Input') {
         var fullDiv = document.createElement('div');
         fullDiv.className = 'output math-output';
@@ -278,7 +293,6 @@ socket.onmessage = function(event) {
         MathJax.Hub.Queue(["Typeset", MathJax.Hub, mathBox.id]);
         MathJax.Hub.Queue([onFinishTypesetting, mathBox.id]);
 
-
         createRecoverButtom(fullDiv);
         createGetCodeButton(fullDiv);
     } else {
@@ -304,6 +318,7 @@ socket.onmessage = function(event) {
             }
 
             addMathCallbacks(mathBox);
+            prevMath = mathBox.cloneNode(true);
 
             fullDiv.appendChild(mathBox);
 
@@ -314,10 +329,13 @@ socket.onmessage = function(event) {
         }
     }
 
-    createCM();
+    var cm = createCM();
+    cm.prevMath = prevMath;
+    cm.setValue(codeMirrorInitialContents);
+    cm.setCursor({line: 0, ch: codeMirrorInitialContents.length});
+    cm.prevOutput = fullDiv;
 
-    currentCM.setValue(codeMirrorInitialContents);
-    currentCM.setCursor({line: 0, ch: codeMirrorInitialContents.length});
+    currentCM = cm;
 };
 
 function createRecoverButtom(fullDiv) {
@@ -418,6 +436,7 @@ function mathTreeNodeAboveBoth(n1, n2, topLevel) {
 }
 
 function solidifyCurrent() {
+    return;
     if (!currentCM.selectedDOM) {
         return;
     }
@@ -468,7 +487,7 @@ function solidifyCurrent() {
     })(newspan, thisColor);
 
 
-    currentCM.availColors.pop();
+    //currentCM.availColors.pop();
     currentCM.selectedDOM = null;
     currentCM.selectedTextMarker = null;
 }
@@ -483,6 +502,155 @@ function onFinishTypesetting(where) {
     }
 
     addMathCallbacks(element);
+    currentCM.prevMath = element.cloneNode(true);
+}
+
+function replaceAllMathTags(cm) {
+    if (!cm.prevMath) return;
+
+    var prevOutput = $(cm.prevOutput).children(".output")[0];
+    var prevMathBoxClone = cm.prevMath.cloneNode(true);
+    addMathCallbacks(prevMathBoxClone);
+    cm.prevOutput.replaceChild(prevMathBoxClone, prevOutput);
+
+    var oldMarks = cm.getAllMarks();
+    for (var i=0; i<oldMarks.length; i++) {
+        oldMarks[i].clear();
+    }
+
+    var availColors = [9,8,7,6,5,4,3,2,1,0];
+
+    var tagBeginStr = '#(mtn:';
+    var tagBeginStrLen = tagBeginStr.length;
+
+    var s = cm.getValue();
+    var currentOffset = 0;
+    var tagStartIdx;
+
+    while ((tagStartIdx = s.indexOf(tagBeginStr, currentOffset)) != -1) {
+        var tagEndIdx = s.indexOf(')', tagStartIdx+tagBeginStrLen);
+        if (tagEndIdx == -1) {
+            // There's no close-paren in the rest of the string, so there's no
+            // more complete tags left
+            break;
+        }
+        currentOffset = tagEndIdx;
+
+        var tag = s.slice(tagStartIdx + tagBeginStrLen, tagEndIdx);
+        var mathForTagAry = $(cm.prevMath).find("[mathtreenode='" + tag + "']");
+        var mathInOutAry = $(prevMathBoxClone).find("[mathtreenode='" + tag + "']");
+        if (mathForTagAry.length != 1 || mathInOutAry.length != 1) {
+            console.log("No or >1 match for tag '" + tag + "': ");
+            console.log(mathForTagAry);
+            console.log(mathInOutAry);
+            continue;
+        }
+        var color = availColors.pop();
+
+        // Put the math in a span and highlight it
+        var mathInOut = mathInOutAry[0];
+
+        var newspan = document.createElement('span');
+        newspan.setAttribute('highlighted', color);
+
+        while (mathInOut.children.length > 0) {
+            // This (re)moves the child
+            newspan.appendChild(mathInOut.children[0]);
+        }
+
+        mathInOut.appendChild(newspan);
+
+        // Replace the text with a copy of the math
+        var mathCopy = mathForTagAry[0].cloneNode(true);
+
+        var toInsert = document.createElement('span');
+        toInsert.className = 'mjx-math mjx-chtml mathinequation';
+        toInsert.appendChild(mathCopy);
+
+        toInsert .setAttribute('highlighted', color);
+
+        (function(themath) {
+            toInsert.mouseEnterListener = function() {
+                themath.setAttribute('hoverednode', true);
+            }
+            toInsert.addEventListener("mouseenter", toInsert.mouseEnterListener);
+
+            toInsert.mouseLeaveListener = function() {
+                themath.removeAttribute('hoverednode');
+            }
+            toInsert.addEventListener("mouseleave", toInsert.mouseLeaveListener);
+        })(newspan);
+
+        cm.selectedTextMarker = cm.markText(
+                cm.posFromIndex(tagStartIdx),
+                cm.posFromIndex(tagEndIdx+1),
+                {replacedWith: toInsert});
+
+        continue;
+
+
+
+
+
+
+//        var full = s;
+//        var tagTillEnd = s.slice(tagIdx + tagstartlen);
+//
+//        var endIdx = tagTillEnd.indexOf(')');
+//        if (endIdx == -1) break;
+//        var nextTagIdx = tagTillEnd.indexOf('#(mtn:');
+//        if (nextTagIdx != -1 && nextTagIdx < endIdx) {
+//            s = tagTillEnd.slice(nextTagIdx);
+//            currentOffset += tagIdx + nextTagIdx + tagstartlen;
+//            continue;
+//        }
+//
+//        var tag = tagTillEnd.slice(0, endIdx);
+//
+//        // Find the tag in the math
+//        var mathForTagAry = $(cm.prevOutput).find("[mathtreenode='" + tag + "']");
+//        if (mathForTagAry.length != 1) {
+//            s = tagTillEnd.slice(endIdx);
+//            currentOffset += tagIdx + endIdx + tagstartlen;
+//            continue;
+//        }
+//        var mathForTag = mathForTagAry[0];
+//
+//        var mathCopy = mathForTag.cloneNode(true);
+//        mathCopy.removeAttribute('highlighted');
+//        var mathCopyChildren = $(mathCopy).find("*");
+//        for (var i=0; i<mathCopyChildren.length; i++) {
+//            mathCopyChildren[i].removeAttribute('highlighted');
+//        }
+//
+//        var toInsert = document.createElement('span');
+//        toInsert.className = 'mjx-math mjx-chtml mathinequation';
+//        toInsert.appendChild(mathCopy);
+//
+//        var color = availColors.pop();
+//        mathForTag.setAttribute('highlighted', color);
+//        toInsert  .setAttribute('highlighted', color);
+//
+//        (function(themath) {
+//            toInsert.mouseEnterListener = function() {
+//                themath.setAttribute('hoverednode', true);
+//            }
+//            toInsert.addEventListener("mouseenter", toInsert.mouseEnterListener);
+//
+//            toInsert.mouseLeaveListener = function() {
+//                themath.removeAttribute('hoverednode');
+//            }
+//            toInsert.addEventListener("mouseleave", toInsert.mouseLeaveListener);
+//        })(mathForTag);
+//
+//        cm.selectedTextMarker = cm.markText(
+//                {line:0, ch:tagIdx + currentOffset},
+//                {line:0, ch:tagIdx + currentOffset + endIdx + tagstartlen + 1},
+//                {replacedWith: toInsert});
+//
+//        s = tagTillEnd.slice(endIdx);
+//        currentOffset += tagIdx + endIdx + tagstartlen;
+    }
 }
 
 function sendOutputLatex() {
