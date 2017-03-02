@@ -302,48 +302,46 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 });
                 Ex::sum_many(new_exprs).ok_or(gen_err)
             }
-            //Ex::Division(top, bottom) => {
-            Ex::Division(_,_) => {
-                return Err(AlgebraDSLError::Unimplemented);
-                //let original_top_len = top.len();
-                //let bottom_indices = children.iter()
-                //    .cloned()
-                //    .filter_map(|i| {
-                //        if i >= top.len() && i < top.len() + bottom.len() {
-                //            Some(i - top.len())
-                //        } else {
-                //            None
-                //        }
-                //    })
-                //    .collect::<Vec<_>>();
-                //let top_indices = children.iter()
-                //    .cloned()
-                //    .filter_map(|i| { if i < top.len() { Some(i) } else { None } })
-                //    .collect::<Vec<_>>();
-                //let mut new_top = delete_prod(top, top_indices.as_slice());
-                //let mut new_bottom = delete_prod(bottom, bottom_indices.as_slice());
+            Ex::Division(top, bottom) => {
+                let original_top_len = top.len();
+                let bottom_indices = children.iter()
+                    .cloned()
+                    .filter_map(|i| {
+                        if i >= top.len() && i < top.len() + bottom.len() {
+                            Some(i - top.len())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let top_indices = children.iter()
+                    .cloned()
+                    .filter_map(|i| { if i < top.len() { Some(i) } else { None } })
+                    .collect::<Vec<_>>();
+                let mut new_top = delete_prod(top, top_indices.as_slice());
+                let mut new_bottom = delete_prod(bottom, bottom_indices.as_slice());
 
-                //expr.map(|e| {
-                //    // TODO
-                //    fn insert_division(prod: &mut Vec<Ex>, idx: usize, e: Ex) {
-                //        match e {
-                //            Ex::Division(t, b) => {
-                //                if b.len() == 0 {
-                //                    insert_many(prod, idx, t);
-                //                } else {
-                //                    prod.insert(idx, Ex::Division(t, b));
-                //                }
-                //            }
-                //            e => prod.insert(idx, e),
-                //        }
-                //    }
-                //    if insert_idx < original_top_len {
-                //        insert_division(&mut new_top, insert_idx, e);
-                //    } else {
-                //        insert_division(&mut new_bottom, insert_idx - original_top_len, e);
-                //    }
-                //});
-                //Ok(Ex::divide_products(new_top, new_bottom))
+                expr.map(|e| {
+                    // TODO
+                    fn insert_division(prod: &mut Vec<Ex>, idx: usize, e: Ex) {
+                        match e {
+                            Ex::Division(t, b) => {
+                                if b.len() == 0 {
+                                    insert_many(prod, idx, t);
+                                } else {
+                                    prod.insert(idx, Ex::Division(t, b));
+                                }
+                            }
+                            e => prod.insert(idx, e),
+                        }
+                    }
+                    if insert_idx < original_top_len {
+                        insert_division(&mut new_top, insert_idx, e);
+                    } else {
+                        insert_division(&mut new_bottom, insert_idx - original_top_len, e);
+                    }
+                });
+                Ok(Ex::divide_products(new_top, new_bottom))
             }
             _ => Err(gen_err),
         };
@@ -444,9 +442,11 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             Some((TreeIdx(v), tails))
         }
 
-        if indices.iter().map(|i| i.as_ref().len()).min().map(|m|m == 0).unwrap_or(true) {
+        if indices.len() < 1 ||
+           indices.iter().map(|i| i.as_ref().len()).min().expect(UNREACH) == 0 {
             return Err(AlgebraDSLError::InvalidSiblingIndices);
         }
+
 
         let (mut trunk, mut branches) =
             stem(indices).ok_or(AlgebraDSLError::InvalidSiblingIndices)?;
@@ -454,8 +454,10 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         // Make sure there is at least one branch, pushing back the trunk if needed
         if branches.len() == 0 {
             // If there is only one index, push the trunk up one.
-            let last = trunk.pop().ok_or(AlgebraDSLError::InvalidSiblingIndices)?;
-            branches.push(TreeIdx(vec![last]));
+            match trunk.pop() {
+                Some(last) => branches.push(TreeIdx(vec![last])),
+                None => return Err(AlgebraDSLError::InvalidSiblingIndices),
+            }
         }
 
         // Collect the leading index for each branch.
@@ -769,40 +771,13 @@ impl Indexable for Expression {
                 match self {
                     &Expression::Negation(ref e) if first == 0 => e.get(rest),
                     &Expression::Sum(ref e) if first < e.len() => e[first].get(rest),
-                    &Expression::Division(ref t, ref b) if b.len() == 0 =>
-                        t[first].get(rest),
-                    &Expression::Division(ref t, _) if first == 0 => {
-                        if t.len() == 1 {
-                            t[0].get(rest)
+                    &Expression::Division(ref t, ref b) if first < t.len() + b.len() => {
+                        if first < t.len() {
+                            t[first].get(rest)
                         } else {
-                            match rest.first() {
-                                Some(snd) if snd < t.len() => {
-                                    let rest = rest.rest();
-                                    t[snd].get(rest)
-                                }
-                                // XXX: user has selected entire top half,
-                                // but can't return that
-                                None => Err(AlgebraDSLError::Unimplemented),
-                                _ => Err(AlgebraDSLError::InvalidIdx),
-                            }
+                            b[first - t.len()].get(rest)
                         }
-                    },
-                    &Expression::Division(_, ref b) if first == 1 => {
-                        if b.len() == 1 {
-                            b[0].get(rest)
-                        } else {
-                            match rest.first() {
-                                Some(snd) if snd < b.len() => {
-                                    let rest = rest.rest();
-                                    b[snd].get(rest)
-                                }
-                                // XXX: user has selected entire bottom half,
-                                // but can't return that
-                                None => Err(AlgebraDSLError::Unimplemented),
-                                _ => Err(AlgebraDSLError::InvalidIdx),
-                            }
-                        }
-                    },
+                    }
                     &Expression::Power(ref base, _) if first == 0 => base.get(rest),
                     &Expression::Power(_, ref power) if first == 1 => power.get(rest),
                     &Expression::Subscript(ref base, _) if first == 0 => base.get(rest),
@@ -833,40 +808,14 @@ impl Indexable for Expression {
                 match self {
                     &mut Expression::Negation(ref mut e) if first == 0 => e.get_mut(rest),
                     &mut Expression::Sum(ref mut e) if first < e.len() => e[first].get_mut(rest),
-                    &mut Expression::Division(ref mut t, ref mut b) if b.len() == 0 =>
-                        t[first].get_mut(rest),
-                    &mut Expression::Division(ref mut t, _) if first == 0 => {
-                        if t.len() == 1 {
-                            t[0].get_mut(rest)
+                    &mut Expression::Division(ref mut t, ref mut b) if first <
+                                                                       t.len() + b.len() => {
+                        if first < t.len() {
+                            t[first].get_mut(rest)
                         } else {
-                            match rest.first() {
-                                Some(snd) if snd < t.len() => {
-                                    let rest = rest.rest();
-                                    t[snd].get_mut(rest)
-                                }
-                                // XXX: user has selected entire top half,
-                                // but can't return that
-                                None => Err(AlgebraDSLError::Unimplemented),
-                                _ => Err(AlgebraDSLError::InvalidIdx),
-                            }
+                            b[first - t.len()].get_mut(rest)
                         }
-                    },
-                    &mut Expression::Division(_, ref mut b) if first == 1 => {
-                        if b.len() == 1 {
-                            b[0].get_mut(rest)
-                        } else {
-                            match rest.first() {
-                                Some(snd) if snd < b.len() => {
-                                    let rest = rest.rest();
-                                    b[snd].get_mut(rest)
-                                }
-                                // XXX: user has selected entire bottom half,
-                                // but can't return that
-                                None => Err(AlgebraDSLError::Unimplemented),
-                                _ => Err(AlgebraDSLError::InvalidIdx),
-                            }
-                        }
-                    },
+                    }
                     &mut Expression::Power(ref mut base, _) if first == 0 => base.get_mut(rest),
                     &mut Expression::Power(_, ref mut power) if first == 1 => power.get_mut(rest),
                     &mut Expression::Subscript(ref mut base, _) if first == 0 => base.get_mut(rest),
