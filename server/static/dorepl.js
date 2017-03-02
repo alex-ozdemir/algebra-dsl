@@ -234,7 +234,6 @@ socket.onmessage = function(event) {
         var fullDiv = document.createElement('div');
         fullDiv.className = 'output math-output';
         fullDiv.id = 'mathout'+formulaNum;
-        document.getElementById('repl').appendChild(fullDiv);
 
         var checkbox = document.createElement('input');
         checkbox.setAttribute('type', 'checkbox');
@@ -252,9 +251,12 @@ socket.onmessage = function(event) {
 
         fullDiv.appendChild(mathBox);
 
+        fullDiv.style.display = 'none';
+
+        document.getElementById('repl').appendChild(fullDiv);
         // Handle Actual Formula
         MathJax.Hub.Queue(["Typeset", MathJax.Hub, mathBox.id]);
-        MathJax.Hub.Queue([onFinishTypesetting, mathBox.id]);
+        MathJax.Hub.Queue([onFinishTypesetting, mathBox, fullDiv]);
 
         createRecoverButtom(fullDiv);
         createGetCodeButton(fullDiv);
@@ -294,9 +296,10 @@ socket.onmessage = function(event) {
 
     var cm = createCM();
     cm.prevMath = prevMath;
+    cm.prevOutput = fullDiv;
+
     cm.setValue(codeMirrorInitialContents);
     cm.setCursor({line: 0, ch: codeMirrorInitialContents.length});
-    cm.prevOutput = fullDiv;
 
     currentCM = cm;
 };
@@ -407,9 +410,7 @@ function solidifySelection(cm) {
     }
 }
 
-function onFinishTypesetting(where) {
-    var element = document.getElementById(where);
-
+function onFinishTypesetting(element, fullDiv, nextcm) {
     // Remove any leftover MathML
     var maths = element.getElementsByTagName('math');
     while(maths.length > 0) {
@@ -418,6 +419,8 @@ function onFinishTypesetting(where) {
 
     addMathCallbacks(element);
     currentCM.prevMath = element.cloneNode(true);
+
+    fullDiv.style.display = 'block';
 }
 
 function replaceAllMathTags(cm, changeObj) {
