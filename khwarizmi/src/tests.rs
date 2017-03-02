@@ -52,8 +52,8 @@ fn index_power() {
 fn format_frac() {
     let expr = Ex::Division(vec![var('x')], vec![var('y')]);
     let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                    mathTreeNode=\"0\"><mfrac><mrow><mrow \
-                    mathTreeNode=\"0,0\"><mi>x</mi></mrow></mrow><mrow><mrow \
+                    mathTreeNode=\"0\"><mfrac><mrow multiparent=\"true\"><mrow \
+                    mathTreeNode=\"0,0\"><mi>x</mi></mrow></mrow><mrow multiparent=\"true\"><mrow \
                     mathTreeNode=\"0,1\"><mi>y</mi></mrow></mrow></mfrac></mrow></math>";
     let test = format!("{}", expr);
     assert_expected_eq_actual!(expected, test);
@@ -86,7 +86,7 @@ fn format_add() {
                             var('y'),
                             var('z')]);
     let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                    mathTreeNode=\"0\"><mrow \
+                    mathTreeNode=\"0\" multiparent=\"true\"><mrow \
                     mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
                     mathTreeNode=\"0,1\"><mi>y</mi></mrow><mo>+</mo><mrow \
                     mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
@@ -100,11 +100,12 @@ fn format_add_w_paren() {
                             Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('y')),
                             Ex::Atom(Atom::PlainVariable('z'))])]);
     let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                    mathTreeNode=\"0\"><mrow \
+                    mathTreeNode=\"0\" multiparent=\"true\"><mrow \
                     mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
-                    mathTreeNode=\"0,1\"><mo form=\"prefix\">(</mo><mrow \
+                    mathTreeNode=\"0,1\" multiparent=\"true\"><mo form=\"prefix\">(</mo><mrow \
                     mathTreeNode=\"0,1,0\"><mi>y</mi></mrow><mo>+</mo><mrow \
-                    mathTreeNode=\"0,1,1\"><mi>z</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
+                    mathTreeNode=\"0,1,1\"><mi>z</mi></mrow><mo form=\"postfix\">)</mo>\
+                    </mrow></mrow></math>";
     let test = format!("{}", expr);
     assert_expected_eq_actual!(expected, test);
 }
@@ -116,7 +117,7 @@ fn format_prod() {
                                 var('z')],
                             vec![]);
     let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                    mathTreeNode=\"0\"><mrow \
+                    mathTreeNode=\"0\" multiparent=\"true\"><mrow \
                     mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
                     mathTreeNode=\"0,1\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow \
                     mathTreeNode=\"0,2\"><mi>z</mi></mrow></mrow></math>";
@@ -130,9 +131,9 @@ fn format_prod_w_paren() {
                             Ex::Division(vec![Ex::Atom(Atom::PlainVariable('y')),
                             Ex::Atom(Atom::PlainVariable('z'))],vec![])],vec![]);
     let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                    mathTreeNode=\"0\"><mrow \
+                    mathTreeNode=\"0\" multiparent=\"true\"><mrow \
                     mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
-                    mathTreeNode=\"0,1\"><mo form=\"prefix\">(</mo><mrow \
+                    mathTreeNode=\"0,1\" multiparent=\"true\"><mo form=\"prefix\">(</mo><mrow \
                     mathTreeNode=\"0,1,0\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow \
                     mathTreeNode=\"0,1,1\"><mi>z</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
     let test = format!("{}", expr);
@@ -147,11 +148,11 @@ fn format_prod_add() {
                                              var('a')])],
                             vec![]);
     let expected =
-        "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\"><mrow \
-         mathTreeNode=\"0,0\"><mo form=\"prefix\">(</mo><mrow \
+        "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\" multiparent=\"true\"><mrow \
+         mathTreeNode=\"0,0\" multiparent=\"true\"><mo form=\"prefix\">(</mo><mrow \
          mathTreeNode=\"0,0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
          mathTreeNode=\"0,0,1\"><mi>y</mi></mrow><mo \
-         form=\"postfix\">)</mo></mrow><mo>&#8290;</mo><mrow mathTreeNode=\"0,1\"><mo \
+         form=\"postfix\">)</mo></mrow><mo>&#8290;</mo><mrow mathTreeNode=\"0,1\" multiparent=\"true\"><mo \
          form=\"prefix\">(</mo><mrow mathTreeNode=\"0,1,0\"><mi>z</mi></mrow><mo>+</mo><mrow \
          mathTreeNode=\"0,1,1\"><mi>a</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
     let test = format!("{}", expr);

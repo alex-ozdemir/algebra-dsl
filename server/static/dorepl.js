@@ -144,14 +144,14 @@ function mouseUpCallback(event) {
         var cur = mousePressHead
         while (cur !== null) {
             headAncestors.push(cur);
-            cur = mathTreeNodeAbove(cur.parentNode, this);
+            cur = mathTreeNodeOrMultiparentAbove(cur.parentNode, this);
         }
         cur = mousePressAnchor;
         var prev = null;
         var indexOfMatch
         while ((indexOfMatch = headAncestors.indexOf(cur)) === -1) {
             prev = cur;
-            cur = mathTreeNodeAbove(cur.parentNode, this);
+            cur = mathTreeNodeOrMultiparentAbove(cur.parentNode, this);
         }
 
         if (!cur.hasAttribute('multiparent')) {
@@ -272,7 +272,6 @@ socket.onmessage = function(event) {
 
     if (formulaNum > 0) {
         var prevFormula = document.getElementById('formula'+(formulaNum-1));
-        console.log(prevFormula);
         if (prevFormula) {
             removeMathCallbacks(prevFormula);
         }
@@ -424,6 +423,16 @@ function createGetCodeButton(fullDiv) {
 
 function mathTreeNodeAbove(cur, topLevel) {
     while (!cur.hasAttribute('mathtreenode')) {
+        if (cur === topLevel) {
+            return null;
+        }
+        cur = cur.parentNode;
+    }
+    return cur;
+}
+
+function mathTreeNodeOrMultiparentAbove(cur, topLevel) {
+    while (!cur.hasAttribute('mathtreenode') && !cur.hasAttribute('multiparent')) {
         if (cur === topLevel) {
             return null;
         }

@@ -240,16 +240,15 @@ fn fmt_prod_as_math_ml(exprs: &[Expression],
     for (i, e) in iter {
         let mut base_string = String::from(prev_index);
         write!(base_string, ",{}", i + start_idx)?;
-        if i == len - 1 {
-            fmt_as_math_ml(e, f, &base_string, prev_precedence)?;
-        } else {
-            fmt_as_math_ml(e, f, &base_string, prev_precedence)?;
+        fmt_as_math_ml(e, f, &base_string, prev_precedence)?;
+        if i < len - 1 {
             let e_next = &exprs[i + 1];
             match e_next {
                 &Expression::Atom(Atom::Floating(_)) |
                 &Expression::Atom(Atom::Natural(_)) |
                 &Expression::Power(box Expression::Atom(Atom::Floating(_)),_) |
-                &Expression::Power(box Expression::Atom(Atom::Natural(_)),_) => write!(f, "<mo>&#x022C5;</mo>")?,
+                &Expression::Power(box Expression::Atom(Atom::Natural(_)),_)
+                    => write!(f, "<mo>&#x022C5;</mo>")?,
                 _ => write!(f, "<mo>&#8290;</mo>")?,
             };
         }
@@ -262,7 +261,6 @@ fn fmt_as_math_ml(expr: &Expression,
                   prev_index: &str,
                   prev_precedence: (&Expression, bool, bool))
                   -> Result<(), fmt::Error> {
-    println!("Writing MTN thing, prev_index = {} expr = {:?}", prev_index, expr);
     write!(f, "<{} mathTreeNode=\"{}\"{}>", MROW, prev_index, match expr {
         &Expression::Sum(..)                            => " multiparent=\"true\"",
         &Expression::Division(_, ref b) if b.len() == 0 => " multiparent=\"true\"",
@@ -321,10 +319,10 @@ fn fmt_as_math_ml(expr: &Expression,
                 fmt_prod_as_math_ml(n.as_slice(), f, prev_index, (expr, false, false), 0)?;
             } else {
                 write!(f, "<mfrac>")?;
-                write!(f, "<{}>", MROW)?;
+                write!(f, "<{} multiparent=\"true\">", MROW)?;
                 fmt_prod_as_math_ml(n.as_slice(), f, prev_index, (expr, true, false), 0)?;
                 write!(f, "</{}>", MROW)?;
-                write!(f, "<{}>", MROW)?;
+                write!(f, "<{} multiparent=\"true\">", MROW)?;
                 fmt_prod_as_math_ml(d.as_slice(), f, prev_index, (expr, false, false), n.len())?;
                 write!(f, "</{}>", MROW)?;
                 write!(f, "</mfrac>")?;
