@@ -264,7 +264,13 @@ fn fmt_as_math_ml(expr: &Expression,
                   prev_index: &str,
                   prev_precedence: (&Expression, bool, bool))
                   -> Result<(), fmt::Error> {
-    write!(f, "<mrow mathTreeNode=\"{}\">", prev_index)?;
+    println!("Writing MTN thing, prev_index = {} expr = {:?}", prev_index, expr);
+    write!(f, "<{} mathTreeNode=\"{}\"{}>", MROW, prev_index, match expr {
+        &Expression::Sum(..)                            => " multiparent=\"true\"",
+        &Expression::Division(_, ref b) if b.len() == 0 => " multiparent=\"true\"",
+        _ => "",
+    })?;
+
     if capture(prev_precedence.0,
                expr,
                prev_precedence.1,
@@ -323,7 +329,7 @@ fn fmt_as_math_ml(expr: &Expression,
                 base_string.push_str(",0");
 
                 write!(f, "<{}{}>", MROW, if n.len() > 1 {
-                    format!(" mathTreeNode=\"{}\"", &base_string)
+                    format!(" mathTreeNode=\"{}\" multiparent=\"true\"", &base_string)
                 } else {
                     String::new()
                 })?;
@@ -335,7 +341,7 @@ fn fmt_as_math_ml(expr: &Expression,
                 base_string.push_str(",1");
 
                 write!(f, "<{}{}>", MROW, if d.len() > 1 {
-                    format!(" mathTreeNode=\"{}\"", &base_string)
+                    format!(" mathTreeNode=\"{}\" multiparent=\"true\"", &base_string)
                 } else {
                     String::new()
                 })?;

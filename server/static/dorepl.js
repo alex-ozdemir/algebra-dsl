@@ -139,11 +139,60 @@ function mouseUpCallback(event) {
     } else {
         solidifySelection();
 
-        var parent = mathTreeNodeAboveBoth(mousePressAnchor, mousePressHead, this);
+        var headAncestors = [];
 
-        var cursorPos = cm.getCursor();
-        var insertText = '#(mtn:'+parent.getAttribute('mathtreenode')+')';
-        cm.replaceRange(insertText, cursorPos);
+        var cur = mousePressHead
+        while (cur !== null) {
+            headAncestors.push(cur);
+            cur = mathTreeNodeAbove(cur.parentNode, this);
+        }
+        cur = mousePressAnchor;
+        var prev = null;
+        var indexOfMatch
+        while ((indexOfMatch = headAncestors.indexOf(cur)) === -1) {
+            prev = cur;
+            cur = mathTreeNodeAbove(cur.parentNode, this);
+        }
+
+        if (!cur.hasAttribute('multiparent')) {
+            // Not a multiparent: not allowed to select siblings, so just select
+            // the whole thing
+            var cursorPos = cm.getCursor();
+            var insertText = '#(mtn:'+cur.getAttribute('mathtreenode')+')';
+            cm.replaceRange(insertText, cursorPos);
+        } else if (prev !== null && indexOfMatch != 0) {
+
+            var siblingOne = headAncestors[indexOfMatch-1];
+            var siblingTwo = prev;
+
+            cur = siblingTwo;
+
+            var siblingsToAdd = [cur];
+            while (cur !== null && cur !== siblingOne) {
+                cur = cur.nextSibling;
+                if (cur !== null && cur.hasAttribute('mathtreenode')) {
+                    siblingsToAdd.push(cur);
+                }
+            }
+            if (cur === null) {
+                cur = siblingOne;
+                siblingsToAdd = [cur];
+                while (cur !== siblingTwo) {
+                    cur = cur.nextSibling;
+                    if (cur.hasAttribute('mathtreenode')) {
+                        siblingsToAdd.push(cur);
+                    }
+                }
+            }
+
+            var insertText = '';
+            for (var i=0; i<siblingsToAdd.length; i++) {
+                insertText += '#(mtn:'+siblingsToAdd[i].getAttribute('mathtreenode')+')';
+            }
+
+            var cursorPos = cm.getCursor();
+            cm.replaceRange(insertText, cursorPos);
+        }
     }
     mousePressAnchor = null;
     cm.focus();
@@ -223,6 +272,7 @@ socket.onmessage = function(event) {
 
     if (formulaNum > 0) {
         var prevFormula = document.getElementById('formula'+(formulaNum-1));
+        console.log(prevFormula);
         if (prevFormula) {
             removeMathCallbacks(prevFormula);
         }
