@@ -25,10 +25,17 @@ MathJax.Hub.Config({
 });
 
 var currentCM = null;
+var currentMath = null;
 var CMhistory = []; //stores references to all the old CM instances
 var isMousePressed = false;
 var mousePressAnchor = null;
 var batchCommands = [];
+var socket = new WebSocket("ws://" + location.hostname + ':2794', "rust-websocket");
+
+function putIntoCM(cm, text) {
+    cm.setValue(text);
+    cm.setCursor(cm.posFromIndex(text.length));
+}
 
 $(document).ready(function() {
     $('#feedbackModal').on('shown.bs.modal', function () {
@@ -36,15 +43,17 @@ $(document).ready(function() {
     })
 
     var cm = createCM();
-
-    cm.setValue("$ ");
-    cm.setCursor({line: 0, ch: 2});
+    putIntoCM(cm, "$ ");
     currentCM = cm;
 
     document.addEventListener("mouseup", globalMouseUpCallback);
 })
 
 function createCM() {
+    if (currentMath) {
+        removeMathCallbacks(currentMath);
+    }
+
     var cm = CodeMirror(document.getElementById('repl'), {
         autofocus: true,
         matchBrackets: true,
@@ -75,8 +84,6 @@ function createCM() {
 
     return cm;
 }
-
-var socket = new WebSocket("ws://" + location.hostname + ':2794', "rust-websocket");
 
 function sendToServer(cmBox) {
     cmBox.setOption('readOnly', true);
@@ -203,15 +210,10 @@ function globalMouseUpCallback(event) {
 }
 
 function addMathCallbacks(where) {
-    console.log("Adding");
-    console.log(where);
     where.addEventListener("mousedown", mouseDownCallback);
     where.addEventListener("mouseup", mouseUpCallback);
 }
 function removeMathCallbacks(where) {
-    console.log("Removing");
-    console.log(where);
-
     where.removeEventListener("mousedown", mouseDownCallback);
     where.removeEventListener("mouseup", mouseUpCallback);
 }
@@ -225,73 +227,46 @@ socket.onmessage = function(event) {
         console.log("Server sent bad data: No @ symbol");
         return;
     }
-    var formulaNum = data.substr(0, atIdx);
-    var rest = data.substr(atIdx+1);
 
-    var atIdx = rest.indexOf('@');
-    if (atIdx === -1) {
-        console.log("Server sent bad data: Only one @ symbol");
-        return;
-    }
+    var type = data.slice(0, atIdx);
 
-    if (formulaNum > 0) {
-        var prevFormula = document.getElementById('formula'+(formulaNum-1));
-        if (prevFormula) {
-            removeMathCallbacks(prevFormula);
-        }
-    }
-
-    var type = rest.substr(0, atIdx);
-    var rest = rest.substr(atIdx+1);
-
-    var cm = createCM();
-
-    // Print out the latex or error or text response from server
-    if (type === 'LaTeX') {
+    var previousMath = currentMath;
+    if (type === 'LaTeXBlock') {
         var box = document.createElement('textarea');
         box.className = 'latexoutputbox'
-        var text = document.createTextNode(rest);
+        var text = document.createTextNode(data.slice(atIdx + 1));
         box.appendChild(text);
         box.readOnly = true;
         $(box).on('focus', function(){this.select()});
 
-        document.getElementById('repl').insertBefore(box, cm.getWrapperElement());
+        document.getElementById('repl').appendChild(box);
 
         // Needs to be set after it's in the real dom tree so that scrollHeight
         // is correct
         box.style.height = (box.scrollHeight)+"px";
+    } else if (type === 'LaTeXLine') {
+        var cm = currentCM;
+        putIntoCM(cm, "$ " + data.slice(atIdx + 1));
+        cm.focus();
     } else if (type === 'Err') {
         var errDiv = document.createElement('div');
-        errDiv.className = 'output';
+        errDiv.className = 'output algebra-dsl-error';
+        errDiv.innerHTML = data.slice(atIdx + 1);
+        document.getElementById('repl').appendChild(errDiv);
+    } else if (type === 'Math') {
+        var nextAtIdx = data.indexOf('@', atIdx + 1);
+        var nextNextAtIdx = data.indexOf('@', nextAtIdx + 1);
 
-        errDiv.className += ' algebra-dsl-error';
-        errDiv.innerHTML = rest;
-        document.getElementById('repl').insertBefore(errDiv, cm.getWrapperElement());
-    } else if (type === 'Re') {
-        var reDiv = document.createElement('div');
-        reDiv.className = 'output';
-        reDiv.className += ' response-from-server';
-        reDiv.innerHTML = rest;
-        document.getElementById('repl').insertBefore(reDiv, cm.getWrapperElement());
-    } else if (type === 'Input') {
-        var atIdx = rest.indexOf('@');
-        if (atIdx === -1) {
-            console.log("Server sent bad data: Only two @ symbols in `Input`");
-            return;
-        }
+        var formulaNum = data.slice(atIdx + 1, nextAtIdx);
+        var checkCheckbox = data.slice(nextAtIdx + 1, nextNextAtIdx) === 'true';
 
-        var startVal = "$ " + rest.substr(0, atIdx);
-        cm.setValue(startVal);
-        cm.setCursor({line: 0, ch: startVal.length});
-        rest = rest.substr(atIdx + 1);
-    }
+        var html = data.slice(nextNextAtIdx + 1);
 
-    // Print out the current math
-    if (type === 'Math' || type === 'Input') {
         // Contains the checkbox, math, and buttons
         var fullDiv = document.createElement('div');
         fullDiv.className = 'output math-output';
         fullDiv.id = 'mathout'+formulaNum;
+        fullDiv.setAttribute("formulanum", formulaNum);
         fullDiv.className += ' new-math-output';
         // Hide until the math is done typesetting
         fullDiv.style.display = 'none';
@@ -299,68 +274,39 @@ socket.onmessage = function(event) {
         var checkbox = document.createElement('input');
         checkbox.setAttribute('type', 'checkbox');
         fullDiv.appendChild(checkbox);
-        checkbox.checked = true;
+        checkbox.checked = checkCheckbox;
 
         var mathBox = document.createElement('span');
         mathBox.id = 'formula'+formulaNum;
         mathBox.className += ' output disable-highlight';
-        mathBox.innerHTML = rest;
+        mathBox.innerHTML = html;
         addMathCallbacks(mathBox);
         fullDiv.appendChild(mathBox);
 
         createRecoverButtom(fullDiv);
         createGetCodeButton(fullDiv);
 
-        cm.prevOutput = fullDiv;
+        currentMath = fullDiv;
+        document.getElementById('repl').appendChild(fullDiv);
 
-        document.getElementById('repl').insertBefore(fullDiv, cm.getWrapperElement());
+        var cm = createCM();
+        cm.prevOutput = fullDiv;
+        currentCM = cm;
 
         // Handle Actual Formula
         MathJax.Hub.Queue(["Typeset", MathJax.Hub, mathBox.id]);
         MathJax.Hub.Queue([onFinishTypesetting, mathBox, fullDiv, cm]);
-    } else {
-        var prevOut = document.getElementById('mathout'+(formulaNum-1));
-        if (prevOut && (prevOut.childNodes[1].tagName.toLowerCase() == "span" && prevOut.childNodes.length > 1)) {
 
-            // Contains the checkbox, math, and buttons
-            var fullDiv = document.createElement('div');
-            fullDiv.className = 'output math-output';
-            fullDiv.id = 'mathout'+formulaNum;
-
-            var checkbox = document.createElement('input');
-            checkbox.setAttribute('type', 'checkbox');
-            fullDiv.appendChild(checkbox);
-            checkbox.checked = false;
-
-            var mathBox = prevOut.childNodes[1].cloneNode(true);
-            mathBox.id = 'formula'+formulaNum;
-            addMathCallbacks(mathBox);
-
-            var subNodes = mathBox.getElementsByTagName('*');
-            for (var i=0; i<subNodes.length; i++) {
-                subNodes[i].removeAttribute('selected');
-                subNodes[i].removeAttribute('highlighted');
-            }
-            cm.prevMath = mathBox.cloneNode(true);
-            fullDiv.appendChild(mathBox);
-
-            createRecoverButtom(fullDiv);
-            createGetCodeButton(fullDiv);
-
-            cm.prevOutput = fullDiv;
-
-            document.getElementById('repl').insertBefore(fullDiv, cm.getWrapperElement());
-
-            replaceAllMathTags(cm);
-        } else {
-            cm.setValue("$ ");
-            cm.setCursor({line: 0, ch: 2});
-        }
+        executeBatchCommands(cm);
     }
 
-    currentCM = cm;
+    if (!previousMath && (type === 'LaTeX' || type === 'Err')) {
+        var cm = createCM();
+        putIntoCM(cm, "$ ");
+        currentCM = cm;
 
-    executeBatchCommands(cm);
+        executeBatchCommands(cm);
+    }
 };
 
 function createRecoverButtom(fullDiv) {
@@ -370,29 +316,9 @@ function createRecoverButtom(fullDiv) {
     recoverButton.className += " " + recoverClass;
 
     recoverButton.addEventListener("click", function(e) {
-        var tosend = "recover "
-
-        var cns = document.getElementById('repl').childNodes;
-
-        var eqnIdx = -1;
-        for (var i=0; i<cns.length; i++) {
-            if (cns[i].classList.contains('new-math-output')) {
-                eqnIdx++;
-            }
-            var buttonCandidates = cns[i].getElementsByClassName(recoverClass);
-            if (buttonCandidates.length >= 2) {
-                console.log("Too many " + recoverClass + " buttons!");
-                console.log(buttonCandidates);
-            }
-            if (buttonCandidates.length > 0 && e.target === buttonCandidates[0] ) {
-                tosend += eqnIdx;
-                break;
-            }
-        }
-
+        var formulaNum = e.target.parentNode.getAttribute("formulanum");
         var cm = currentCM;
-
-        cm.setValue(tosend);
+        putIntoCM(cm, "recover " + formulaNum);
         sendToServer(cm);
     });
     fullDiv.appendChild(recoverButton);
@@ -405,28 +331,8 @@ function createGetCodeButton(fullDiv) {
     getcodeButton.className += " " + recoverClass;
 
     getcodeButton.addEventListener("click", function(e) {
-        var tosend = "code "
-
-        var cns = document.getElementById('repl').childNodes;
-
-        var eqnIdx = -1;
-        for (var i=0; i<cns.length; i++) {
-            if (cns[i].classList.contains('new-math-output')) {
-                eqnIdx++;
-            }
-            var buttonCandidates = cns[i].getElementsByClassName(recoverClass);
-            if (buttonCandidates.length >= 2) {
-                console.log("Too many " + recoverClass + " buttons!");
-                console.log(buttonCandidates);
-            }
-            if (buttonCandidates.length > 0 && e.target === buttonCandidates[0] ) {
-                tosend += eqnIdx;
-                break;
-            }
-        }
-        var cm = currentCM;
-        cm.setValue(tosend);
-        sendToServer(cm);
+        var formulaNum = e.target.parentNode.getAttribute("formulanum");
+        socket.send("cmd@code " + formulaNum);
     });
     fullDiv.appendChild(getcodeButton);
 }
@@ -493,6 +399,12 @@ function onFinishTypesetting(element, fullDiv, nextcm) {
     // In case the user (or a batch command) types tags before we got done
     // typesetting it
     replaceAllMathTags(nextcm);
+
+
+    currentCM.getWrapperElement().scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+    });
 }
 
 function replaceAllMathTags(cm, changeObj) {
@@ -608,16 +520,16 @@ function replaceAllMathTags(cm, changeObj) {
 }
 
 function executeBatchCommands(cm) {
-    let cmd;
-    do {
-        cmd = batchCommands.shift();
-        if (typeof cmd !== 'string') {
-            return;
-        }
-    } while(cmd === '');
+    let cmd = batchCommands.shift();
+    if (typeof cmd !== 'string') {
+        return;
+    }
 
-    cm.setValue(cmd);
-    sendToServer(cm);
+    putIntoCM(cm, cmd);
+
+    if (batchCommands.length > 0) {
+        sendToServer(cm);
+    }
 }
 
 function sendOutputLatex() {
@@ -658,9 +570,9 @@ function reclaimDown(cm) {
     if (cm.loc < 0) {
         cm.loc = 0;
     } else {
-        cm.history[len-2-cm.loc] = cm.getValue();
-        cm.setValue(cm.history[len-1-cm.loc]);
-        cm.setCursor({line: 0, ch: cm.getValue().length});
+        cm.history[len - 2 - cm.loc] = cm.getValue();
+
+        putIntoCM(cm, cm.history[len - 1 - cm.loc]);
     }
 }
 
@@ -675,8 +587,7 @@ function reclaimUp(cm) {
         cm.loc = len - 1;
     } else {
         cm.history[len-cm.loc] = cm.getValue();
-        cm.setValue(cm.history[len-1-cm.loc]);
-        cm.setCursor({line: 0, ch: cm.getValue().length});
+        putIntoCM(cm, cm.history[len - 1 - cm.loc]);
     }
 }
 
@@ -723,6 +634,8 @@ function loadSession(file) {
     var fr = new FileReader();
     fr.onload = function(e) {
         var lines = e.target.result.split('\n');
+        // The file ends with a newline: we don't want that
+        lines.pop();
         batchCommands = lines;
         executeBatchCommands(currentCM);
     };

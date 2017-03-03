@@ -7,9 +7,8 @@ use khwarizmi::{Expression, TreeIdx, AlgebraDSLError, Indexable, Math, LatexWrit
 #[derive(Debug, PartialEq, Clone)]
 pub enum Return {
     Math(Math),
-    LaTeXStr(String),
-    /// The code the use requested and the object it corresponds to
-    LaTeXInput(String, Math),
+    LaTeXBlock(String),
+    LaTeXLine(String),
     NoReturn,
 }
 
@@ -79,7 +78,7 @@ impl Cmd {
                             .ok_or(AlgebraDSLError::InvalidIdx)?)
                         .map_err(|_| AlgebraDSLError::InternalError)?;
                 }
-                Ok(Return::LaTeXStr(latex_writer.finish_str()
+                Ok(Return::LaTeXBlock(latex_writer.finish_str()
                     .map_err(|_| AlgebraDSLError::InternalError)?))
             }
             (Cmd::Recover(idx), e) => {
@@ -92,8 +91,7 @@ impl Cmd {
             (Cmd::GetCode(idx), _) => {
                 let recover_math = history.get(idx).ok_or(AlgebraDSLError::InvalidIdx)?;
                 let latex_string = recover_math.as_khwarizmi_latex();
-                let parsed = Math::from_str(latex_string.as_str().trim())?;
-                Ok(Return::LaTeXInput(latex_string, parsed))
+                Ok(Return::LaTeXLine(latex_string))
             }
             (Cmd::Feedback(text, html), _) => {
                 let mut f = OpenOptions::new().create(true)

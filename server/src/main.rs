@@ -102,30 +102,41 @@ fn main() {
                             Ok(cmd) => cmd.execute(history.last(), &history),
                             Err(e) => Err(e),
                         };
-                        let msg = match output {
+                        let (math_to_send, other_msg) = match output {
                             Ok(cmd::Return::Math(e)) => {
                                 let simpler = auto_simplify(e);
-                                let s = format!("{}@Math@{}", formula_num, simpler);
-                                history.push(simpler);
-                                Some(s)
+                                history.push(simpler.clone());
+                                (Some(simpler), None)
                             }
-                            Ok(cmd::Return::LaTeXStr(s)) => {
-                                Some(format!("{}@LaTeX@{}", formula_num, s))
+                            Ok(cmd::Return::LaTeXBlock(s)) => {
+                                (history.last().cloned().map(|last| {
+                                    history.push(last.clone()); last
+                                 }),
+                                 Some(format!("LaTeXBlock@{}", s)))
                             }
-                            Ok(cmd::Return::LaTeXInput(code, e)) => {
-                                let s = format!("{}@Input@{}@{}", formula_num, code, e);
-                                history.push(e);
-                                Some(s)
+                            Ok(cmd::Return::LaTeXLine(code)) => {
+                                (None,
+                                 Some(format!("LaTeXLine@{}", code)))
                             }
-                            Ok(_) => None,
-                            Err(e) => Some(format!("{}@Err@Error: {:?}", formula_num, e)),
+                            Ok(cmd::Return::NoReturn) => (None, None),
+                            Err(e) => {
+                                (history.last().cloned().map(|last| { history.push(last.clone()); last }),
+                                 Some(format!("Err@Error: {:?}", e)))
+                            }
                         };
+                        let check_math_checkbox = other_msg.is_none();
+                        if let Some(msg) = other_msg {
+                            println!("Output: {:#?}", msg);
+                            sender.send_message(&Message::text(msg)).unwrap();
+                        }
+                        if let Some(math) = math_to_send {
+                            let msg = format!("Math@{}@{}@{}", formula_num, check_math_checkbox, math);
 
-                        if let Some(msg) = msg {
-                            formula_num += 1;
                             println!("Output: {:#?}", msg);
                             println!("The current formula is {:#?}", history.last());
                             sender.send_message(&Message::text(msg)).unwrap();
+
+                            formula_num += 1;
                         }
                     }
                     _ => {
