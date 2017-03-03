@@ -214,6 +214,10 @@ impl Equation {
         self.left = self.left.take().inflate_division(expr.clone());
         self.right = self.right.take().inflate_division(expr);
     }
+    pub fn power_to_both(&mut self, expr: Expression) {
+        self.left = self.left.take().inflate_power(expr.clone());
+        self.right = self.right.take().inflate_power(expr);
+    }
     pub fn simplify_constants(self) -> Self {
         Equation {
             left: self.left.simplify_constants(),
@@ -562,6 +566,9 @@ impl Expression {
             }
             not_prod => Expression::Division(vec![not_prod], vec![expr]),
         }
+    }
+    pub fn inflate_power(self, expr: Expression) -> Self {
+        Expression::Power(box self, box expr)
     }
 
     fn simplify_product(exprs: Vec<Expression>) -> (f64, i64, Vec<Expression>) {

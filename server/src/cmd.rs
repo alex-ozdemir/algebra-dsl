@@ -18,6 +18,7 @@ pub enum Op {
     Times,
     Div,
     Minus,
+    Power,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -64,6 +65,7 @@ impl Cmd {
                         Op::Plus => eq.plus_to_both(new_expr),
                         Op::Div => eq.div_to_both(new_expr),
                         Op::Minus => eq.minus_to_both(new_expr),
+                        Op::Power => eq.power_to_both(new_expr),
                     }
                     Ok(Return::Math(Math::Eq(eq)))
                 } else {
@@ -182,6 +184,10 @@ impl str::FromStr for Cmd {
                 let rest = &s[1..].trim();
                 let expr = Expression::from_str(rest)?;
                 Ok(Cmd::Map(Op::Times, expr))
+            } else if s.starts_with("^") {
+                let rest = &s[1..].trim();
+                let expr = Expression::from_str(rest)?;
+                Ok(Cmd::Map(Op::Power, expr))
             } else if s.starts_with("$") {
                 Ok(Cmd::New(Math::from_str(&s[1..].trim())?))
             } else if s.starts_with("code") {
