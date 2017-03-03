@@ -17,6 +17,9 @@
   <body>
     <div id="repl"></div>
     <button class="btn btn-default btn-sm" type="button" onclick="sendOutputLatex()">Get Checked Math as LaTeX</button>
+    <button class="btn btn-default btn-sm" type="button" onclick="downloadSession()">Download Session</button>
+    <input type="file" id="loadsessioninput" onchange="loadSession(this.files[0])" style="display:none">
+    <button class="btn btn-default btn-sm" type="button" onclick="$('#loadsessioninput').click()">Load Session</button>
     <button class="btn btn-default btn-sm" type="button" data-toggle="modal" data-target="#feedbackModal">Send feedback!</button>
     <div class="modal fade" id="feedbackModal" tabindex="-1" role="dialog" aria-labelledby="feedbackModalLabel">
       <div class="modal-dialog" role="document">

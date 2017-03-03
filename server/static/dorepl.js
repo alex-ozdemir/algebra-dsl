@@ -28,6 +28,7 @@ var currentCM = null;
 var CMhistory = []; //stores references to all the old CM instances
 var isMousePressed = false;
 var mousePressAnchor = null;
+var batchCommands = [];
 
 $(document).ready(function() {
     $('#feedbackModal').on('shown.bs.modal', function () {
@@ -72,8 +73,6 @@ function createCM() {
     cm.on('keydown',  solidifySelection);
     cm.on('mousedown',  solidifySelection);
 
-    //cm.on('keydown',  solidifyCurrent);
-    //cm.on('mousedown',  solidifyCurrent);
     return cm;
 }
 
@@ -203,11 +202,16 @@ function globalMouseUpCallback(event) {
     mousePressAnchor = null;
 }
 
-function addMathCallbacks(mathBox) {
-    mathBox.addEventListener("mousedown", mouseDownCallback);
-    mathBox.addEventListener("mouseup", mouseUpCallback);
+function addMathCallbacks(where) {
+    console.log("Adding");
+    console.log(where);
+    where.addEventListener("mousedown", mouseDownCallback);
+    where.addEventListener("mouseup", mouseUpCallback);
 }
 function removeMathCallbacks(where) {
+    console.log("Removing");
+    console.log(where);
+
     where.removeEventListener("mousedown", mouseDownCallback);
     where.removeEventListener("mouseup", mouseUpCallback);
 }
@@ -215,8 +219,6 @@ function removeMathCallbacks(where) {
 
 socket.onmessage = function(event) {
     var data = event.data;
-
-    var codeMirrorInitialContents = '';
 
     var atIdx = data.indexOf('@');
     if (atIdx === -1) {
@@ -231,44 +233,6 @@ socket.onmessage = function(event) {
         console.log("Server sent bad data: Only one @ symbol");
         return;
     }
-    var type = rest.substr(0, atIdx);
-    var rest = rest.substr(atIdx+1);
-
-    // Print out the latex or error or text response from server
-
-    if (type === 'LaTeX') {
-        var box = document.createElement('textarea');
-        box.className = 'latexoutputbox'
-        var text = document.createTextNode(rest);
-        box.appendChild(text);
-        box.readOnly = true;
-
-        $(box).on('focus', function(){this.select()});
-        document.getElementById('repl').appendChild(box);
-
-        box.style.height = (box.scrollHeight)+"px";
-    } else if (type === 'Err') {
-        var errDiv = document.createElement('div');
-        errDiv.className = 'output';
-
-        errDiv.className += ' algebra-dsl-error';
-        errDiv.innerHTML = rest;
-        document.getElementById('repl').appendChild(errDiv);
-    } else if (type === 'Re') {
-      var reDiv = document.createElement('div');
-      reDiv.className = 'output';
-      reDiv.className += ' response-from-server';
-      reDiv.innerHTML = rest;
-      document.getElementById('repl').appendChild(reDiv);
-    } else if (type === 'Input') {
-        var atIdx = rest.indexOf('@');
-        if (atIdx === -1) {
-            console.log("Server sent bad data: Only two @ symbols in `Input`");
-            return;
-        }
-        codeMirrorInitialContents = "$ " + rest.substr(0, atIdx);
-        rest = rest.substr(atIdx + 1);
-    }
 
     if (formulaNum > 0) {
         var prevFormula = document.getElementById('formula'+(formulaNum-1));
@@ -277,80 +241,126 @@ socket.onmessage = function(event) {
         }
     }
 
-    var prevMath = null;
+    var type = rest.substr(0, atIdx);
+    var rest = rest.substr(atIdx+1);
 
+    var cm = createCM();
+
+    // Print out the latex or error or text response from server
+    if (type === 'LaTeX') {
+        var box = document.createElement('textarea');
+        box.className = 'latexoutputbox'
+        var text = document.createTextNode(rest);
+        box.appendChild(text);
+        box.readOnly = true;
+        $(box).on('focus', function(){this.select()});
+
+        document.getElementById('repl').insertBefore(box, cm.getWrapperElement());
+
+        // Needs to be set after it's in the real dom tree so that scrollHeight
+        // is correct
+        box.style.height = (box.scrollHeight)+"px";
+    } else if (type === 'Err') {
+        var errDiv = document.createElement('div');
+        errDiv.className = 'output';
+
+        errDiv.className += ' algebra-dsl-error';
+        errDiv.innerHTML = rest;
+        document.getElementById('repl').insertBefore(errDiv, cm.getWrapperElement());
+    } else if (type === 'Re') {
+        var reDiv = document.createElement('div');
+        reDiv.className = 'output';
+        reDiv.className += ' response-from-server';
+        reDiv.innerHTML = rest;
+        document.getElementById('repl').insertBefore(reDiv, cm.getWrapperElement());
+    } else if (type === 'Input') {
+        var atIdx = rest.indexOf('@');
+        if (atIdx === -1) {
+            console.log("Server sent bad data: Only two @ symbols in `Input`");
+            return;
+        }
+
+        var startVal = "$ " + rest.substr(0, atIdx);
+        cm.setValue(startVal);
+        cm.setCursor({line: 0, ch: startVal.length});
+        rest = rest.substr(atIdx + 1);
+    }
+
+    // Print out the current math
     if (type === 'Math' || type === 'Input') {
+        // Contains the checkbox, math, and buttons
         var fullDiv = document.createElement('div');
         fullDiv.className = 'output math-output';
         fullDiv.id = 'mathout'+formulaNum;
+        fullDiv.className += ' new-math-output';
+        // Hide until the math is done typesetting
+        fullDiv.style.display = 'none';
 
         var checkbox = document.createElement('input');
         checkbox.setAttribute('type', 'checkbox');
         fullDiv.appendChild(checkbox);
+        checkbox.checked = true;
 
         var mathBox = document.createElement('span');
         mathBox.id = 'formula'+formulaNum;
         mathBox.className += ' output disable-highlight';
-
         mathBox.innerHTML = rest;
-
-        fullDiv.className += ' new-math-output';
-
-        checkbox.checked = true;
-
+        addMathCallbacks(mathBox);
         fullDiv.appendChild(mathBox);
-
-        fullDiv.style.display = 'none';
-
-        document.getElementById('repl').appendChild(fullDiv);
-        // Handle Actual Formula
-        MathJax.Hub.Queue(["Typeset", MathJax.Hub, mathBox.id]);
-        MathJax.Hub.Queue([onFinishTypesetting, mathBox, fullDiv]);
 
         createRecoverButtom(fullDiv);
         createGetCodeButton(fullDiv);
+
+        cm.prevOutput = fullDiv;
+
+        document.getElementById('repl').insertBefore(fullDiv, cm.getWrapperElement());
+
+        // Handle Actual Formula
+        MathJax.Hub.Queue(["Typeset", MathJax.Hub, mathBox.id]);
+        MathJax.Hub.Queue([onFinishTypesetting, mathBox, fullDiv, cm]);
     } else {
         var prevOut = document.getElementById('mathout'+(formulaNum-1));
         if (prevOut && (prevOut.childNodes[1].tagName.toLowerCase() == "span" && prevOut.childNodes.length > 1)) {
+
+            // Contains the checkbox, math, and buttons
             var fullDiv = document.createElement('div');
             fullDiv.className = 'output math-output';
             fullDiv.id = 'mathout'+formulaNum;
-            document.getElementById('repl').appendChild(fullDiv);
 
             var checkbox = document.createElement('input');
             checkbox.setAttribute('type', 'checkbox');
             fullDiv.appendChild(checkbox);
+            checkbox.checked = false;
 
             var mathBox = prevOut.childNodes[1].cloneNode(true);
             mathBox.id = 'formula'+formulaNum;
+            addMathCallbacks(mathBox);
 
             var subNodes = mathBox.getElementsByTagName('*');
-
             for (var i=0; i<subNodes.length; i++) {
                 subNodes[i].removeAttribute('selected');
                 subNodes[i].removeAttribute('highlighted');
             }
-
-            addMathCallbacks(mathBox);
-            prevMath = mathBox.cloneNode(true);
-
+            cm.prevMath = mathBox.cloneNode(true);
             fullDiv.appendChild(mathBox);
 
             createRecoverButtom(fullDiv);
             createGetCodeButton(fullDiv);
+
+            cm.prevOutput = fullDiv;
+
+            document.getElementById('repl').insertBefore(fullDiv, cm.getWrapperElement());
+
+            replaceAllMathTags(cm);
         } else {
-            codeMirrorInitialContents = "$ ";
+            cm.setValue("$ ");
+            cm.setCursor({line: 0, ch: 2});
         }
     }
 
-    var cm = createCM();
-    cm.prevMath = prevMath;
-    cm.prevOutput = fullDiv;
-
-    cm.setValue(codeMirrorInitialContents);
-    cm.setCursor({line: 0, ch: codeMirrorInitialContents.length});
-
     currentCM = cm;
+
+    executeBatchCommands(cm);
 };
 
 function createRecoverButtom(fullDiv) {
@@ -380,9 +390,10 @@ function createRecoverButtom(fullDiv) {
             }
         }
 
-        currentCM.setValue(tosend);
+        var cm = currentCM;
 
-        sendToServer(currentCM);
+        cm.setValue(tosend);
+        sendToServer(cm);
     });
     fullDiv.appendChild(recoverButton);
 }
@@ -413,10 +424,9 @@ function createGetCodeButton(fullDiv) {
                 break;
             }
         }
-
-        currentCM.setValue(tosend);
-
-        sendToServer(currentCM);
+        var cm = currentCM;
+        cm.setValue(tosend);
+        sendToServer(cm);
     });
     fullDiv.appendChild(getcodeButton);
 }
@@ -465,7 +475,7 @@ function solidifySelection(cm) {
     if (cm.selectedDOM) {
         cm.selectedDOM = null;
         cm.selectedTextMarker = null;
-        replaceAllMathTags(cm, {origin: 'solidify'});
+        replaceAllMathTags(cm);
     }
 }
 
@@ -476,10 +486,13 @@ function onFinishTypesetting(element, fullDiv, nextcm) {
         maths.item(0).remove();
     }
 
-    addMathCallbacks(element);
-    currentCM.prevMath = element.cloneNode(true);
-
     fullDiv.style.display = 'block';
+
+    nextcm.prevMath = element.cloneNode(true);
+
+    // In case the user (or a batch command) types tags before we got done
+    // typesetting it
+    replaceAllMathTags(nextcm);
 }
 
 function replaceAllMathTags(cm, changeObj) {
@@ -491,7 +504,9 @@ function replaceAllMathTags(cm, changeObj) {
 
     var prevOutput = $(cm.prevOutput).children(".output")[0];
     var prevMathBoxClone = cm.prevMath.cloneNode(true);
-    addMathCallbacks(prevMathBoxClone);
+    if (cm === currentCM) {
+        addMathCallbacks(prevMathBoxClone);
+    }
 
     var oldMarks = cm.getAllMarks();
     for (var i=0; i<oldMarks.length; i++) {
@@ -534,7 +549,13 @@ function replaceAllMathTags(cm, changeObj) {
 
         var elementToAddHoverTo;
 
-        if (changeObj.origin === 'click' && tagStartPos.line === changeObj.from.line && tagStartPos.ch === changeObj.from.ch) {
+        var changeAddedThisTag = changeObj
+            && changeObj.origin === 'click'
+            && tagStartPos.line === changeObj.from.line
+            && tagStartPos.ch === changeObj.from.ch;
+
+        if (changeAddedThisTag) {
+
             mathInOut.setAttribute('selected', 'true');
             mathInOut.setAttribute('highlighted', color);
             cm.selectedDOM = mathInOut;
@@ -573,11 +594,12 @@ function replaceAllMathTags(cm, changeObj) {
             toInsert.addEventListener("mouseleave", toInsert.mouseLeaveListener);
         })(elementToAddHoverTo);
 
-        var marker = cm.selectedTextMarker = cm.markText(
+        var marker = cm.markText(
                 tagStartPos,
                 cm.posFromIndex(tagEndIdx+1),
                 {replacedWith: toInsert});
-        if (changeObj.origin === 'click' && tagStartIdx === changeObj.from) {
+
+        if (changeAddedThisTag) {
             cm.selectedTextMarker = marker;
         }
     }
@@ -585,9 +607,20 @@ function replaceAllMathTags(cm, changeObj) {
     cm.prevOutput.replaceChild(prevMathBoxClone, prevOutput);
 }
 
+function executeBatchCommands(cm) {
+    let cmd;
+    do {
+        cmd = batchCommands.shift();
+        if (typeof cmd !== 'string') {
+            return;
+        }
+    } while(cmd === '');
+
+    cm.setValue(cmd);
+    sendToServer(cm);
+}
+
 function sendOutputLatex() {
-
-
     var tosend = "output ";
 
     var cns = document.getElementById('repl').childNodes;
@@ -610,40 +643,40 @@ function sendOutputLatex() {
         }
     }
 
-    currentCM.setValue(tosend);
-
-    sendToServer(currentCM);
+    var cm = currentCM;
+    cm.setValue(tosend);
+    sendToServer(cm);
 }
 
-function reclaimDown() {
-    var len = currentCM.history.length;
+function reclaimDown(cm) {
+    var len = cm.history.length;
     //don't try this on the first box
     if (len < 2) {
         return;
     }
-    currentCM.loc += -1;
-    if (currentCM.loc < 0) {
-        currentCM.loc = 0;
+    cm.loc += -1;
+    if (cm.loc < 0) {
+        cm.loc = 0;
     } else {
-        currentCM.history[len-2-currentCM.loc] = currentCM.getValue();
-        currentCM.setValue(currentCM.history[len-1-currentCM.loc]);
-        currentCM.setCursor({line: 0, ch: currentCM.getValue().length});
+        cm.history[len-2-cm.loc] = cm.getValue();
+        cm.setValue(cm.history[len-1-cm.loc]);
+        cm.setCursor({line: 0, ch: cm.getValue().length});
     }
 }
 
-function reclaimUp() {
-    var len = currentCM.history.length;
+function reclaimUp(cm) {
+    var len = cm.history.length;
     //don't try this on the first box
     if (len < 2) {
         return;
     }
-    currentCM.loc += 1;
-    if (currentCM.loc >= len){
-        currentCM.loc = len - 1;
+    cm.loc += 1;
+    if (cm.loc >= len){
+        cm.loc = len - 1;
     } else {
-        currentCM.history[len-currentCM.loc] = currentCM.getValue();
-        currentCM.setValue(currentCM.history[len-1-currentCM.loc]);
-        currentCM.setCursor({line: 0, ch: currentCM.getValue().length});
+        cm.history[len-cm.loc] = cm.getValue();
+        cm.setValue(cm.history[len-1-cm.loc]);
+        cm.setCursor({line: 0, ch: cm.getValue().length});
     }
 }
 
@@ -655,4 +688,43 @@ function sendFeedback() {
     socket.send(msg);
 
     document.getElementById('feedbackText').value = '';
+}
+
+function downloadSession() {
+    var allBoxData = [];
+    for (var i=0; i<CMhistory.length; i++) {
+        allBoxData.push(CMhistory[i].getValue() + '\n');
+    }
+
+    var file = new Blob(allBoxData, {type: 'txt'});
+    var defaultfilename = "khwarizmi-session.txt";
+
+    if (window.navigator.msSaveOrOpenBlob)
+        // IE10+
+        window.navigator.msSaveOrOpenBlob(file, defaultfilename);
+    else {
+        // Other browers
+        var url = URL.createObjectURL(file);
+
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = defaultfilename;
+        document.body.appendChild(a);
+
+        a.click();
+        setTimeout(function() {
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }, 0);
+    }
+}
+
+function loadSession(file) {
+    var fr = new FileReader();
+    fr.onload = function(e) {
+        var lines = e.target.result.split('\n');
+        batchCommands = lines;
+        executeBatchCommands(currentCM);
+    };
+    fr.readAsText(file);
 }

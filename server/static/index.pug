@@ -32,6 +32,9 @@ html
   body
     #repl
     button(type="button" class="btn btn-default btn-sm" onclick="sendOutputLatex()") Get Checked Math as LaTeX
+    button(type="button" class="btn btn-default btn-sm" onclick="downloadSession()") Download Session
+    input(type="file" id="loadsessioninput" onchange="loadSession(this.files[0])" style="display:none")
+    button(type="button" class="btn btn-default btn-sm" onclick="$('#loadsessioninput').click()") Load Session
     button(type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#feedbackModal") Send feedback!
 
     div(class="modal fade" id="feedbackModal" tabindex="-1" role="dialog" aria-labelledby="feedbackModalLabel")
