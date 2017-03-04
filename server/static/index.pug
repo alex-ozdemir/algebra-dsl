@@ -55,7 +55,17 @@ html
             button.close(type='button', data-dismiss='modal', aria-hidden='true') ×
             h4.modal-title Connection Closed
           .modal-body
-            p.text-warning The connection to the server was lost
+            p.text-warning The connection to the server was lost.
+          .modal-footer
+            button.btn.btn-primary(type='button', data-dismiss='modal') Close
+    #connectionerrormodal.modal.fade
+      .modal-dialog.modal-sm
+        .modal-content
+          .modal-header
+            button.close(type='button', data-dismiss='modal', aria-hidden='true') ×
+            h4.modal-title Connection Error
+          .modal-body
+            p.text-warning There was an error in the connection to the server.
           .modal-footer
             button.btn.btn-primary(type='button', data-dismiss='modal') Close
 

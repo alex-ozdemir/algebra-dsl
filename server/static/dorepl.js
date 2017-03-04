@@ -333,6 +333,10 @@ socket.onclose = function(event) {
     $('#connectionlostmodal').modal('show');
 }
 
+socket.onerror = function(event) {
+    $('#connectionerrormodal').modal('show');
+}
+
 function createRecoverButtom(fullDiv) {
     var recoverButton = document.createElement('button');
     const recoverClass = "recover";
