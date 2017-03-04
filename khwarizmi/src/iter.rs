@@ -28,8 +28,9 @@ impl<'a> Iterator for ChildIter<'a> {
             MathRef::Ex(&Ex::Negation(box ref e)) if idx == 0 => Some(e),
             MathRef::Ex(&Ex::Sum(ref es)) if idx < es.len() => Some(&es[idx]),
             MathRef::Ex(&Ex::Division(ref t, _)) if idx < t.len() => Some(&t[idx]),
-            MathRef::Ex(&Ex::Division(ref t, ref b)) if idx - t.len() < b.len() =>
-                Some(&b[idx - t.len()]),
+            MathRef::Ex(&Ex::Division(ref t, ref b)) if idx - t.len() < b.len() => {
+                Some(&b[idx - t.len()])
+            }
             MathRef::Ex(&Ex::Power(box ref b, _)) if idx == 0 => Some(b),
             MathRef::Ex(&Ex::Power(_, box ref e)) if idx == 1 => Some(e),
             MathRef::Ex(&Ex::Subscript(box ref b, _)) if idx == 0 => Some(b),
@@ -52,7 +53,9 @@ impl<'a> Iterator for ChildIter<'a> {
             _ => None,
         };
         let idx_and_res = res.map(|r| (override_idx.clone().unwrap_or(idx), r));
-        override_idx.map(|i| {self.next_idx = i;});
+        override_idx.map(|i| {
+            self.next_idx = i;
+        });
         self.next_idx += 1;
         idx_and_res
     }
@@ -72,7 +75,7 @@ impl<'a> ExpressionIter<'a> {
             unemitted_root: match e {
                 MathRef::Ex(ex) => Some(ex),
                 MathRef::Eq(_) => None,
-            }
+            },
         }
     }
 }

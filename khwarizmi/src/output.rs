@@ -61,7 +61,10 @@ impl Math {
                     &Math::Eq(ref eq) => {
                         fmt_as_latex(&eq.left, f, (&eq.left, false, true), LaTeXOutputType::ForUs)?;
                         write!(f, " = ")?;
-                        fmt_as_latex(&eq.right, f, (&eq.right, false, true), LaTeXOutputType::ForUs)?;
+                        fmt_as_latex(&eq.right,
+                                     f,
+                                     (&eq.right, false, true),
+                                     LaTeXOutputType::ForUs)?;
                     }
                     &Math::Ex(ref ex) => {
                         fmt_as_latex(&ex, f, (&ex, false, true), LaTeXOutputType::ForUs)?;
@@ -88,9 +91,15 @@ impl LatexWriter {
                 write!(f, "  ")?;
                 match self.0 {
                     &Math::Eq(ref eq) => {
-                        fmt_as_latex(&eq.left, f, (&eq.left, false, true), LaTeXOutputType::ForOther)?;
+                        fmt_as_latex(&eq.left,
+                                     f,
+                                     (&eq.left, false, true),
+                                     LaTeXOutputType::ForOther)?;
                         write!(f, " &= ")?;
-                        fmt_as_latex(&eq.right, f, (&eq.right, false, true), LaTeXOutputType::ForOther)?;
+                        fmt_as_latex(&eq.right,
+                                     f,
+                                     (&eq.right, false, true),
+                                     LaTeXOutputType::ForOther)?;
                     }
                     &Math::Ex(ref ex) => {
                         fmt_as_latex(&ex, f, (&ex, false, true), LaTeXOutputType::ForOther)?;
@@ -131,7 +140,7 @@ fn capture(expr1: &Expression, expr2: &Expression, alt: bool, top: bool) -> bool
             }
             ref d @ &Expression::Division(_, _) if d.is_product() => {
                 match expr2 {
-                    ref d2 @ &Expression::Division(_,_) if d2.is_product() => true,
+                    ref d2 @ &Expression::Division(_, _) if d2.is_product() => true,
                     &Expression::Sum(_) => true,
                     &Expression::Negation(_) => true,
                     _ => false,
@@ -155,7 +164,7 @@ fn capture(expr1: &Expression, expr2: &Expression, alt: bool, top: bool) -> bool
             }
             &Expression::Division(_, ref d) => {
                 match expr2 {
-                    ref d2 @ &Expression::Division(_,_) if d2.is_product() => true,
+                    ref d2 @ &Expression::Division(_, _) if d2.is_product() => true,
                     &Expression::Sum(_) |
                     &Expression::Negation(_) => d.len() > 1,
                     _ => false,
@@ -208,7 +217,7 @@ fn capture(expr1: &Expression, expr2: &Expression, alt: bool, top: bool) -> bool
             }
             &Expression::Division(ref n, _) => {
                 match expr2 {
-                    ref d2 @ &Expression::Division(_,_) if d2.is_product() => true,
+                    ref d2 @ &Expression::Division(_, _) if d2.is_product() => true,
                     &Expression::Sum(_) |
                     &Expression::Negation(_) => n.len() > 1,
                     _ => false,
@@ -246,9 +255,10 @@ fn fmt_prod_as_math_ml(exprs: &[Expression],
             match e_next {
                 &Expression::Atom(Atom::Floating(_)) |
                 &Expression::Atom(Atom::Natural(_)) |
-                &Expression::Power(box Expression::Atom(Atom::Floating(_)),_) |
-                &Expression::Power(box Expression::Atom(Atom::Natural(_)),_)
-                    => write!(f, "<mo>&#x022C5;</mo>")?,
+                &Expression::Power(box Expression::Atom(Atom::Floating(_)), _) |
+                &Expression::Power(box Expression::Atom(Atom::Natural(_)), _) => {
+                    write!(f, "<mo>&#x022C5;</mo>")?
+                }
                 _ => write!(f, "<mo>&#8290;</mo>")?,
             };
         }
@@ -261,11 +271,15 @@ fn fmt_as_math_ml(expr: &Expression,
                   prev_index: &str,
                   prev_precedence: (&Expression, bool, bool))
                   -> Result<(), fmt::Error> {
-    write!(f, "<{} mathTreeNode=\"{}\"{}>", MROW, prev_index, match expr {
-        &Expression::Sum(..)                            => " multiparent=\"true\"",
-        &Expression::Division(_, ref b) if b.len() == 0 => " multiparent=\"true\"",
-        _ => "",
-    })?;
+    write!(f,
+           "<{} mathTreeNode=\"{}\"{}>",
+           MROW,
+           prev_index,
+           match expr {
+               &Expression::Sum(..) => " multiparent=\"true\"",
+               &Expression::Division(_, ref b) if b.len() == 0 => " multiparent=\"true\"",
+               _ => "",
+           })?;
 
     if capture(prev_precedence.0,
                expr,
@@ -458,8 +472,10 @@ fn fmt_prod_as_latex(exprs: &[Expression],
             match e_next {
                 &Expression::Atom(Atom::Floating(_)) |
                 &Expression::Atom(Atom::Natural(_)) |
-                &Expression::Power(box Expression::Atom(Atom::Floating(_)),_) |
-                &Expression::Power(box Expression::Atom(Atom::Natural(_)),_) => write!(f, "\\cdot")?,
+                &Expression::Power(box Expression::Atom(Atom::Floating(_)), _) |
+                &Expression::Power(box Expression::Atom(Atom::Natural(_)), _) => {
+                    write!(f, "\\cdot")?
+                }
                 _ => {}
             };
         }
@@ -490,7 +506,7 @@ fn fmt_as_latex(expr: &Expression,
                 &Atom::Symbol(sym) => write!(f, "{} ", sym.as_latex())?,
                 &Atom::Escaped(ref s) => {
                     match output {
-                        LaTeXOutputType::ForUs    => write!(f, "%{}%", s),
+                        LaTeXOutputType::ForUs => write!(f, "%{}%", s),
                         LaTeXOutputType::ForOther => write!(f, "{}", s),
                     }?
                 }

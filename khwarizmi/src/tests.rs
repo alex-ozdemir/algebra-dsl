@@ -82,9 +82,7 @@ fn format_sub() {
 
 #[test]
 fn format_add() {
-    let expr = Ex::Sum(vec![var('x'),
-                            var('y'),
-                            var('z')]);
+    let expr = Ex::Sum(vec![var('x'), var('y'), var('z')]);
     let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
                     mathTreeNode=\"0\" multiparent=\"true\"><mrow \
                     mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
@@ -98,24 +96,20 @@ fn format_add() {
 fn format_add_w_paren() {
     let expr = Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('x')),
                             Ex::Sum(vec![Ex::Atom(Atom::PlainVariable('y')),
-                            Ex::Atom(Atom::PlainVariable('z'))])]);
-    let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                    mathTreeNode=\"0\" multiparent=\"true\"><mrow \
-                    mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
-                    mathTreeNode=\"0,1\" multiparent=\"true\"><mo form=\"prefix\">(</mo><mrow \
-                    mathTreeNode=\"0,1,0\"><mi>y</mi></mrow><mo>+</mo><mrow \
-                    mathTreeNode=\"0,1,1\"><mi>z</mi></mrow><mo form=\"postfix\">)</mo>\
-                    </mrow></mrow></math>";
+                                         Ex::Atom(Atom::PlainVariable('z'))])]);
+    let expected =
+        "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\" \
+         multiparent=\"true\"><mrow mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
+         mathTreeNode=\"0,1\" multiparent=\"true\"><mo form=\"prefix\">(</mo><mrow \
+         mathTreeNode=\"0,1,0\"><mi>y</mi></mrow><mo>+</mo><mrow \
+         mathTreeNode=\"0,1,1\"><mi>z</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
     let test = format!("{}", expr);
     assert_expected_eq_actual!(expected, test);
 }
 
 #[test]
 fn format_prod() {
-    let expr = Ex::Division(vec![var('x'),
-                                var('y'),
-                                var('z')],
-                            vec![]);
+    let expr = Ex::Division(vec![var('x'), var('y'), var('z')], vec![]);
     let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
                     mathTreeNode=\"0\" multiparent=\"true\"><mrow \
                     mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
@@ -128,32 +122,33 @@ fn format_prod() {
 #[test]
 fn format_prod_w_paren() {
     let expr = Ex::Division(vec![Ex::Atom(Atom::PlainVariable('x')),
-                            Ex::Division(vec![Ex::Atom(Atom::PlainVariable('y')),
-                            Ex::Atom(Atom::PlainVariable('z'))],vec![])],vec![]);
-    let expected = "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow \
-                    mathTreeNode=\"0\" multiparent=\"true\"><mrow \
-                    mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
-                    mathTreeNode=\"0,1\" multiparent=\"true\"><mo form=\"prefix\">(</mo><mrow \
-                    mathTreeNode=\"0,1,0\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow \
-                    mathTreeNode=\"0,1,1\"><mi>z</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
+                                 Ex::Division(vec![Ex::Atom(Atom::PlainVariable('y')),
+                                                   Ex::Atom(Atom::PlainVariable('z'))],
+                                              vec![])],
+                            vec![]);
+    let expected =
+        "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\" \
+         multiparent=\"true\"><mrow mathTreeNode=\"0,0\"><mi>x</mi></mrow><mo>&#8290;</mo><mrow \
+         mathTreeNode=\"0,1\" multiparent=\"true\"><mo form=\"prefix\">(</mo><mrow \
+         mathTreeNode=\"0,1,0\"><mi>y</mi></mrow><mo>&#8290;</mo><mrow \
+         mathTreeNode=\"0,1,1\"><mi>z</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
     let test = format!("{}", expr);
     assert_expected_eq_actual!(expected, test);
 }
 
 #[test]
 fn format_prod_add() {
-    let expr = Ex::Division(vec![Ex::Sum(vec![var('x'),
-                                             var('y')]),
-                                Ex::Sum(vec![var('z'),
-                                             var('a')])],
+    let expr = Ex::Division(vec![Ex::Sum(vec![var('x'), var('y')]),
+                                 Ex::Sum(vec![var('z'), var('a')])],
                             vec![]);
     let expected =
-        "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\" multiparent=\"true\"><mrow \
-         mathTreeNode=\"0,0\" multiparent=\"true\"><mo form=\"prefix\">(</mo><mrow \
-         mathTreeNode=\"0,0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
+        "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mrow mathTreeNode=\"0\" \
+         multiparent=\"true\"><mrow mathTreeNode=\"0,0\" multiparent=\"true\"><mo \
+         form=\"prefix\">(</mo><mrow mathTreeNode=\"0,0,0\"><mi>x</mi></mrow><mo>+</mo><mrow \
          mathTreeNode=\"0,0,1\"><mi>y</mi></mrow><mo \
-         form=\"postfix\">)</mo></mrow><mo>&#8290;</mo><mrow mathTreeNode=\"0,1\" multiparent=\"true\"><mo \
-         form=\"prefix\">(</mo><mrow mathTreeNode=\"0,1,0\"><mi>z</mi></mrow><mo>+</mo><mrow \
+         form=\"postfix\">)</mo></mrow><mo>&#8290;</mo><mrow mathTreeNode=\"0,1\" \
+         multiparent=\"true\"><mo form=\"prefix\">(</mo><mrow \
+         mathTreeNode=\"0,1,0\"><mi>z</mi></mrow><mo>+</mo><mrow \
          mathTreeNode=\"0,1,1\"><mi>a</mi></mrow><mo form=\"postfix\">)</mo></mrow></mrow></math>";
     let test = format!("{}", expr);
     assert_expected_eq_actual!(expected, test);
@@ -161,11 +156,7 @@ fn format_prod_add() {
 
 #[test]
 fn replace_siblings() {
-    let mut before = Ex::Division(vec![nat(3),
-                                      nat(4),
-                                      var('x'),
-                                      nat(7)],
-                                  vec![]);
+    let mut before = Ex::Division(vec![nat(3), nat(4), var('x'), nat(7)], vec![]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
     let after = Ex::Division(vec![nat(84), var('x')], vec![]);
     let indices: Vec<_> =
@@ -179,10 +170,7 @@ fn replace_siblings() {
 
 #[test]
 fn replace_division_all_top() {
-    let mut before = Ex::Division(vec![nat(3),
-                                      nat(4),
-                                      nat(7)],
-                                  vec![]);
+    let mut before = Ex::Division(vec![nat(3), nat(4), nat(7)], vec![]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,2)"];
     let after = nat(84);
     let indices: Vec<_> =
@@ -195,14 +183,9 @@ fn replace_division_all_top() {
 
 #[test]
 fn replace_division_end_of_top() {
-    let mut before = Ex::Division(vec![nat(3),
-                                      nat(4),
-                                      nat(7)],
-                                  vec![]);
+    let mut before = Ex::Division(vec![nat(3), nat(4), nat(7)], vec![]);
     let index_strings = vec!["#(mtn:0,1)", "#(mtn:0,2)"];
-    let after = Ex::Division(vec![nat(3),
-                                   nat(21)],
-                             vec![]);
+    let after = Ex::Division(vec![nat(3), nat(21)], vec![]);
     let indices: Vec<_> =
         index_strings.into_iter().map(TreeIdx::from_str).map(Result::unwrap).collect();
     let siblings = before.make_siblings(indices.as_slice()).unwrap();
@@ -213,14 +196,9 @@ fn replace_division_end_of_top() {
 
 #[test]
 fn replace_division_all_bottom() {
-    let mut before = Ex::Division(vec![nat(3),
-                                       nat(4)],
-                                  vec![nat(6),
-                                       nat(7)]);
+    let mut before = Ex::Division(vec![nat(3), nat(4)], vec![nat(6), nat(7)]);
     let index_strings = vec!["#(mtn:0,2)", "#(mtn:0,3)"];
-    let after = Ex::Division(vec![nat(3),
-                                  nat(4)],
-                             vec![nat(42)]);
+    let after = Ex::Division(vec![nat(3), nat(4)], vec![nat(42)]);
     let indices: Vec<_> =
         index_strings.into_iter().map(TreeIdx::from_str).map(Result::unwrap).collect();
     let siblings = before.make_siblings(indices.as_slice()).unwrap();
@@ -231,18 +209,9 @@ fn replace_division_all_bottom() {
 
 #[test]
 fn replace_division_mid_top_mid_bottom() {
-    let mut before = Ex::Division(vec![nat(3),
-                                       nat(4),
-                                       nat(4)],
-                                  vec![nat(6),
-                                       nat(4),
-                                       nat(7)]);
+    let mut before = Ex::Division(vec![nat(3), nat(4), nat(4)], vec![nat(6), nat(4), nat(7)]);
     let index_strings = vec!["#(mtn:0,1)", "#(mtn:0,4)"];
-    let after = Ex::Division(vec![nat(3),
-                                  nat(42),
-                                  nat(4)],
-                             vec![nat(6),
-                                  nat(7)]);
+    let after = Ex::Division(vec![nat(3), nat(42), nat(4)], vec![nat(6), nat(7)]);
     let indices: Vec<_> =
         index_strings.into_iter().map(TreeIdx::from_str).map(Result::unwrap).collect();
     let siblings = before.make_siblings(indices.as_slice()).unwrap();
@@ -253,10 +222,7 @@ fn replace_division_mid_top_mid_bottom() {
 
 #[test]
 fn replace_siblings_sum() {
-    let mut before = Ex::Sum(vec![nat(3),
-                                  nat(4),
-                                  var('x'),
-                                  nat(7)]);
+    let mut before = Ex::Sum(vec![nat(3), nat(4), var('x'), nat(7)]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
     let after = Ex::Sum(vec![nat(84), var('x')]);
     let indices: Vec<_> =
@@ -270,49 +236,32 @@ fn replace_siblings_sum() {
 
 #[test]
 fn delete_expr() {
-    let mut before = Ex::Division(vec![nat(3),
-                                      nat(4),
-                                      var('x'),
-                                      nat(7)],
-                                  vec![]);
+    let mut before = Ex::Division(vec![nat(3), nat(4), var('x'), nat(7)], vec![]);
     let v = vec![TreeIdx::from_str("#(mtn:0,1)").unwrap()];
     let idx = before.make_siblings(v.as_slice()).unwrap();
-    let after = Ex::Division(vec![nat(3),
-                                 var('x'),
-                                 nat(7)],
-                             vec![]);
+    let after = Ex::Division(vec![nat(3), var('x'), nat(7)], vec![]);
     before.delete(idx).unwrap();
     assert_expected_eq_actual!(after, before);
 }
 
 #[test]
 fn simplify_product() {
-    let before = Ex::Division(vec![nat(3),
-                                  nat(4),
-                                  nat(7)],
-                              vec![]);
+    let before = Ex::Division(vec![nat(3), nat(4), nat(7)], vec![]);
     let after = nat(84);
     assert_expected_eq_actual!(after, before.simplify_constants());
 
-    let before = Ex::Division(vec![nat(3),
-                                  float(4.0),
-                                  nat(7)],
-                              vec![]);
+    let before = Ex::Division(vec![nat(3), float(4.0), nat(7)], vec![]);
     let after = float(84.0);
     assert_expected_eq_actual!(after, before.simplify_constants());
 }
 
 #[test]
 fn simplify_sum() {
-    let before = Ex::Sum(vec![nat(3),
-                              nat(4),
-                              nat(7)]);
+    let before = Ex::Sum(vec![nat(3), nat(4), nat(7)]);
     let after = nat(14);
     assert_expected_eq_actual!(after, before.simplify_constants());
 
-    let before = Ex::Sum(vec![nat(3),
-                              float(4.0),
-                              nat(7)]);
+    let before = Ex::Sum(vec![nat(3), float(4.0), nat(7)]);
     let after = float(14.0);
     assert_expected_eq_actual!(after, before.simplify_constants());
 }
@@ -374,8 +323,14 @@ fn make_in_denominator_flatten() {
 
 #[test]
 fn subtract_to_0() {
-    let mut b = Eq{ left: var('x'), right: nat(-5) };
-    let a = Eq{ left: Ex::Sum(vec![var('x'), nat(5)]), right: nat(0) };
+    let mut b = Eq {
+        left: var('x'),
+        right: nat(-5),
+    };
+    let a = Eq {
+        left: Ex::Sum(vec![var('x'), nat(5)]),
+        right: nat(0),
+    };
     b.plus_to_both(nat(5));
     b = b.simplify_constants();
     assert_expected_eq_actual!(a, b);
@@ -394,7 +349,10 @@ fn simple_ex_iter_test() {
 
 #[test]
 fn simple_eq_iter_test() {
-    let equation = Eq{ left: var('x'), right: nat(5)};
+    let equation = Eq {
+        left: var('x'),
+        right: nat(5),
+    };
     let mut count = 0;
     for (idx, e) in equation.expr_iter() {
         count += 1;

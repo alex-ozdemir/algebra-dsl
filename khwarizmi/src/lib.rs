@@ -1,4 +1,5 @@
-#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from, pub_restricted)]
+#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from,
+           pub_restricted)]
 #![allow(dead_code)]
 #[macro_use]
 extern crate nom;
@@ -424,10 +425,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
     /// Collapses a tower of exponents
     /// (x^y)^z => x^(yz)
     /// Does this process `howmany` times.
-    fn collapse(&mut self,
-               index: &TreeIdx,
-               howmany: usize)
-               -> Result<(), AlgebraDSLError> {
+    fn collapse(&mut self, index: &TreeIdx, howmany: usize) -> Result<(), AlgebraDSLError> {
         let mut tree = self.get(index.as_ref())?.clone();
         for _ in 0..howmany {
             tree = match tree {
@@ -435,16 +433,15 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                     match big_base {
                         Expression::Power(inner_base, box inner_exp) => {
                             let newexp = inner_exp.inflate_multiplication_symmetric(outer_exp);
-                            Expression::Power(inner_base,
-                                              box newexp)
-                        },
+                            Expression::Power(inner_base, box newexp)
+                        }
                         _ => return Err(AlgebraDSLError::NotEnoughNestedExponents),
                     }
                 }
                 _ => return Err(AlgebraDSLError::NotEnoughNestedExponents),
             }
         }
-        self.replace(index, tree).map(|_|())
+        self.replace(index, tree).map(|_| ())
     }
 
     /// If all the input indices share a parent, constructs a sibling index representing all of
@@ -530,7 +527,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             children: single_indices,
         })
     }
-    fn swap(&mut self, a: &TreeIdx, b: &TreeIdx) -> Result<(),AlgebraDSLError> {
+    fn swap(&mut self, a: &TreeIdx, b: &TreeIdx) -> Result<(), AlgebraDSLError> {
         // Detect errors early and fail. Necessary because we don't have a concept of disjoint
         // borrows, so we can't mutably borrow a and
         let min_len = a.0.iter().zip(b.0.iter()).count();
@@ -593,7 +590,7 @@ impl Expression {
                     Expression::Division(mut otop, mut obot) => {
                         mytop.append(&mut otop);
                         mybot.append(&mut obot);
-                    },
+                    }
                     _ => mytop.push(other),
                 }
                 Expression::Division(mytop, mybot)
@@ -604,7 +601,7 @@ impl Expression {
                         // Put self at the front
                         otop.insert(0, self);
                         Expression::Division(otop, obot)
-                    },
+                    }
                     _ => Expression::Division(vec![self, other], vec![]),
                 }
             }
