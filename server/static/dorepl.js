@@ -239,6 +239,8 @@ socket.onmessage = function(event) {
         var text = document.createTextNode(data.slice(atIdx + 1));
         box.appendChild(text);
         box.readOnly = true;
+
+        // When it's clicked, select the whole thing
         $(box).on('focus', function(){this.select()});
 
         document.getElementById('repl').appendChild(box);
@@ -310,6 +312,10 @@ socket.onmessage = function(event) {
         executeBatchCommands(cm);
     }
 };
+
+socket.onclose = function(event) {
+    $('#connectionlostmodal').modal('show');
+}
 
 function createRecoverButtom(fullDiv) {
     var recoverButton = document.createElement('button');

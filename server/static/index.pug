@@ -37,17 +37,27 @@ html
     button(type="button" class="btn btn-default btn-sm" onclick="$('#loadsessioninput').click()") Load Session
     button(type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#feedbackModal") Send feedback!
 
-    div(class="modal fade" id="feedbackModal" tabindex="-1" role="dialog" aria-labelledby="feedbackModalLabel")
-      div(class="modal-dialog" role="document")
-        div(class="modal-content")
-          div(class="modal-header")
-            button(type="button" class="close" data-dismiss="modal" aria-label="Close")
-              span(aria-hidden="true") &times;
-            h4(class="modal-title" id="feedbackModalLabel") Feedback
-          div(class="modal-body")
-            textarea.form-control#feedbackText
-          div(class="modal-footer")
-            button(type="button" class="btn btn-primary" data-dismiss="modal" onclick="sendFeedback()") Submit Feedback
+    #feedbackModal.modal.fade(tabindex='-1', role='dialog', aria-labelledby='feedbackModalLabel')
+      .modal-dialog(role='document')
+        .modal-content
+          .modal-header
+            button.close(type='button', data-dismiss='modal', aria-label='Close')
+              span(aria-hidden='true') ×
+            h4#feedbackModalLabel.modal-title Feedback
+          .modal-body
+            textarea#feedbackText.form-control
+          .modal-footer
+            button.btn.btn-primary(type='button', data-dismiss='modal', onclick='sendFeedback()') Submit Feedback
+    #connectionlostmodal.modal.fade
+      .modal-dialog.modal-sm
+        .modal-content
+          .modal-header
+            button.close(type='button', data-dismiss='modal', aria-hidden='true') ×
+            h4.modal-title Connection Closed
+          .modal-body
+            p.text-warning The connection to the server was lost
+          .modal-footer
+            button.btn.btn-primary(type='button', data-dismiss='modal') Close
 
 //- vim: sw=2 sts=2 tw=0
 //- au BufWritePost * !pug -P index.pug
