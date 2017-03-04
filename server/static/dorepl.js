@@ -30,6 +30,7 @@ var CMhistory = []; //stores references to all the old CM instances
 var isMousePressed = false;
 var mousePressAnchor = null;
 var batchCommands = [];
+var modified = false;
 var socket = new WebSocket("ws://" + location.hostname + ':2794', "rust-websocket");
 
 function putIntoCM(cm, text) {
@@ -45,6 +46,7 @@ $(document).ready(function() {
     var cm = createCM();
     putIntoCM(cm, "$ ");
     currentCM = cm;
+    modified = false;
 
     document.addEventListener("mouseup", globalMouseUpCallback);
 })
@@ -408,6 +410,7 @@ function onFinishTypesetting(element, fullDiv, nextcm) {
 }
 
 function replaceAllMathTags(cm, changeObj) {
+    modified = true;
     if (!cm.prevMath) return;
     cm.autoSelectionChange = true;
 
@@ -610,6 +613,8 @@ function downloadSession() {
     var file = new Blob(allBoxData, {type: 'txt'});
     var defaultfilename = "khwarizmi-session.txt";
 
+    modified = false;
+
     if (window.navigator.msSaveOrOpenBlob)
         // IE10+
         window.navigator.msSaveOrOpenBlob(file, defaultfilename);
@@ -641,3 +646,11 @@ function loadSession(file) {
     };
     fr.readAsText(file);
 }
+
+// Give prompt unless user just saved
+$(window).bind('beforeunload', function(){
+    if (modified) {
+      return "Are you sure you want to leave without saving changes?";
+    }
+    return undefined;
+});
