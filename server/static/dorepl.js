@@ -33,7 +33,13 @@ var batchCommands = [];
 var modified = false;
 var socket = new WebSocket("ws://" + location.hostname + ':2794', "rust-websocket");
 
-function putIntoCM(cm, text) {
+function putIntoCM(cm, text, saveOld) {
+    if (saveOld) {
+        var oldVal = cm.getValue();
+        if (oldVal.length > 0) {
+            batchCommands.push(oldVal);
+        }
+    }
     cm.setValue(text);
     cm.setCursor(cm.posFromIndex(text.length));
 }
@@ -44,7 +50,7 @@ $(document).ready(function() {
     })
 
     var cm = createCM();
-    putIntoCM(cm, "$ ");
+    putIntoCM(cm, "$ ", false);
     currentCM = cm;
     modified = false;
 
@@ -250,7 +256,11 @@ socket.onmessage = function(event) {
         box.style.height = (box.scrollHeight)+"px";
     } else if (type === 'LaTeXLine') {
         var cm = currentCM;
-        putIntoCM(cm, "$ " + data.slice(atIdx + 1));
+        if (cm.getValue() === '') {
+            putIntoCM(cm, "$ ", false);
+        }
+        var cursorPos = cm.getCursor();
+        cm.replaceRange(data.slice(atIdx + 1), cursorPos);
         cm.focus();
     } else if (type === 'Err') {
         var errDiv = document.createElement('div');
@@ -279,6 +289,12 @@ socket.onmessage = function(event) {
         checkbox.setAttribute('type', 'checkbox');
         fullDiv.appendChild(checkbox);
         checkbox.checked = checkCheckbox;
+        // Add a bootstrap tooltip
+        checkbox.setAttribute('data-toggle', 'tooltip');
+        checkbox.setAttribute('data-placement', 'top');
+        checkbox.setAttribute('title',
+                "Select this equation for output");
+        $(checkbox).tooltip();
 
         var mathBox = document.createElement('span');
         mathBox.id = 'formula'+formulaNum;
@@ -304,9 +320,9 @@ socket.onmessage = function(event) {
         executeBatchCommands(cm);
     }
 
-    if (!previousMath && (type === 'LaTeX' || type === 'Err')) {
+    if (!previousMath && (type === 'LaTeXBlock' || type === 'Err')) {
         var cm = createCM();
-        putIntoCM(cm, "$ ");
+        putIntoCM(cm, "$ ", false);
         currentCM = cm;
 
         executeBatchCommands(cm);
@@ -322,11 +338,18 @@ function createRecoverButtom(fullDiv) {
     const recoverClass = "recover";
     recoverButton.innerHTML = "&#x27f2;";
     recoverButton.className += " " + recoverClass;
+    // Add a bootstrap tooltip
+    recoverButton.setAttribute('data-toggle', 'tooltip');
+    recoverButton.setAttribute('data-placement', 'top');
+    recoverButton.setAttribute('title',
+            "Recover this equation");
+    $(recoverButton).tooltip();
+
 
     recoverButton.addEventListener("click", function(e) {
         var formulaNum = e.target.parentNode.getAttribute("formulanum");
         var cm = currentCM;
-        putIntoCM(cm, "recover " + formulaNum);
+        putIntoCM(cm, "recover " + formulaNum, true);
         sendToServer(cm);
     });
     fullDiv.appendChild(recoverButton);
@@ -338,10 +361,19 @@ function createGetCodeButton(fullDiv) {
     getcodeButton.innerHTML = "&lt;/&gt;";
     getcodeButton.className += " " + recoverClass;
 
+    // Add a bootstrap tooltip
+    getcodeButton.setAttribute('data-toggle', 'tooltip');
+    getcodeButton.setAttribute('data-placement', 'top');
+    getcodeButton.setAttribute('title',
+            "Insert LaTeX code for this equation into current input");
+    $(getcodeButton).tooltip();
+
     getcodeButton.addEventListener("click", function(e) {
         var formulaNum = e.target.parentNode.getAttribute("formulanum");
         socket.send("cmd@code " + formulaNum);
     });
+
+
     fullDiv.appendChild(getcodeButton);
 }
 
@@ -534,7 +566,7 @@ function executeBatchCommands(cm) {
         return;
     }
 
-    putIntoCM(cm, cmd);
+    putIntoCM(cm, cmd, false);
 
     if (batchCommands.length > 0) {
         sendToServer(cm);
@@ -544,28 +576,21 @@ function executeBatchCommands(cm) {
 function sendOutputLatex() {
     var tosend = "output ";
 
-    var cns = document.getElementById('repl').childNodes;
+    var checkedBoxes = $('.math-output>input[type="checkbox"]:checked');
 
-    var firstPrint = true;
-    var eqnIdx = -1;
-    for (var i=0; i<cns.length; i++) {
-        if (cns[i].classList.contains('new-math-output')) {
-            eqnIdx++;
+    var firstprint = true;
+    for (var i=0; i<checkedBoxes.length; i++) {
+        var fullDiv = checkedBoxes[i].parentNode;
+        var id = fullDiv.getAttribute('formulanum');
+        if (!firstprint) {
+            tosend += ', ';
         }
-        if (cns[i].classList.contains('math-output') && cns[i].childNodes.length > 1) {
-            var checkbox = cns[i].childNodes[0];
-            if (checkbox.checked) {
-                if (!firstPrint) {
-                    tosend += ', ';
-                }
-                tosend += '' + eqnIdx;
-                firstPrint = false;
-            }
-        }
+        tosend += id;
+        firstprint = false;
     }
 
     var cm = currentCM;
-    cm.setValue(tosend);
+    putIntoCM(cm, tosend, true);
     sendToServer(cm);
 }
 
@@ -581,7 +606,7 @@ function reclaimDown(cm) {
     } else {
         cm.history[len - 2 - cm.loc] = cm.getValue();
 
-        putIntoCM(cm, cm.history[len - 1 - cm.loc]);
+        putIntoCM(cm, cm.history[len - 1 - cm.loc], false);
     }
 }
 
@@ -596,7 +621,7 @@ function reclaimUp(cm) {
         cm.loc = len - 1;
     } else {
         cm.history[len-cm.loc] = cm.getValue();
-        putIntoCM(cm, cm.history[len - 1 - cm.loc]);
+        putIntoCM(cm, cm.history[len - 1 - cm.loc], false);
     }
 }
 
@@ -641,12 +666,16 @@ function downloadSession() {
     }
 }
 
+// Note: this function destroys what's in the current input box
 function loadSession(file) {
     var fr = new FileReader();
     fr.onload = function(e) {
         var lines = e.target.result.split('\n');
         // The file ends with a newline: we don't want that
-        lines.pop();
+        var last = lines.pop();
+        if (last.length > 0) {
+            lines.push(last);
+        }
         batchCommands = lines;
         executeBatchCommands(currentCM);
     };
