@@ -1,0 +1,6 @@
+$ (x^y)^z
+collapse #(mtn:0)
+collapse #(mtn:0) 4
+collapse #(mtn:0)4
+collapse   	   #(mtn:0)  	  4
+

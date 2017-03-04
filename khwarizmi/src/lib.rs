@@ -32,6 +32,7 @@ pub enum AlgebraDSLError {
     IllFormattedCommand,
     InvalidDelete,
     InvalidMake,
+    NotEnoughNestedExponents,
     InvalidSiblingIndices,
     MapExpression,
     NeedsExpression,
@@ -420,6 +421,32 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         Ok(())
     }
 
+    /// Collapses a tower of exponents
+    /// (x^y)^z => x^(yz)
+    /// Does this process `howmany` times.
+    fn collapse(&mut self,
+               index: &TreeIdx,
+               howmany: usize)
+               -> Result<(), AlgebraDSLError> {
+        let mut tree = self.get(index.as_ref())?.clone();
+        for _ in 0..howmany {
+            tree = match tree {
+                Expression::Power(box big_base, box outer_exp) => {
+                    match big_base {
+                        Expression::Power(inner_base, box inner_exp) => {
+                            let newexp = inner_exp.inflate_multiplication_symmetric(outer_exp);
+                            Expression::Power(inner_base,
+                                              box newexp)
+                        },
+                        _ => return Err(AlgebraDSLError::NotEnoughNestedExponents),
+                    }
+                }
+                _ => return Err(AlgebraDSLError::NotEnoughNestedExponents),
+            }
+        }
+        self.replace(index, tree).map(|_|())
+    }
+
     /// If all the input indices share a parent, constructs a sibling index representing all of
     /// them
     fn make_siblings(&self, indices: &[TreeIdx]) -> Result<SiblingIndices, AlgebraDSLError> {
@@ -556,6 +583,31 @@ impl Expression {
                 Expression::Division(top, bottom)
             }
             not_prod => Expression::Division(vec![not_prod, expr], vec![]),
+        }
+    }
+    /// Multiplies self by expr. If either self or other are themselves Divisions, combine them
+    pub fn inflate_multiplication_symmetric(self, other: Expression) -> Self {
+        match self {
+            Expression::Division(mut mytop, mut mybot) => {
+                match other {
+                    Expression::Division(mut otop, mut obot) => {
+                        mytop.append(&mut otop);
+                        mybot.append(&mut obot);
+                    },
+                    _ => mytop.push(other),
+                }
+                Expression::Division(mytop, mybot)
+            }
+            _ => {
+                match other {
+                    Expression::Division(mut otop, obot) => {
+                        // Put self at the front
+                        otop.insert(0, self);
+                        Expression::Division(otop, obot)
+                    },
+                    _ => Expression::Division(vec![self, other], vec![]),
+                }
+            }
         }
     }
     pub fn inflate_division(self, expr: Expression) -> Self {

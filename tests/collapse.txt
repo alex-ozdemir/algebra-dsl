@@ -1,0 +1,7 @@
+$ (a((b^c)^d)^e)^f
+collapse #(mtn:0)
+collapse #(mtn:0,0,1)2
+$ {\left(a{\left({\left({b}^{c}\right)}^{d}\right)}^{e}\right)}^{f}
+collapse #(mtn:0,0,1)
+collapse #(mtn:0,0,1)
+

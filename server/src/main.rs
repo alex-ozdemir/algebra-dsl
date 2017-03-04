@@ -110,17 +110,20 @@ fn main() {
                             }
                             Ok(cmd::Return::LaTeXBlock(s)) => {
                                 (history.last().cloned().map(|last| {
-                                    history.push(last.clone()); last
-                                 }),
+                                    history.push(last.clone());
+                                    last
+                                }),
                                  Some(format!("LaTeXBlock@{}", s)))
                             }
                             Ok(cmd::Return::LaTeXLine(code)) => {
-                                (None,
-                                 Some(format!("LaTeXLine@{}", code)))
+                                (None, Some(format!("LaTeXLine@{}", code)))
                             }
                             Ok(cmd::Return::NoReturn) => (None, None),
                             Err(e) => {
-                                (history.last().cloned().map(|last| { history.push(last.clone()); last }),
+                                (history.last().cloned().map(|last| {
+                                    history.push(last.clone());
+                                    last
+                                }),
                                  Some(format!("Err@Error: {:?}", e)))
                             }
                         };
@@ -130,7 +133,8 @@ fn main() {
                             sender.send_message(&Message::text(msg)).unwrap();
                         }
                         if let Some(math) = math_to_send {
-                            let msg = format!("Math@{}@{}@{}", formula_num, check_math_checkbox, math);
+                            let msg =
+                                format!("Math@{}@{}@{}", formula_num, check_math_checkbox, math);
 
                             println!("Output: {:#?}", msg);
                             println!("The current formula is {:#?}", history.last());

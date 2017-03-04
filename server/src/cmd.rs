@@ -4,6 +4,7 @@ use std::io::Write;
 
 use khwarizmi::{Expression, TreeIdx, AlgebraDSLError, Indexable, Math, LatexWriter};
 
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Return {
     Math(Math),
@@ -32,6 +33,7 @@ pub enum Cmd {
     GetCode(usize),
     Feedback(String, String),
     Replace(Vec<TreeIdx>, Expression),
+    Collapse(TreeIdx, Option<usize>),
 }
 
 impl Cmd {
@@ -49,14 +51,12 @@ impl Cmd {
                 }
                 Ok(Return::Math(expr))
             }
-            (Cmd::Make(_, _), None) => Err(AlgebraDSLError::NeedsExpression),
             (Cmd::Delete(indices), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
                 let sibs = old_expr.make_siblings(indices.as_slice())?;
                 expr.delete(sibs)?;
                 Ok(Return::Math(expr))
             }
-            (Cmd::Delete(_), None) => Err(AlgebraDSLError::NeedsExpression),
             (Cmd::Map(op, new_expr), Some(e)) => {
                 if let &Math::Eq(ref e) = e {
                     let mut eq = e.clone();
@@ -72,7 +72,6 @@ impl Cmd {
                     Err(AlgebraDSLError::MapExpression)
                 }
             }
-            (Cmd::Map(_, _), _) => Err(AlgebraDSLError::MapExpression),
             (Cmd::Output(math_idxs_to_output), _) => {
                 let mut latex_writer = LatexWriter::new();
                 for idx in math_idxs_to_output {
@@ -113,7 +112,17 @@ impl Cmd {
                 }
                 Ok(Return::Math(eqorexpr))
             }
-            (Cmd::Replace(_, _), None) => Err(AlgebraDSLError::NeedsExpression),
+            (Cmd::Collapse(idx, howfar), Some(old)) => {
+                let howfar = howfar.unwrap_or(1);
+
+                let mut e = old.clone();
+
+                e.collapse(&idx, howfar)?;
+
+                Ok(Return::Math(e))
+            }
+
+            (_, None) => Err(AlgebraDSLError::NeedsExpression),
         }
     }
 }
@@ -208,6 +217,27 @@ impl str::FromStr for Cmd {
                 }
                 let expr = Expression::from_str(rest)?;
                 Ok(Cmd::Replace(indices, expr))
+            } else if s.starts_with("collapse") {
+                let rest = s[8..].trim();
+
+                let (n, rest) = if char::from(rest.as_bytes()
+                        .last()
+                        .ok_or(AlgebraDSLError::IllFormattedCommand)?
+                        .clone())
+                    .is_digit(10) {
+                    let splitpoint = rest.rfind(|c: char| !c.is_digit(10))
+                        .ok_or(AlgebraDSLError::IllFormattedCommand)?;
+                    let (fst, snd) = rest.split_at(splitpoint + 1);
+
+                    (Some(snd.trim().parse().map_err(|_| AlgebraDSLError::IllFormattedCommand)?),
+                     fst.trim())
+                } else {
+                    (None, rest)
+                };
+
+                let idx = TreeIdx::from_str(rest)?;
+
+                Ok(Cmd::Collapse(idx, n))
             } else {
                 Err(AlgebraDSLError::UnrecognizedCmd)
             }
