@@ -221,6 +221,7 @@ function addMathCallbacks(where) {
     where.addEventListener("mousedown", mouseDownCallback);
     where.addEventListener("mouseup", mouseUpCallback);
 }
+
 function removeMathCallbacks(where) {
     where.removeEventListener("mousedown", mouseDownCallback);
     where.removeEventListener("mouseup", mouseUpCallback);
@@ -300,18 +301,18 @@ socket.onmessage = function(event) {
         mathBox.id = 'formula'+formulaNum;
         mathBox.className += ' output disable-highlight';
         mathBox.innerHTML = html;
-        addMathCallbacks(mathBox);
         fullDiv.appendChild(mathBox);
 
         createRecoverButtom(fullDiv);
         createGetCodeButton(fullDiv);
 
-        currentMath = fullDiv;
         document.getElementById('repl').appendChild(fullDiv);
 
         var cm = createCM();
         cm.prevOutput = fullDiv;
         currentCM = cm;
+
+        currentMath = mathBox;
 
         // Handle Actual Formula
         MathJax.Hub.Queue(["Typeset", MathJax.Hub, mathBox.id]);
@@ -444,7 +445,6 @@ function onFinishTypesetting(element, fullDiv, nextcm) {
     // typesetting it
     replaceAllMathTags(nextcm);
 
-
     currentCM.getWrapperElement().scrollIntoView({
         behavior: "smooth",
         block: "end",
@@ -461,6 +461,7 @@ function replaceAllMathTags(cm, changeObj) {
 
     var prevOutput = $(cm.prevOutput).children(".output")[0];
     var prevMathBoxClone = cm.prevMath.cloneNode(true);
+    currentMath = prevMathBoxClone;
     if (cm === currentCM) {
         addMathCallbacks(prevMathBoxClone);
     }
