@@ -7,7 +7,8 @@ pub mod mac;
 use self::latex::{Token, Special};
 use std::num;
 use std::str::FromStr;
-use {Equation, Expression, Symbol, Atom, StandaloneSymbol, OperatorSymbol, FunctionSymbol};
+use {Equation, Expression, Symbol, Atom, StandaloneSymbol, OperatorSymbol, FunctionSymbol,
+     PLACEHOLDER};
 use self::mac::{PostMac, UniOp, Operator, KnownCS, Numeric};
 
 const UNREACH: &'static str = "An option/result that was expected to be Some/Ok was not.\n\
@@ -44,6 +45,7 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
         }
         PostMac::Char(c) => Ok(Ex::Atom(Atom::PlainVariable(c))),
         PostMac::Escaped(string) => Ok(Ex::Atom(Atom::Escaped(string))),
+        PostMac::Placeholder => Ok(Ex::Atom(Atom::Escaped(PLACEHOLDER.to_string()))),
         PostMac::Standalone(sym) => Ok(Ex::Atom(Atom::Symbol(Symbol::Standalone(sym)))),
         PostMac::Op(o) => Err(ParseError::LoneOperator(o)),
         PostMac::Frac(top, bottom) => {
@@ -105,7 +107,7 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                     expr => expression_stack.push(parse_operators(expr)?),
                 };
                 if let &[_.., UniOp::Std(Operator::LGroup), UniOp::Std(Operator::RGroup)] =
-                       operator_stack.as_slice() {
+                    operator_stack.as_slice() {
                     operator_stack.pop();
                     operator_stack.pop();
                 }

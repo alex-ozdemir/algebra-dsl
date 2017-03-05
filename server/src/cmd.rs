@@ -28,6 +28,7 @@ pub enum Cmd {
     Make(Vec<TreeIdx>, Expression),
     Delete(Vec<TreeIdx>),
     Map(Op, Expression),
+    Swap(TreeIdx, TreeIdx),
     Output(Vec<usize>),
     Recover(usize),
     GetCode(usize),
@@ -43,18 +44,23 @@ impl Cmd {
             (Cmd::Make(indices, new_expr), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
                 if indices.len() == 1 {
-                    expr.replace(&indices[0], new_expr)?;
+                    expr.make(&indices[0], new_expr)?;
                 } else {
-                    let sibs = old_expr.make_siblings(indices.as_slice())?;
+                    let sibs = old_expr.sibling_indices(indices.as_slice())?;
                     println!("Make location {:?} into {:?}", sibs, new_expr);
-                    expr.replace_siblings(sibs, new_expr)?;
+                    expr.make_siblings(sibs, new_expr)?;
                 }
                 Ok(Return::Math(expr))
             }
             (Cmd::Delete(indices), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
-                let sibs = old_expr.make_siblings(indices.as_slice())?;
+                let sibs = old_expr.sibling_indices(indices.as_slice())?;
                 expr.delete(sibs)?;
+                Ok(Return::Math(expr))
+            }
+            (Cmd::Swap(i1, i2), Some(old_expr)) => {
+                let mut expr = old_expr.clone();
+                expr.swap(&i1, &i2)?;
                 Ok(Return::Math(expr))
             }
             (Cmd::Map(op, new_expr), Some(e)) => {
@@ -106,10 +112,9 @@ impl Cmd {
                 Ok(Return::NoReturn)
             }
             (Cmd::Replace(indices, new_expr), Some(old_eqorexpr)) => {
+                let v = indices.iter().map(|i| i.as_ref()).collect::<Vec<_>>();
                 let mut eqorexpr = old_eqorexpr.clone();
-                for ind in &indices {
-                    eqorexpr.replace(ind, new_expr.clone())?;
-                }
+                eqorexpr.replace_all(v.as_slice(), new_expr)?;
                 Ok(Return::Math(eqorexpr))
             }
             (Cmd::Collapse(idx, howfar), Some(old)) => {
@@ -127,36 +132,44 @@ impl Cmd {
     }
 }
 
+/// Parses any indices at the beginning of `s` and returns the indices and the rest of `s`
+fn parse_indices(s: &str) -> Result<(Vec<TreeIdx>, &str), AlgebraDSLError> {
+    let mut indices = Vec::new();
+    let mut rest = s.trim_left();
+    while rest.starts_with("#") {
+        let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
+        let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
+        indices.push(idx);
+        rest = &rest[(idx_end + 1)..].trim();
+    }
+    Ok((indices, rest))
+}
+
 impl str::FromStr for Cmd {
     type Err = AlgebraDSLError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.starts_with("cmd@") {
             let s: &str = &s[4..].trim_left();
             if s.starts_with("make") {
-                let mut indices = Vec::new();
-                let mut rest: &str = &s[4..].trim();
-                while rest.starts_with("#") {
-                    let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
-                    let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
-                    indices.push(idx);
-                    rest = &rest[(idx_end + 1)..].trim();
-                }
-                let expr = Expression::from_str(rest)?;
+                let (indices, rest) = parse_indices(&s[4..].trim())?;
+                let expr = Expression::from_str(rest.trim())?;
                 Ok(Cmd::Make(indices, expr))
             } else if s.starts_with("delete") {
-                let mut indices = Vec::new();
-                let mut rest: &str = &s[6..].trim();
-                while rest.starts_with("#") {
-                    let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
-                    let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
-                    indices.push(idx);
-                    rest = &rest[(idx_end + 1)..].trim();
-                }
-                if !rest.is_empty() {
-                    println!("Rest isn't empty, it's {}", rest);
+                let (indices, rest) = parse_indices(&s[6..].trim())?;
+                if !rest.trim().is_empty() {
+                    println!("Rest isn't empty, it's `{}`", rest);
                     Err(AlgebraDSLError::IllFormattedCommand)
                 } else {
                     Ok(Cmd::Delete(indices))
+                }
+            } else if s.starts_with("swap") {
+                let (mut indices, rest) = parse_indices(&s[4..].trim())?;
+                if indices.len() != 2 || rest.trim().len() > 0 {
+                    Err(AlgebraDSLError::IllFormattedCommand)
+                } else {
+                    let i2 = indices.pop().unwrap();
+                    let i1 = indices.pop().unwrap();
+                    Ok(Cmd::Swap(i1, i2))
                 }
             } else if s.starts_with("output") {
                 let mut indices = Vec::new();
@@ -204,18 +217,11 @@ impl str::FromStr for Cmd {
                 let idx = usize::from_str(rest).map_err(|_| AlgebraDSLError::InvalidIdx)?;
                 Ok(Cmd::GetCode(idx))
             } else if s.starts_with("replace") {
-                let mut indices = Vec::new();
-                let mut rest: &str = &s[7..].trim();
-                while rest.starts_with("#") {
-                    let idx_end = rest.find(')').ok_or(AlgebraDSLError::IllFormattedIndex)?;
-                    let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
-                    indices.push(idx);
-                    rest = &rest[(idx_end + 1)..].trim();
-                }
+                let (indices, rest) = parse_indices(&s[7..].trim())?;
                 if indices.len() == 0 {
                     return Err(AlgebraDSLError::IllFormattedCommand);
                 }
-                let expr = Expression::from_str(rest)?;
+                let expr = Expression::from_str(rest.trim())?;
                 Ok(Cmd::Replace(indices, expr))
             } else if s.starts_with("collapse") {
                 let rest = s[8..].trim();

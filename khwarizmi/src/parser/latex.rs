@@ -4,7 +4,7 @@ use nom::{alpha, sp, IResult};
 use std::str;
 
 named!(single_char<char>, preceded!(sp,
-    one_of!("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
+    one_of!("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890@")
 ));
 
 named!(identifier<String>,

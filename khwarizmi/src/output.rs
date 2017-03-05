@@ -495,10 +495,12 @@ fn fmt_as_latex(expr: &Expression,
                expr,
                prev_precedence.1,
                prev_precedence.2) {
-        write!(f, "{}(", match output {
-                LaTeXOutputType::ForUs => "",
-                LaTeXOutputType::ForOther => "\\left",
-        })?;
+        write!(f,
+               "{}(",
+               match output {
+                   LaTeXOutputType::ForUs => "",
+                   LaTeXOutputType::ForOther => "\\left",
+               })?;
     }
     match expr {
         &Expression::Atom(ref atom) => {
@@ -607,10 +609,12 @@ fn fmt_as_latex(expr: &Expression,
                expr,
                prev_precedence.1,
                prev_precedence.2) {
-        write!(f, "{})", match output {
-                LaTeXOutputType::ForUs => "",
-                LaTeXOutputType::ForOther => "\\right",
-        })?;
+        write!(f,
+               "{})",
+               match output {
+                   LaTeXOutputType::ForUs => "",
+                   LaTeXOutputType::ForOther => "\\right",
+               })?;
     }
     Ok(())
 }

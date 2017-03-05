@@ -99,6 +99,7 @@ pub enum PostMac {
     Op(UniOp),
     Char(char),
     Escaped(String),
+    Placeholder,
     Num(Numeric),
 }
 
@@ -144,6 +145,7 @@ impl PostMac {
             &PostMac::Standalone(_) |
             &PostMac::Char(_) |
             &PostMac::Escaped(_) |
+            &PostMac::Placeholder |
             &PostMac::Num(_) => true,
             &PostMac::Op(_) => false,
         }
@@ -158,6 +160,7 @@ impl PostMac {
             &PostMac::Standalone(_) |
             &PostMac::Char(_) |
             &PostMac::Escaped(_) |
+            &PostMac::Placeholder |
             &PostMac::Num(_) => true,
             &PostMac::Op(_) => false,
         }
@@ -181,6 +184,7 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
         }
         Token::Escaped(string) => Ok(PostMac::Escaped(string)),
         Token::Special(x) => Err(ParseError::UnknownSpecialChar(x)),
+        Token::Char('@') => Ok(PostMac::Placeholder),
         Token::Char(c) if c.is_alphabetic() => Ok(PostMac::Char(c)),
         Token::Char(c) if c.is_numeric() => Ok(PostMac::Num(Numeric(c.to_string(), None))),
         Token::Char(c) => Err(ParseError::UnimplementedCharacter(c)),

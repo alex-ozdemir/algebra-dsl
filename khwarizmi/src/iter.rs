@@ -6,7 +6,7 @@ pub struct ChildIter<'a> {
 }
 
 impl<'a> ChildIter<'a> {
-    pub(super) fn new(parent: MathRef<'a>) -> Self {
+    pub fn new(parent: MathRef<'a>) -> Self {
         ChildIter {
             parent: parent,
             next_idx: 0,
@@ -68,7 +68,7 @@ pub struct ExpressionIter<'a> {
 }
 
 impl<'a> ExpressionIter<'a> {
-    pub(super) fn new(e: MathRef<'a>) -> Self {
+    pub fn new(e: MathRef<'a>) -> Self {
         ExpressionIter {
             iter_stack: vec![ChildIter::new(e)],
             idx_stack: TreeIdx::from_vec(vec![]),

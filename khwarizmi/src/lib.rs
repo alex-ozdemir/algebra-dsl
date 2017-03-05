@@ -14,16 +14,18 @@ pub use symbols::{Symbol, StandaloneSymbol, OperatorSymbol, FunctionSymbol};
 
 pub use iter::{ChildIter, ExpressionIter};
 
+use std::ops::Deref;
 use std::convert::TryFrom;
 use std::str::FromStr;
-use std::{fmt, mem};
+use std::{cmp, fmt, mem};
 
 use parser::ParseError;
 
 const NULL_EXPRESSION: Expression = Expression::Atom(Atom::Natural(0));
-const NULL_IDX: &'static [TreeInt] = &[];
+const NULL_SLICE: &'static [TreeInt] = &[];
 const UNREACH: &'static str = "An option/result that was expected to be Some/Ok was not.\n\
                                This is a bug!";
+const PLACEHOLDER: &'static str = "@@Placeholder@@";
 
 #[derive(Debug,PartialEq, Eq)]
 pub enum AlgebraDSLError {
@@ -89,14 +91,16 @@ type TreeInt = usize;
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct TreeIdx(Vec<TreeInt>);
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
-pub struct TreeIdxRef<'a>(&'a [TreeInt]);
-
 #[derive(PartialEq, Debug, Clone)]
 pub struct SiblingIndices {
     parent_idx: TreeIdx,
     // This list *must* be sorted. This is enforced by the constructor
     children: Vec<TreeInt>,
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct TreeIdxSlice {
+    inner: [TreeInt],
 }
 
 impl TreeIdx {
@@ -121,9 +125,6 @@ impl TreeIdx {
     fn from_vec(v: Vec<TreeInt>) -> Self {
         TreeIdx(v)
     }
-    fn as_ref<'a>(&'a self) -> TreeIdxRef<'a> {
-        TreeIdxRef(&self.0[..])
-    }
     fn push(&mut self, i: TreeInt) {
         self.0.push(i)
     }
@@ -135,62 +136,96 @@ impl TreeIdx {
     }
 }
 
-impl<'a> TreeIdxRef<'a> {
+impl Deref for TreeIdx {
+    type Target = TreeIdxSlice;
+    fn deref(&self) -> &Self::Target {
+        TreeIdxSlice::from_slice(self.0.as_slice())
+    }
+}
+
+impl AsRef<TreeIdxSlice> for TreeIdx {
+    fn as_ref(&self) -> &TreeIdxSlice {
+        self.deref()
+    }
+}
+
+impl AsRef<TreeIdxSlice> for TreeIdxSlice {
+    fn as_ref(&self) -> &TreeIdxSlice {
+        self
+    }
+}
+
+impl TreeIdxSlice {
+    pub fn from_slice(slice: &[TreeInt]) -> &Self {
+        // Safe because the layouts are the same.
+        unsafe { mem::transmute(slice) }
+    }
     pub fn first(&self) -> Option<TreeInt> {
         if self.len() > 0 {
-            Some(self.0[0])
+            Some(self.inner[0])
         } else {
             None
         }
     }
-    pub fn rest(&self) -> TreeIdxRef<'a> {
-        TreeIdxRef(if self.len() > 0 {
-            &self.0[1..]
-        } else {
-            NULL_IDX
-        })
-    }
-    pub fn parent(&self) -> Option<TreeIdxRef<'a>> {
+    pub fn rest(&self) -> &TreeIdxSlice {
         if self.len() > 0 {
-            Some(TreeIdxRef(&self.0[..self.len() - 1]))
+            TreeIdxSlice::from_slice(&self.inner[1..])
+        } else {
+            TreeIdxSlice::from_slice(NULL_SLICE)
+        }
+    }
+    pub fn parent(&self) -> Option<&TreeIdxSlice> {
+        if self.len() > 0 {
+            Some(TreeIdxSlice::from_slice(&self.inner[..self.len() - 1]))
         } else {
             None
         }
     }
-    pub fn grandparent(&self) -> Option<TreeIdxRef<'a>> {
+    pub fn grandparent(&self) -> Option<&TreeIdxSlice> {
         if self.len() > 1 {
-            Some(TreeIdxRef(&self.0[..self.len() - 2]))
+            Some(TreeIdxSlice::from_slice(&self.inner[..self.len() - 2]))
         } else {
             None
         }
     }
     pub fn last(&self) -> Option<usize> {
         if self.len() > 0 {
-            Some(self.0[self.len() - 1])
+            Some(self.inner[self.len() - 1])
         } else {
             None
         }
     }
-    pub fn prefix(&self) -> Option<TreeIdxRef<'a>> {
+    pub fn prefix(&self) -> Option<&TreeIdxSlice> {
         if self.len() > 0 {
-            Some(TreeIdxRef(&self.0[0..(self.len() - 1)]))
+            Some(TreeIdxSlice::from_slice(&self.inner[0..(self.len() - 1)]))
         } else {
             None
         }
     }
     #[inline]
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.inner.len()
     }
-    pub fn tail_from(&self, n: usize) -> Option<TreeIdxRef<'a>> {
+    pub fn tail_from(&self, n: usize) -> Option<&TreeIdxSlice> {
         if n < self.len() {
-            Some(TreeIdxRef(&self.0[n..]))
+            Some(TreeIdxSlice::from_slice(&self.inner[n..]))
         } else {
             None
         }
     }
     pub fn to_owned(&self) -> TreeIdx {
-        TreeIdx(self.0.iter().cloned().collect())
+        TreeIdx(self.inner.iter().cloned().collect())
+    }
+    /// Returns whether `self` refers to a location in `other` *or* vis-versa
+    pub fn nested(&self, other: &TreeIdxSlice) -> bool {
+        let min_len = cmp::min(self.len(), other.len());
+        self.inner.iter().zip(other.inner.iter()).filter(|&(a, b)| a == b).count() >= min_len
+    }
+
+    /// Returns whether `self` contains (or equals) `other`
+    pub fn contains(&self, other: &TreeIdxSlice) -> bool {
+
+        return self.nested(other) && self.len() <= other.len();
     }
 }
 
@@ -229,42 +264,68 @@ impl Equation {
 }
 
 impl Indexable for Equation {
-    fn get(&self, index: TreeIdxRef) -> Result<&Expression, AlgebraDSLError> {
-        match index.first() {
-            Some(0) => self.left.get(index.rest()),
-            Some(1) => self.right.get(index.rest()),
+    fn get<Idx: AsRef<TreeIdxSlice> + ?Sized>(&self,
+                                              index: &Idx)
+                                              -> Result<&Expression, AlgebraDSLError> {
+        match index.as_ref().first() {
+            Some(0) => self.left.get(index.as_ref().rest()),
+            Some(1) => self.right.get(index.as_ref().rest()),
             _ => Err(AlgebraDSLError::InvalidIdx),
         }
     }
-    fn get_mut(&mut self, index: TreeIdxRef) -> Result<&mut Expression, AlgebraDSLError> {
-        match index.first() {
-            Some(0) => self.left.get_mut(index.rest()),
-            Some(1) => self.right.get_mut(index.rest()),
+    fn get_mut<Idx: AsRef<TreeIdxSlice> + ?Sized>(&mut self,
+                                                  index: &Idx)
+                                                  -> Result<&mut Expression, AlgebraDSLError> {
+        match index.as_ref().first() {
+            Some(0) => self.left.get_mut(index.as_ref().rest()),
+            Some(1) => self.right.get_mut(index.as_ref().rest()),
             _ => Err(AlgebraDSLError::InvalidIdx),
         }
     }
 }
 
 impl SiblingIndices {
-    fn parent(&self) -> TreeIdxRef {
+    fn parent(&self) -> &TreeIdxSlice {
         self.parent_idx.as_ref()
     }
 }
 
 pub trait Indexable: fmt::Display + fmt::Debug + Clone {
-    fn get(&self, index: TreeIdxRef) -> Result<&Expression, AlgebraDSLError>;
-    fn get_mut(&mut self, index: TreeIdxRef) -> Result<&mut Expression, AlgebraDSLError>;
-    fn replace(&mut self,
-               index: &TreeIdx,
-               expr: Expression)
-               -> Result<Expression, AlgebraDSLError> {
+    fn get<Idx: AsRef<TreeIdxSlice> + ?Sized>(&self,
+                                              index: &Idx)
+                                              -> Result<&Expression, AlgebraDSLError>;
+    fn get_mut<Idx: AsRef<TreeIdxSlice> + ?Sized>(&mut self,
+                                                  index: &Idx)
+                                                  -> Result<&mut Expression, AlgebraDSLError>;
+    /// Find location `index` in `self` and replace it with `expr`
+    fn make(&mut self, index: &TreeIdx, expr: Expression) -> Result<(), AlgebraDSLError> {
+        self.replace(index, expr)?;
+        index.as_ref().parent().map(|idx| self.flatten(idx));
+        Ok(())
+    }
+
+    /// Replace each location indicated by one of`indices` in `self` with `expr`
+    fn replace_all<Idx: AsRef<TreeIdxSlice> + ?Sized>(&mut self,
+                                             indices: &[&Idx],
+                                             expr: Expression)
+                                             -> Result<(), AlgebraDSLError> {
+        for idx in indices {
+            self.replace(idx, expr.clone())?;
+        }
+        self.flatten_many(indices).ok(); // Ignore Error
+        Ok(())
+    }
+
+    fn replace<Idx: AsRef<TreeIdxSlice> + ?Sized>(&mut self,
+                                         index: &Idx,
+                                         expr: Expression)
+                                         -> Result<Expression, AlgebraDSLError> {
         let old = {
             let subtree = self.get_mut(index.as_ref())?;
             let old = subtree.take();
             *subtree = expr;
             old
         };
-        index.as_ref().parent().map(|idx| self.flatten(idx));
         Ok(old)
     }
     fn delete(&mut self, indices: SiblingIndices) -> Result<(), AlgebraDSLError> {
@@ -280,16 +341,13 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
     ///
     /// If `expr` is present, puts it in the first location indicated by `indices`. If not, it just
     /// removes the locations specified by indices.
+    ///
+    /// Does not do any flattening.
     fn replace_with_inner(&mut self,
                           indices: &SiblingIndices,
                           expr: Option<Expression>,
                           gen_err: AlgebraDSLError)
                           -> Result<(), AlgebraDSLError> {
-        fn insert_many<T, I: IntoIterator<Item = T>>(v: &mut Vec<T>, idx: usize, i: I) {
-            let back = v.split_off(idx);
-            v.extend(i.into_iter());
-            v.extend(back.into_iter());
-        }
         use Expression as Ex;
         let &SiblingIndices { ref parent_idx, ref children } = indices;
         let parent_ref = self.get_mut(parent_idx.as_ref())?;
@@ -300,12 +358,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                     return Err(gen_err);
                 }
                 let mut new_exprs = delete_prod(args, children.as_slice());
-                expr.map(|e| match e {
-                    Ex::Sum(args) => {
-                        insert_many(&mut new_exprs, insert_idx, args);
-                    }
-                    e => new_exprs.insert(insert_idx, e),
-                });
+                expr.map(|e| new_exprs.insert(insert_idx, e));
                 Ex::sum_many(new_exprs).ok_or(gen_err)
             }
             Ex::Division(top, bottom) => {
@@ -328,23 +381,10 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 let mut new_bottom = delete_prod(bottom, bottom_indices.as_slice());
 
                 expr.map(|e| {
-                    // TODO
-                    fn insert_division(prod: &mut Vec<Ex>, idx: usize, e: Ex) {
-                        match e {
-                            Ex::Division(t, b) => {
-                                if b.len() == 0 {
-                                    insert_many(prod, idx, t);
-                                } else {
-                                    prod.insert(idx, Ex::Division(t, b));
-                                }
-                            }
-                            e => prod.insert(idx, e),
-                        }
-                    }
                     if insert_idx < original_top_len {
-                        insert_division(&mut new_top, insert_idx, e);
+                        new_top.insert(insert_idx, e);
                     } else {
-                        insert_division(&mut new_bottom, insert_idx - original_top_len, e);
+                        new_bottom.insert(insert_idx - original_top_len, e);
                     }
                 });
                 Ok(Ex::divide_products(new_top, new_bottom))
@@ -356,11 +396,10 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         })
     }
 
-    fn replace_siblings(&mut self,
-                        indices: SiblingIndices,
-                        expr: Expression)
-                        -> Result<(), AlgebraDSLError> {
-
+    fn make_siblings(&mut self,
+                     indices: SiblingIndices,
+                     expr: Expression)
+                     -> Result<(), AlgebraDSLError> {
         let cp = self.clone();
         let res = self.replace_with_inner(&indices, Some(expr), AlgebraDSLError::InvalidMake);
         if let Err(_) = res {
@@ -380,7 +419,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
     /// the same type.
     ///
     /// Reports whether a merge occured, or if the index was invalid
-    fn flatten(&mut self, idx: TreeIdxRef) -> Result<(), AlgebraDSLError> {
+    fn flatten(&mut self, idx: &TreeIdxSlice) -> Result<(), AlgebraDSLError> {
         let expr = self.get_mut(idx)?;
         let replacement = match expr.take() {
             Expression::Sum(summands) => {
@@ -414,11 +453,24 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                         e => new_bottom.push(e),
                     })
                     .count();
-                Expression::Division(new_top, new_bottom)
+                Expression::divide_products_flatten(new_top, new_bottom)
             }
             e => e,
         };
         *expr = replacement;
+        Ok(())
+    }
+
+    fn flatten_many<Idx: AsRef<TreeIdxSlice> + ?Sized>(&mut self,
+                                              idxs: &[&Idx])
+                                              -> Result<(), AlgebraDSLError> {
+        let mut indices = idxs.iter().filter_map(|idx| idx.as_ref().parent()).collect::<Vec<_>>();
+        indices.sort();
+        indices.dedup();
+        indices.sort_by_key(|idx| idx.len());
+        for idx in indices.iter().rev() {
+            self.flatten(idx)?;
+        }
         Ok(())
     }
 
@@ -446,7 +498,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
 
     /// If all the input indices share a parent, constructs a sibling index representing all of
     /// them
-    fn make_siblings(&self, indices: &[TreeIdx]) -> Result<SiblingIndices, AlgebraDSLError> {
+    fn sibling_indices(&self, indices: &[TreeIdx]) -> Result<SiblingIndices, AlgebraDSLError> {
         fn stem(indices: &[TreeIdx]) -> Option<(TreeIdx, Vec<TreeIdx>)> {
             let mut v = vec![];
             let mut i = 0;
@@ -501,9 +553,10 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             &Expression::Sum(ref args) => {
                 if branches.iter().any(|idx| {
                     if idx.as_ref().len() != 1 {
-                        if let Some(&Expression::Negation(_)) = idx.as_ref()
-                            .first()
-                            .and_then(|i| args.get(i)) {
+                        if let Some(&Expression::Negation(_)) =
+                            idx.as_ref()
+                                .first()
+                                .and_then(|i| args.get(i)) {
                             idx.as_ref().len() > 2
                         } else {
                             true
@@ -529,10 +582,9 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
     }
     fn swap(&mut self, a: &TreeIdx, b: &TreeIdx) -> Result<(), AlgebraDSLError> {
         // Detect errors early and fail. Necessary because we don't have a concept of disjoint
-        // borrows, so we can't mutably borrow a and
-        let min_len = a.0.iter().zip(b.0.iter()).count();
-        if self.get_mut(a.as_ref()).is_err() || self.get_mut(b.as_ref()).is_err() ||
-           a.0.iter().zip(b.0.iter()).filter(|&(a, b)| a == b).count() >= min_len {
+        // borrows, so we can't mutably borrow a and b simultaneously
+        let nested = a.as_ref().nested(b.as_ref());
+        if nested || self.get_mut(a.as_ref()).is_err() || self.get_mut(b.as_ref()).is_err() {
             return Err(AlgebraDSLError::InvalidIdx);
         }
         let tmp_a = self.get_mut(a.as_ref()).expect(UNREACH).take();
@@ -709,7 +761,7 @@ impl Expression {
                         bottom_exprs.insert(0, Ex::Atom(Atom::Natural(r_bottom_nat)));
                     }
                 }
-                Ex::divide_products(top_exprs, bottom_exprs)
+                Ex::divide_products_flatten(top_exprs, bottom_exprs)
             }
             Ex::Power(box base, box exp) => {
                 let b = base.simplify_constants();
@@ -784,7 +836,17 @@ impl Expression {
     }
 
     /// Creates an `Expression` with `top`s divided by `bottom`s
-    fn divide_products(mut top: Vec<Expression>, bottom: Vec<Expression>) -> Expression {
+    fn divide_products(top: Vec<Expression>, bottom: Vec<Expression>) -> Expression {
+        let one = Expression::Atom(Atom::Natural(1));
+        match (top.len(), bottom.len()) {
+            (0, 0) => one,
+            (0, _) => Expression::Division(vec![one], bottom),
+            (_, _) => Expression::Division(top, bottom),
+        }
+    }
+
+    /// Creates an `Expression` with `top`s divided by `bottom`s
+    fn divide_products_flatten(mut top: Vec<Expression>, bottom: Vec<Expression>) -> Expression {
         let one = Expression::Atom(Atom::Natural(1));
         match (top.len(), bottom.len()) {
             (0, 0) => one,
@@ -819,11 +881,13 @@ impl Expression {
 }
 
 impl Indexable for Expression {
-    fn get(&self, index: TreeIdxRef) -> Result<&Expression, AlgebraDSLError> {
-        match index.first() {
+    fn get<Idx: AsRef<TreeIdxSlice> + ?Sized>(&self,
+                                              index: &Idx)
+                                              -> Result<&Expression, AlgebraDSLError> {
+        match index.as_ref().first() {
             None => Ok(self),
             Some(first) => {
-                let rest = index.rest();
+                let rest = index.as_ref().rest();
                 match self {
                     &Expression::Negation(ref e) if first == 0 => e.get(rest),
                     &Expression::Sum(ref e) if first < e.len() => e[first].get(rest),
@@ -856,11 +920,13 @@ impl Indexable for Expression {
             }
         }
     }
-    fn get_mut(&mut self, index: TreeIdxRef) -> Result<&mut Expression, AlgebraDSLError> {
-        match index.first() {
+    fn get_mut<Idx: AsRef<TreeIdxSlice> + ?Sized>(&mut self,
+                                                  index: &Idx)
+                                                  -> Result<&mut Expression, AlgebraDSLError> {
+        match index.as_ref().first() {
             None => Ok(self),
             Some(first) => {
-                let rest = index.rest();
+                let rest = index.as_ref().rest();
                 match self {
                     &mut Expression::Negation(ref mut e) if first == 0 => e.get_mut(rest),
                     &mut Expression::Sum(ref mut e) if first < e.len() => e[first].get_mut(rest),
@@ -907,13 +973,17 @@ impl<'a> MathRef<'a> {
 }
 
 impl Indexable for Math {
-    fn get(&self, index: TreeIdxRef) -> Result<&Expression, AlgebraDSLError> {
+    fn get<Idx: AsRef<TreeIdxSlice> + ?Sized>(&self,
+                                              index: &Idx)
+                                              -> Result<&Expression, AlgebraDSLError> {
         match self {
             &Math::Eq(ref eq) => eq.get(index),
             &Math::Ex(ref ex) => ex.get(index),
         }
     }
-    fn get_mut(&mut self, index: TreeIdxRef) -> Result<&mut Expression, AlgebraDSLError> {
+    fn get_mut<Idx: AsRef<TreeIdxSlice> + ?Sized>(&mut self,
+                                                  index: &Idx)
+                                                  -> Result<&mut Expression, AlgebraDSLError> {
         match self {
             &mut Math::Eq(ref mut eq) => eq.get_mut(index),
             &mut Math::Ex(ref mut ex) => ex.get_mut(index),
