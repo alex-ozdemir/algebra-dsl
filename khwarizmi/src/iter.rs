@@ -53,9 +53,7 @@ impl<'a> Iterator for ChildIter<'a> {
             _ => None,
         };
         let idx_and_res = res.map(|r| (override_idx.clone().unwrap_or(idx), r));
-        override_idx.map(|i| {
-            self.next_idx = i;
-        });
+        override_idx.map(|i| { self.next_idx = i; });
         self.next_idx += 1;
         idx_and_res
     }

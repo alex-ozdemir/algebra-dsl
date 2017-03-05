@@ -432,8 +432,8 @@ fn simple_replace_all() {
     let after = Ex::Power(box var('y'), box var('y'));
     let i1 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
     let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
-    let v = vec![i1.as_ref(), i2.as_ref()];
-    e.replace_all(v.as_slice(), var('y')).unwrap();
+    let v = vec![i1, i2];
+    e.replace_all(v.iter(), var('y')).unwrap();
     assert_expected_eq_actual!(after, e);
 }
 
@@ -443,8 +443,8 @@ fn sum_flatten_replace_all() {
     let after = Ex::Sum(vec![nat(1), nat(1), nat(1), nat(1)]);
     let i1 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
     let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
-    let v = vec![i1.as_ref(), i2.as_ref()];
-    e.replace_all(v.as_slice(), Ex::Sum(vec![nat(1), nat(1)])).unwrap();
+    let v = vec![i1, i2];
+    e.replace_all(v.iter(), Ex::Sum(vec![nat(1), nat(1)])).unwrap();
     assert_expected_eq_actual!(after, e);
 }
 
@@ -454,8 +454,8 @@ fn division_top_flatten_replace_all() {
     let after = Ex::Division(vec![nat(1), nat(1), nat(1), nat(1)], vec![var('t')]);
     let i1 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
     let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
-    let v = vec![i1.as_ref(), i2.as_ref()];
-    e.replace_all(v.as_slice(), Ex::Division(vec![nat(1), nat(1)], vec![])).unwrap();
+    let v = vec![i1, i2];
+    e.replace_all(v.iter(), Ex::Division(vec![nat(1), nat(1)], vec![])).unwrap();
     assert_expected_eq_actual!(after, e);
 }
 
@@ -465,19 +465,30 @@ fn division_bottom_flatten_replace_all() {
     let after = Ex::Division(vec![var('t')], vec![nat(1), nat(1), nat(1), nat(1)]);
     let i1 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
     let i2 = TreeIdx::from_str("#(mtn:0,2)").unwrap();
-    let v = vec![i1.as_ref(), i2.as_ref()];
-    e.replace_all(v.as_slice(), Ex::Division(vec![nat(1), nat(1)], vec![])).unwrap();
+    let v = vec![i1, i2];
+    e.replace_all(v.iter(), Ex::Division(vec![nat(1), nat(1)], vec![])).unwrap();
     assert_expected_eq_actual!(after, e);
 }
 
 #[test]
 fn complex_replace_all() {
     let mut e = Ex::Sum(vec![nat(2), Ex::Power(box var('x'), box nat(2))]);
-    let after = Ex::Sum(vec![nat(1), nat(1), Ex::Power(box var('x'), box Ex::Sum(vec![nat(1), nat(1)]))]);
+    let after =
+        Ex::Sum(vec![nat(1), nat(1), Ex::Power(box var('x'), box Ex::Sum(vec![nat(1), nat(1)]))]);
     let i1 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
     let i2 = TreeIdx::from_str("#(mtn:0,1,1)").unwrap();
-    let v = vec![i1.as_ref(), i2.as_ref()];
-    e.replace_all(v.as_slice(), Ex::Sum(vec![nat(1), nat(1)])).unwrap();
+    let v = vec![i1, i2];
+    e.replace_all(v.iter(), Ex::Sum(vec![nat(1), nat(1)])).unwrap();
     assert_expected_eq_actual!(after, e);
 }
 
+#[test]
+fn simple_map() {
+    let e = Ex::Sum(vec![nat(1), var('x')]);
+    let t = Ex::from_str(" @ + 7 * @").unwrap();
+    let expect = Ex::Sum(vec![nat(1),
+                              var('x'),
+                              Ex::Division(vec![nat(7), Ex::Sum(vec![nat(1), var('x')])], vec![])]);
+    let actual = e.map(t).unwrap();
+    assert_expected_eq_actual!(expect, actual);
+}

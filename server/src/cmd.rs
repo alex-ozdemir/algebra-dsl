@@ -28,6 +28,7 @@ pub enum Cmd {
     Make(Vec<TreeIdx>, Expression),
     Delete(Vec<TreeIdx>),
     Map(Op, Expression),
+    FullMap(Expression),
     Swap(TreeIdx, TreeIdx),
     Output(Vec<usize>),
     Recover(usize),
@@ -78,6 +79,10 @@ impl Cmd {
                     Err(AlgebraDSLError::MapExpression)
                 }
             }
+            (Cmd::FullMap(template), Some(old_expr)) => {
+                let expr = old_expr.clone();
+                Ok(Return::Math(expr.map(template)?))
+            }
             (Cmd::Output(math_idxs_to_output), _) => {
                 let mut latex_writer = LatexWriter::new();
                 for idx in math_idxs_to_output {
@@ -112,9 +117,8 @@ impl Cmd {
                 Ok(Return::NoReturn)
             }
             (Cmd::Replace(indices, new_expr), Some(old_eqorexpr)) => {
-                let v = indices.iter().map(|i| i.as_ref()).collect::<Vec<_>>();
                 let mut eqorexpr = old_eqorexpr.clone();
-                eqorexpr.replace_all(v.as_slice(), new_expr)?;
+                eqorexpr.replace_all(indices.iter(), new_expr)?;
                 Ok(Return::Math(eqorexpr))
             }
             (Cmd::Collapse(idx, howfar), Some(old)) => {
@@ -171,6 +175,9 @@ impl str::FromStr for Cmd {
                     let i1 = indices.pop().unwrap();
                     Ok(Cmd::Swap(i1, i2))
                 }
+            } else if s.starts_with("map") {
+                let template = Expression::from_str(&s[3..].trim())?;
+                Ok(Cmd::FullMap(template))
             } else if s.starts_with("output") {
                 let mut indices = Vec::new();
                 let mut rest: &str = &s[6..].trim();

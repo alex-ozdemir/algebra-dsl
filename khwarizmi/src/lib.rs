@@ -305,21 +305,25 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
     }
 
     /// Replace each location indicated by one of`indices` in `self` with `expr`
-    fn replace_all<Idx: AsRef<TreeIdxSlice> + ?Sized>(&mut self,
-                                             indices: &[&Idx],
-                                             expr: Expression)
-                                             -> Result<(), AlgebraDSLError> {
-        for idx in indices {
+    fn replace_all<'a, Idx, Iter>(&mut self,
+                                  indices: Iter,
+                                  expr: Expression)
+                                  -> Result<(), AlgebraDSLError>
+        where Idx: AsRef<TreeIdxSlice> + ?Sized + 'a,
+              Iter: Iterator<Item = &'a Idx>
+    {
+        let idxs: Vec<_> = indices.collect();
+        for idx in idxs.iter() {
             self.replace(idx, expr.clone())?;
         }
-        self.flatten_many(indices).ok(); // Ignore Error
+        self.flatten_many(idxs.iter()).ok(); // Ignore Error
         Ok(())
     }
 
     fn replace<Idx: AsRef<TreeIdxSlice> + ?Sized>(&mut self,
-                                         index: &Idx,
-                                         expr: Expression)
-                                         -> Result<Expression, AlgebraDSLError> {
+                                                  index: &Idx,
+                                                  expr: Expression)
+                                                  -> Result<Expression, AlgebraDSLError> {
         let old = {
             let subtree = self.get_mut(index.as_ref())?;
             let old = subtree.take();
@@ -328,6 +332,8 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         };
         Ok(old)
     }
+
+    /// Delete the specified indices
     fn delete(&mut self, indices: SiblingIndices) -> Result<(), AlgebraDSLError> {
         let cp = self.clone();
         let res = self.replace_with_inner(&indices, None, AlgebraDSLError::InvalidDelete);
@@ -365,35 +371,29 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 let original_top_len = top.len();
                 let bottom_indices = children.iter()
                     .cloned()
-                    .filter_map(|i| {
-                        if i >= top.len() && i < top.len() + bottom.len() {
-                            Some(i - top.len())
-                        } else {
-                            None
-                        }
+                    .filter_map(|i| if i >= top.len() && i < top.len() + bottom.len() {
+                        Some(i - top.len())
+                    } else {
+                        None
                     })
                     .collect::<Vec<_>>();
                 let top_indices = children.iter()
                     .cloned()
-                    .filter_map(|i| { if i < top.len() { Some(i) } else { None } })
+                    .filter_map(|i| if i < top.len() { Some(i) } else { None })
                     .collect::<Vec<_>>();
                 let mut new_top = delete_prod(top, top_indices.as_slice());
                 let mut new_bottom = delete_prod(bottom, bottom_indices.as_slice());
 
-                expr.map(|e| {
-                    if insert_idx < original_top_len {
-                        new_top.insert(insert_idx, e);
-                    } else {
-                        new_bottom.insert(insert_idx - original_top_len, e);
-                    }
+                expr.map(|e| if insert_idx < original_top_len {
+                    new_top.insert(insert_idx, e);
+                } else {
+                    new_bottom.insert(insert_idx - original_top_len, e);
                 });
                 Ok(Ex::divide_products(new_top, new_bottom))
             }
             _ => Err(gen_err),
         };
-        result.map(|e| {
-            *parent_ref = e;
-        })
+        result.map(|e| { *parent_ref = e; })
     }
 
     fn make_siblings(&mut self,
@@ -424,11 +424,9 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         let replacement = match expr.take() {
             Expression::Sum(summands) => {
                 Expression::Sum(summands.into_iter()
-                    .flat_map(|e| {
-                        match e {
-                            Expression::Sum(more_summands) => more_summands,
-                            e => vec![e],
-                        }
+                    .flat_map(|e| match e {
+                        Expression::Sum(more_summands) => more_summands,
+                        e => vec![e],
                     })
                     .collect())
             }
@@ -461,10 +459,12 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         Ok(())
     }
 
-    fn flatten_many<Idx: AsRef<TreeIdxSlice> + ?Sized>(&mut self,
-                                              idxs: &[&Idx])
-                                              -> Result<(), AlgebraDSLError> {
-        let mut indices = idxs.iter().filter_map(|idx| idx.as_ref().parent()).collect::<Vec<_>>();
+    /// Flattens many indices, being sure to not invalidate any in the intermediate period
+    fn flatten_many<'a, Idx, Iter>(&mut self, indices: Iter) -> Result<(), AlgebraDSLError>
+        where Idx: AsRef<TreeIdxSlice> + ?Sized + 'a,
+              Iter: Iterator<Item = &'a Idx>
+    {
+        let mut indices = indices.filter_map(|idx| idx.as_ref().parent()).collect::<Vec<_>>();
         indices.sort();
         indices.dedup();
         indices.sort_by_key(|idx| idx.len());
@@ -551,19 +551,17 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         // it's okay.
         match self.get(trunk.as_ref())? {
             &Expression::Sum(ref args) => {
-                if branches.iter().any(|idx| {
-                    if idx.as_ref().len() != 1 {
-                        if let Some(&Expression::Negation(_)) =
-                            idx.as_ref()
-                                .first()
-                                .and_then(|i| args.get(i)) {
-                            idx.as_ref().len() > 2
-                        } else {
-                            true
-                        }
+                if branches.iter().any(|idx| if idx.as_ref().len() != 1 {
+                    if let Some(&Expression::Negation(_)) =
+                        idx.as_ref()
+                            .first()
+                            .and_then(|i| args.get(i)) {
+                        idx.as_ref().len() > 2
                     } else {
-                        false
+                        true
                     }
+                } else {
+                    false
                 }) {
                     return Err(AlgebraDSLError::InvalidSiblingIndices);
                 }
@@ -615,6 +613,17 @@ impl Expression {
     }
     pub fn expr_iter(&self) -> ExpressionIter {
         ExpressionIter::new(MathRef::Ex(self))
+    }
+    pub fn map(self, mut template: Expression) -> Result<Self, AlgebraDSLError> {
+        let mut idxs = Vec::new();
+        let placeholder = Expression::Atom(Atom::Escaped(PLACEHOLDER.to_string()));
+        for (idx, e) in template.expr_iter() {
+            if e == &placeholder {
+                idxs.push(idx);
+            }
+        }
+        template.replace_all(idxs.iter(), self)?;
+        Ok(template)
     }
     pub fn inflate_addition(self, expr: Expression) -> Self {
         match self {
@@ -1014,6 +1023,18 @@ impl Math {
     }
     pub fn expr_iter(&self) -> ExpressionIter {
         self.as_ref().expr_iter()
+    }
+    pub fn map(self, template: Expression) -> Result<Self, AlgebraDSLError> {
+        use self::Math::*;
+        Ok(match self {
+            Eq(Equation { left, right }) => {
+                Eq(Equation {
+                    left: left.map(template.clone())?,
+                    right: right.map(template)?,
+                })
+            }
+            Ex(ex) => Ex(ex.map(template)?),
+        })
     }
 }
 
