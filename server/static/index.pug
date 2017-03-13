@@ -30,12 +30,14 @@ html
     link(rel="stylesheet" type="text/css" href="static/disable-highlight.css")
     link(rel="stylesheet" type="text/css" href="static/math.css")
   body
+    div#topbar
+      button(type="button" class="btn btn-default btn-sm" onclick="sendOutputLatex()") Get Checked Math as LaTeX
+      button(type="button" class="btn btn-default btn-sm" onclick="downloadSession()") Download Session
+      input(type="file" id="loadsessioninput" onchange="loadSession(this.files[0]); this.files = null" style="display:none")
+      button(type="button" class="btn btn-default btn-sm" onclick="$('#loadsessioninput').click()") Load Session
+      button(type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#feedbackModal") Send feedback!
+
     #repl
-    button(type="button" class="btn btn-default btn-sm" onclick="sendOutputLatex()") Get Checked Math as LaTeX
-    button(type="button" class="btn btn-default btn-sm" onclick="downloadSession()") Download Session
-    input(type="file" id="loadsessioninput" onchange="loadSession(this.files[0]); this.files = null" style="display:none")
-    button(type="button" class="btn btn-default btn-sm" onclick="$('#loadsessioninput').click()") Load Session
-    button(type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#feedbackModal") Send feedback!
 
     #feedbackModal.modal.fade(tabindex='-1', role='dialog', aria-labelledby='feedbackModalLabel')
       .modal-dialog(role='document')

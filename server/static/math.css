@@ -9,8 +9,25 @@
 }
 
 body {
-    padding: 20px;
+    padding: 0 20px;
     padding-bottom: 75px;
+}
+
+#repl {
+    padding-top: 60px;
+}
+
+#topbar {
+    z-index: 1000;
+    position:fixed;
+
+    top: 0;
+    margin:auto;
+    left: 0;
+    right: 0;
+    width: 100%;
+
+    background-color: #ffffff;
 }
 
 [highlighted="0"]  { border-color: purple !important; outline-color: purple; }
