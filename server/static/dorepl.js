@@ -488,22 +488,27 @@ function replaceAllMathTags(cm, changeObj) {
             break;
         }
         currentOffset = tagEndIdx;
+        var tagStartPos = cm.posFromIndex(tagStartIdx);
+        var tagEndPos = cm.posFromIndex(tagEndIdx+1);
 
         var tag = s.slice(tagStartIdx + tagBeginStrLen, tagEndIdx);
         var mathForTagAry = $(cm.prevMath).find("[mathtreenode='" + tag + "']");
         var mathInOutAry = $(prevMathBoxClone).find("[mathtreenode='" + tag + "']");
         if (mathForTagAry.length != 1 || mathInOutAry.length != 1) {
-            console.log("No or >1 match for tag '" + tag + "': ");
-            console.log(mathForTagAry);
-            console.log(mathInOutAry);
+            var toInsert = document.createElement('span');
+            toInsert.className = 'broken-reference';
+
+            $(toInsert).append("??");
+
+            cm.markText(tagStartPos, tagEndPos, {
+                replacedWith: toInsert
+            });
             continue;
         }
         var color = availColors.pop();
 
         // Put the math in a span and highlight it
         var mathInOut = mathInOutAry[0];
-
-        var tagStartPos = cm.posFromIndex(tagStartIdx);
 
         var elementToAddHoverTo;
 
@@ -554,7 +559,7 @@ function replaceAllMathTags(cm, changeObj) {
 
         var marker = cm.markText(
                 tagStartPos,
-                cm.posFromIndex(tagEndIdx+1),
+                tagEndPos,
                 {replacedWith: toInsert});
 
         if (changeAddedThisTag) {

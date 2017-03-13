@@ -67,6 +67,10 @@ body {
   margin: 0.3em;
 }
 
+.broken-reference {
+    border: solid 4px black;
+}
+
 button.recover {
     left-margin: fill;
     border-radius: 1em;
