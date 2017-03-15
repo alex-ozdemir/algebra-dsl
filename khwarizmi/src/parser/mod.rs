@@ -84,9 +84,8 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                             let combinator = operator_stack.pop().expect(UNREACH);
                             let second = expression_stack.pop().ok_or(ParseError::OperatorError)?;
                             let new_expr = if combinator.arity()
-                                .ok_or_else(|| {
-                                    ParseError::UnmatchGrouping(combinator.clone())
-                                })? == 1 {
+                                .ok_or_else(|| ParseError::UnmatchGrouping(combinator.clone()))? ==
+                                              1 {
                                 combine1(second, combinator)?
                             } else {
                                 let first = expression_stack.pop()

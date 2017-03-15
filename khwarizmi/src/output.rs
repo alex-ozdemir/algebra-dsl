@@ -51,29 +51,46 @@ impl fmt::Display for Atom {
     }
 }
 
-impl Math {
+impl Equation {
     pub fn as_khwarizmi_latex(&self) -> String {
-        struct DisplaysAsLatex<'a>(&'a Math);
+        struct DisplaysAsLatex<'a>(&'a Equation);
         impl<'a> fmt::Display for DisplaysAsLatex<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 write!(f, "")?;
-                match self.0 {
-                    &Math::Eq(ref eq) => {
-                        fmt_as_latex(&eq.left, f, (&eq.left, false, true), LaTeXOutputType::ForUs)?;
-                        write!(f, " = ")?;
-                        fmt_as_latex(&eq.right,
-                                     f,
-                                     (&eq.right, false, true),
-                                     LaTeXOutputType::ForUs)?;
-                    }
-                    &Math::Ex(ref ex) => {
-                        fmt_as_latex(&ex, f, (&ex, false, true), LaTeXOutputType::ForUs)?;
-                    }
-                }
-                write!(f, "")
+                fmt_as_latex(&self.0.left,
+                             f,
+                             (&self.0.left, false, true),
+                             LaTeXOutputType::ForUs)?;
+                write!(f, " = ")?;
+                fmt_as_latex(&self.0.right,
+                             f,
+                             (&self.0.right, false, true),
+                             LaTeXOutputType::ForUs)
             }
         }
         format!("{}", DisplaysAsLatex(self))
+    }
+}
+
+impl Expression {
+    pub fn as_khwarizmi_latex(&self) -> String {
+        struct DisplaysAsLatex<'a>(&'a Expression);
+        impl<'a> fmt::Display for DisplaysAsLatex<'a> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "")?;
+                fmt_as_latex(self.0, f, (self.0, false, true), LaTeXOutputType::ForUs)
+            }
+        }
+        format!("{}", DisplaysAsLatex(self))
+    }
+}
+
+impl Math {
+    pub fn as_khwarizmi_latex(&self) -> String {
+        match self {
+            &Math::Eq(ref eq) => eq.as_khwarizmi_latex(),
+            &Math::Ex(ref ex) => ex.as_khwarizmi_latex(),
+        }
     }
 }
 

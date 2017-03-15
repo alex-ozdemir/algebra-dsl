@@ -264,10 +264,10 @@ socket.onmessage = function(event) {
         cm.replaceRange(data.slice(atIdx + 1), cursorPos);
         cm.focus();
     } else if (type === 'Err') {
-        var errDiv = document.createElement('div');
-        errDiv.className = 'output algebra-dsl-error';
-        errDiv.innerHTML = data.slice(atIdx + 1);
-        document.getElementById('repl').appendChild(errDiv);
+        var errCode = document.createElement('pre');
+        errCode.className = 'output algebra-dsl-error';
+        errCode.innerHTML = data.slice(atIdx + 1);
+        document.getElementById('repl').appendChild(errCode);
     } else if (type === 'Math') {
         var nextAtIdx = data.indexOf('@', atIdx + 1);
         var nextNextAtIdx = data.indexOf('@', nextAtIdx + 1);
