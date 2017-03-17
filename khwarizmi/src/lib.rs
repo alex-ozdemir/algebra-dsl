@@ -581,6 +581,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         }
         // Takes in a bunch of indices and combines common stems.
         // If there are no indices, returns `None`.
+        // If there is only one, the list of siblings will be empty
         fn stem(indices: &[TreeIdx]) -> Result<(TreeIdx, Vec<TreeIdx>), AlgebraDSLError> {
             let mut v = vec![];
             let mut i = 0;
@@ -601,14 +602,11 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             }
             let tails: Vec<_> = indices.iter()
                 .filter_map(|idx: &TreeIdx| idx.as_ref().tail_from(i).map(|idx| idx.to_owned()))
+                .filter(|idx| idx.len() > 0)
                 .collect();
             // If any of the above "tail_from" calls were out of bounds, then the tails list will
             // be shorter
-            if tails.len() < indices.len() {
-                unreachable!()
-            } else {
-                Ok((TreeIdx(v), tails))
-            }
+            Ok((TreeIdx(v), tails))
         }
 
         let (mut trunk, mut branches) = stem(indices)?;
