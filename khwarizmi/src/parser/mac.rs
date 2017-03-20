@@ -258,9 +258,8 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                     (last, mut next) => {
                         last.map(|last| result_list.push(last));
                         // Potentially insert multiplication
-                        let op_expected = result_list.last()
-                            .map(PostMac::expects_op_after)
-                            .unwrap_or(false);
+                        let op_expected =
+                            result_list.last().map(PostMac::expects_op_after).unwrap_or(false);
                         let implicit_times = op_expected && next.expects_op_before();
                         if implicit_times {
                             result_list.push(PostMac::Op(UniOp::Std(Operator::Times)));

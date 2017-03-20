@@ -635,18 +635,3 @@ fn fmt_as_latex(expr: &Expression,
     }
     Ok(())
 }
-
-
-pub fn precedence(expr: &Expression) -> u8 {
-    match expr {
-        &Expression::Atom(_) => u8::max_value(),
-        &Expression::Application(_, _) => u8::max_value(),
-        &Expression::LimitOp(_, _, _, _) => 60,
-        &Expression::Subscript(_, _) => u8::min_value(),
-        &Expression::Power(_, _) => 45,
-        ref d @ &Expression::Division(_, _) if d.is_product() => 25,
-        &Expression::Division(_, _) => u8::min_value(),
-        &Expression::Sum(_) => 15,
-        &Expression::Negation(_) => 15,
-    }
-}

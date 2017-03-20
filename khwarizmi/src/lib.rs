@@ -1,6 +1,5 @@
 #![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from,
            pub_restricted)]
-#![allow(dead_code)]
 #[macro_use]
 extern crate nom;
 mod parser;
@@ -41,6 +40,7 @@ pub enum ErrorVariant {
     IllFormattedCommand,
     InvalidDelete,
     InvalidMake,
+    InvalidCancel,
     NotEnoughNestedExponents,
     InvalidSiblingIndices,
     MapExpression,
@@ -160,12 +160,11 @@ impl TreeIdx {
             Err(idx_fmt_err(format!("Index\n\t{}\nmust start with `#(mtn:` and end with `)`", s)))
         } else {
             let inner = &s[6..s.len() - 1];
-            let mut idxs = inner.split(',')
-                .map(|d| {
-                    usize::from_str(d).map_err(|_| {
+            let mut idxs = inner.split(',').map(|d| {
+                                                    usize::from_str(d).map_err(|_| {
                         idx_fmt_err(format!("Index\n\t{}\nmust contain comma-delimited numbers", s))
                     })
-                });
+                                                });
             // Pop the first index, because every expression/equation is in the trivial 0 idx
             if Some(Ok(0)) != idxs.next() {
                 return Err(idx_fmt_err(format!("Index\n\t{}\nmust start with a 0", s)));
@@ -269,12 +268,19 @@ impl TreeIdxSlice {
         }
     }
     pub fn to_owned(&self) -> TreeIdx {
-        TreeIdx(self.inner.iter().cloned().collect())
+        TreeIdx(self.inner
+                    .iter()
+                    .cloned()
+                    .collect())
     }
     /// Returns whether `self` refers to a location in `other` *or* vis-versa
     pub fn nested(&self, other: &TreeIdxSlice) -> bool {
         let min_len = cmp::min(self.len(), other.len());
-        self.inner.iter().zip(other.inner.iter()).filter(|&(a, b)| a == b).count() >= min_len
+        self.inner
+            .iter()
+            .zip(other.inner.iter())
+            .filter(|&(a, b)| a == b)
+            .count() >= min_len
     }
 
     /// Returns whether `self` contains (or equals) `other`
@@ -429,24 +435,29 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         use Expression as Ex;
         let &SiblingIndices { ref parent_idx, ref children } = indices;
         let parent_ref = self.get_mut(parent_idx.as_ref())?;
-        let insert_idx = *children.get(0)
-            .ok_or(AlgebraDSLError::from_variant(ErrorVariant::InvalidSiblingIndices))?;
+        let insert_idx =
+            *children.get(0)
+                 .ok_or(AlgebraDSLError::from_variant(ErrorVariant::InvalidSiblingIndices))?;
         let result = match parent_ref.take() {
             Ex::Sum(args) => {
+                if args.len() < children.len() {
+                    return Err(AlgebraDSLError::new(gen_err,
+                        format!("Can't get rid of more things than we have.")));
+                }
                 let mut new_exprs = delete_prod(args, children.as_slice());
                 expr.map(|e| new_exprs.insert(insert_idx, e));
-                Ex::sum_many(new_exprs)
-                    .ok_or(AlgebraDSLError::new(gen_err, format!("Empty sum is illegal")))
+                Ex::sum_many(new_exprs).ok_or(AlgebraDSLError::new(gen_err,
+                                                                   format!("Empty sum is illegal")))
             }
             Ex::Division(top, bottom) => {
                 let original_top_len = top.len();
                 let bottom_indices = children.iter()
                     .cloned()
                     .filter_map(|i| if i >= top.len() && i < top.len() + bottom.len() {
-                        Some(i - top.len())
-                    } else {
-                        None
-                    })
+                                    Some(i - top.len())
+                                } else {
+                                    None
+                                })
                     .collect::<Vec<_>>();
                 let top_indices = children.iter()
                     .cloned()
@@ -456,10 +467,10 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
                 let mut new_bottom = delete_prod(bottom, bottom_indices.as_slice());
 
                 expr.map(|e| if insert_idx < original_top_len {
-                    new_top.insert(insert_idx, e);
-                } else {
-                    new_bottom.insert(insert_idx - original_top_len, e);
-                });
+                             new_top.insert(insert_idx, e);
+                         } else {
+                             new_bottom.insert(insert_idx - original_top_len, e);
+                         });
                 Ok(Ex::divide_products(new_top, new_bottom))
             }
             e => {
@@ -499,32 +510,32 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         let replacement = match expr.take() {
             Expression::Sum(summands) => {
                 Expression::Sum(summands.into_iter()
-                    .flat_map(|e| match e {
-                        Expression::Sum(more_summands) => more_summands,
-                        e => vec![e],
-                    })
-                    .collect())
+                                    .flat_map(|e| match e {
+                                                  Expression::Sum(more_summands) => more_summands,
+                                                  e => vec![e],
+                                              })
+                                    .collect())
             }
             Expression::Division(top, bottom) => {
                 let mut new_top = vec![];
                 let mut new_bottom = vec![];
                 top.into_iter()
                     .map(|e| match e {
-                        Expression::Division(t, b) => {
-                            new_top.extend(t.into_iter());
-                            new_bottom.extend(b.into_iter());
-                        }
-                        e => new_top.push(e),
-                    })
+                             Expression::Division(t, b) => {
+                        new_top.extend(t.into_iter());
+                        new_bottom.extend(b.into_iter());
+                    }
+                             e => new_top.push(e),
+                         })
                     .count();
                 bottom.into_iter()
                     .map(|e| match e {
-                        Expression::Division(t, b) => {
-                            new_bottom.extend(t.into_iter());
-                            new_top.extend(b.into_iter());
-                        }
-                        e => new_bottom.push(e),
-                    })
+                             Expression::Division(t, b) => {
+                        new_bottom.extend(t.into_iter());
+                        new_top.extend(b.into_iter());
+                    }
+                             e => new_bottom.push(e),
+                         })
                     .count();
                 Expression::divide_products_flatten(new_top, new_bottom)
             }
@@ -634,17 +645,15 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         match self.get(trunk.as_ref())? {
             &Expression::Sum(ref args) => {
                 if branches.iter().any(|idx| if idx.as_ref().len() != 1 {
-                    if let Some(&Expression::Negation(_)) =
-                        idx.as_ref()
-                            .first()
-                            .and_then(|i| args.get(i)) {
-                        idx.as_ref().len() > 2
-                    } else {
-                        true
-                    }
-                } else {
-                    false
-                }) {
+                                           if let Some(&Expression::Negation(_)) =
+                        idx.as_ref().first().and_then(|i| args.get(i)) {
+                                               idx.as_ref().len() > 2
+                                           } else {
+                                               true
+                                           }
+                                       } else {
+                                           false
+                                       }) {
                     return Err(err_sib_idx(format!("Sibling indices must differ only in last \
                                                     expression. Actual differences: {:?}",
                                                    branches)));
@@ -660,9 +669,9 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
         }
 
         Ok(SiblingIndices {
-            parent_idx: trunk,
-            children: single_indices,
-        })
+               parent_idx: trunk,
+               children: single_indices,
+           })
     }
     fn swap(&mut self, a: &TreeIdx, b: &TreeIdx) -> Result<(), AlgebraDSLError> {
         // Detect errors early and fail. Necessary because we don't have a concept of disjoint
@@ -682,6 +691,139 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             Ok(())
         }
     }
+    fn cancel_inverse(&mut self, indices: SiblingIndices) -> Result<(), AlgebraDSLError> {
+        //check whether the sibling indices refer to a valid pair of inverses
+        let should_delete;
+        {
+            let &SiblingIndices { ref parent_idx, ref children } = &indices;
+            if children.len() != 2 {
+                //Cancel 2 at a time
+                return Err(AlgebraDSLError::from_variant(ErrorVariant::InvalidCancel));
+            }
+            let mut child0_idx = parent_idx.clone();
+            child0_idx.push(*children.get(0)
+                        .ok_or(AlgebraDSLError::from_variant(ErrorVariant::InternalError))?);
+            let mut child1_idx = parent_idx.clone();
+            child1_idx.push(*children.get(1)
+                        .ok_or(AlgebraDSLError::from_variant(ErrorVariant::InternalError))?);
+            should_delete = self.are_inverses(&parent_idx, &child0_idx, &child1_idx)?;
+        }
+        //then delete if it is a valid pair
+        if should_delete {
+            self.delete(indices)
+        } else {
+            Err(AlgebraDSLError::from_variant(ErrorVariant::InvalidCancel))
+        }
+    }
+    fn are_inverses(&self,
+                    parent: &TreeIdx,
+                    child0: &TreeIdx,
+                    child1: &TreeIdx)
+                    -> Result<bool, AlgebraDSLError> {
+        let parent_ref = self.get(parent.as_ref())?;
+        let child0_ref = self.get(child0.as_ref())?;
+        let child1_ref = self.get(child1.as_ref())?;
+        match parent_ref {
+            &Expression::Sum(_) => {
+                if let &Expression::Negation(ref child0_inner) = child0_ref {
+                    if **child0_inner == *child1_ref {
+                        return Ok(true);
+                    }
+                }
+                if let &Expression::Negation(ref child1_inner) = child1_ref {
+                    if **child1_inner == *child0_ref {
+                        return Ok(true);
+                    }
+                }
+            }
+            &Expression::Division(ref top, _) => {
+                if child0.last() < Some(top.len()) && child1.last() >= Some(top.len()) &&
+                   *child0_ref == *child1_ref {
+                    return Ok(true);
+                }
+            }
+            _ => return Ok(false),
+        }
+        Ok(false)
+    }
+    fn cancel_in_sum(&mut self,
+                     mut args: Vec<Expression>,
+                     idx: &TreeIdx)
+                     -> Result<(), AlgebraDSLError> {
+        //if we're down to only one thing, it doesn't run anyway.
+        for i in 1..args.len() {
+            for j in 0..i {
+                //if expr i and expr j are the same, but with negative sign, delete them
+                if let Expression::Negation(ref inner_i) = args[i].clone() {
+                    if **inner_i == args[j] {
+                        args.remove(i);
+                        args.remove(j); //i must come after j
+                        let mut index_i = idx.clone();
+                        index_i.push(i);
+                        let mut index_j = idx.clone();
+                        index_j.push(j);
+                        let sibs = self.sibling_indices(vec![index_i, index_j].as_slice())?;
+                        self.delete(sibs)?;
+                        return self.cancel_in_sum(args, idx);
+                    }
+                }
+                if let Expression::Negation(ref inner_j) = args[j].clone() {
+                    if **inner_j == args[i] {
+                        args.remove(i);
+                        args.remove(j);
+                        let mut index_i = idx.clone();
+                        index_i.push(i);
+                        let mut index_j = idx.clone();
+                        index_j.push(j);
+                        let sibs = self.sibling_indices(vec![index_i, index_j].as_slice())?;
+                        self.delete(sibs)?;
+                        return self.cancel_in_sum(args, idx);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    fn cancel_in_div(&mut self,
+                     mut top: Vec<Expression>,
+                     mut bot: Vec<Expression>,
+                     idx: &TreeIdx)
+                     -> Result<(), AlgebraDSLError> {
+        for t in 0..top.len() {
+            for b in 0..bot.len() {
+                if top[t] == bot[b] {
+                    let mut index_t = idx.clone();
+                    index_t.push(t);
+                    let mut index_b = idx.clone();
+                    index_b.push(b + top.len());
+                    let sibs = self.sibling_indices(vec![index_t, index_b].as_slice())?;
+                    top.remove(t);
+                    bot.remove(b);
+                    self.delete(sibs)?;
+                    return self.cancel_in_div(top, bot, idx);
+                }
+            }
+        }
+        Ok(())
+    }
+    fn cancel_assoc(&mut self, idx: &TreeIdx) -> Result<(), AlgebraDSLError> {
+        //Cancels everything in an entire associative structure
+        let expr = self.get(idx.as_ref())?.clone();
+        match expr {
+            Expression::Sum(args) => self.cancel_in_sum(args, idx),
+            Expression::Division(top, bot) => self.cancel_in_div(top, bot, idx),
+            _ => Err(AlgebraDSLError::from_variant(ErrorVariant::InvalidIdx)),
+        }
+    }
+    fn simplify(&mut self, idx: &TreeIdx) -> Result<(), AlgebraDSLError> {
+        //Attempts to simplify a given location in the tree, deterministically
+        match self.get(idx.as_ref())? {//expr {
+            &Expression::Sum(_) => self.cancel_assoc(idx),
+            &Expression::Division(_, _) => self.cancel_assoc(idx),
+            &Expression::Power(box Expression::Power(_, _), _) => self.collapse(idx, 1),
+            _ => Ok(()),
+        }
+    }
 }
 
 fn delete_prod(mut p: Vec<Expression>, is: &[TreeInt]) -> Vec<Expression> {
@@ -697,9 +839,7 @@ fn remove_args(args: &mut Vec<Expression>, idxs: &[TreeInt]) {
 
 impl Expression {
     pub fn from_str(expr: &str) -> Result<Self, AlgebraDSLError> {
-        parser::parse_expr(expr)
-            .map_err(ErrorVariant::Parse)
-            .map_err(AlgebraDSLError::from_variant)
+        parser::parse_expr(expr).map_err(ErrorVariant::Parse).map_err(AlgebraDSLError::from_variant)
     }
     pub fn take(&mut self) -> Self {
         mem::replace(self, NULL_EXPRESSION)
@@ -881,8 +1021,8 @@ impl Expression {
                     (Ex::Atom(Atom::Natural(n)), Ex::Atom(Atom::Natural(n2))) => {
                         let p: Result<u32, _> = TryFrom::try_from(n2);
                         Ex::Atom(p.map(|u| n.pow(u))
-                            .map(Atom::Natural)
-                            .unwrap_or(Atom::Floating((n as f64).powf(n2 as f64))))
+                                     .map(Atom::Natural)
+                                     .unwrap_or(Atom::Floating((n as f64).powf(n2 as f64))))
                     }
                     (e1, e2) => Ex::Power(box e1, box e2),
 
@@ -960,8 +1100,9 @@ impl Expression {
 
     /// Creates an `Expression` with `top`s divided by `bottom`s
     fn sum_many(mut summands: Vec<Expression>) -> Option<Expression> {
+        let zero = Expression::Atom(Atom::Natural(0));
         match summands.len() {
-            0 => None,
+            0 => Some(zero),
             1 => summands.pop(),
             _ => Some(Expression::Sum(summands)),
         }
@@ -1118,14 +1259,14 @@ impl Math {
     pub fn map(self, template: Expression) -> Result<Self, AlgebraDSLError> {
         use self::Math::*;
         Ok(match self {
-            Eq(Equation { left, right }) => {
-                Eq(Equation {
-                    left: left.map(template.clone())?,
-                    right: right.map(template)?,
-                })
-            }
-            Ex(ex) => Ex(ex.map(template)?),
-        })
+               Eq(Equation { left, right }) => {
+                   Eq(Equation {
+                          left: left.map(template.clone())?,
+                          right: right.map(template)?,
+                      })
+               }
+               Ex(ex) => Ex(ex.map(template)?),
+           })
     }
 }
 

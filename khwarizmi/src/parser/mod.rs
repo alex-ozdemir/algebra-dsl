@@ -84,12 +84,14 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                             let combinator = operator_stack.pop().expect(UNREACH);
                             let second = expression_stack.pop().ok_or(ParseError::OperatorError)?;
                             let new_expr = if combinator.arity()
-                                .ok_or_else(|| ParseError::UnmatchGrouping(combinator.clone()))? ==
+                                   .ok_or_else(|| {
+                                                   ParseError::UnmatchGrouping(combinator.clone())
+                                               })? ==
                                               1 {
                                 combine1(second, combinator)?
                             } else {
-                                let first = expression_stack.pop()
-                                    .ok_or(ParseError::OperatorError)?;
+                                let first =
+                                    expression_stack.pop().ok_or(ParseError::OperatorError)?;
                                 combine2(first, combinator, second)
                             };
                             expression_stack.push(new_expr);
@@ -148,11 +150,11 @@ macro_rules! combine_associative {
 fn post_process_all(exprs: Vec<Expression>) -> Result<Vec<Expression>, ParseError> {
     exprs.into_iter().fold(Ok(Vec::new()), |earlier, this| {
         earlier.and_then(|mut vec| {
-            post_process(this).map(|post_this| {
-                vec.push(post_this);
-                vec
-            })
-        })
+                             post_process(this).map(|post_this| {
+                                                        vec.push(post_this);
+                                                        vec
+                                                    })
+                         })
     })
 }
 
@@ -198,23 +200,23 @@ fn post_process(expr: Expression) -> Result<Expression, ParseError> {
 fn combine1(expr: Expression, op: UniOp) -> Result<Expression, ParseError> {
     use self::Operator::*;
     Ok(match op {
-        UniOp::Std(Neg) => Expression::Negation(box expr),
-        UniOp::LimitOp(sym, sub, sup) => {
-            let sub_expr = match sub { // I don't use map because `?` doesn't work in || {}
-                Some(box sub) => Some(parse_operators(sub)?),
-                None => None,
-            };
-            let sup_expr = match sup { // I don't use map because `?` doesn't work in || {}
-                Some(box sup) => Some(parse_operators(sup)?),
-                None => None,
-            };
-            Expression::LimitOp(sym,
-                                sub_expr.map(Box::new),
-                                sup_expr.map(Box::new),
-                                box expr)
-        }
-        _ => panic!("Combine1 called with non-unary operator"),
-    })
+           UniOp::Std(Neg) => Expression::Negation(box expr),
+           UniOp::LimitOp(sym, sub, sup) => {
+        let sub_expr = match sub { // I don't use map because `?` doesn't work in || {}
+            Some(box sub) => Some(parse_operators(sub)?),
+            None => None,
+        };
+        let sup_expr = match sup { // I don't use map because `?` doesn't work in || {}
+            Some(box sup) => Some(parse_operators(sup)?),
+            None => None,
+        };
+        Expression::LimitOp(sym,
+                            sub_expr.map(Box::new),
+                            sup_expr.map(Box::new),
+                            box expr)
+    }
+           _ => panic!("Combine1 called with non-unary operator"),
+       })
 }
 
 fn combine2(left: Expression, op: UniOp, right: Expression) -> Expression {
@@ -239,9 +241,9 @@ pub fn parse_equation(input: &str) -> Result<Equation, ParseError> {
     let right = parse_expr(sides.pop().expect(UNREACH))?;
     let left = parse_expr(sides.pop().expect(UNREACH))?;
     Ok(Equation {
-        left: left,
-        right: right,
-    })
+           left: left,
+           right: right,
+       })
 }
 
 pub fn parse_expr(input: &str) -> Result<Expression, ParseError> {

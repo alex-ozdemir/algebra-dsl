@@ -37,6 +37,8 @@ pub enum Cmd {
     Feedback(String, String),
     Replace(Vec<TreeIdx>, Expression),
     Collapse(TreeIdx, Option<usize>),
+    Cancel(Vec<TreeIdx>),
+    Simplify(TreeIdx),
 }
 
 fn internal_err() -> Error {
@@ -71,6 +73,17 @@ impl Cmd {
                 expr.delete(sibs)?;
                 Ok(Return::Math(expr))
             }
+            (Cmd::Cancel(indices), Some(old_expr)) => {
+                let mut expr = old_expr.clone();
+                let sibs = old_expr.sibling_indices(indices.as_slice())?;
+                expr.cancel_inverse(sibs)?;
+                Ok(Return::Math(expr))
+            }
+            (Cmd::Simplify(idx), Some(old_expr)) => {
+                let mut expr = old_expr.clone();
+                expr.simplify(&idx)?;
+                Ok(Return::Math(expr))
+            }
             (Cmd::Swap(i1, i2), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
                 expr.swap(&i1, &i2)?;
@@ -95,12 +108,11 @@ impl Cmd {
                 let mut latex_writer = LatexWriter::new();
                 for idx in math_idxs_to_output {
                     latex_writer.add_math(history.get(idx)
-                            .ok_or_else(|| invalid_hist_idx_err(idx))?)
+                                              .ok_or_else(|| invalid_hist_idx_err(idx))?)
                         .map_err(|_| internal_err())
                         .unwrap();
                 }
-                Ok(Return::LaTeXBlock(latex_writer.finish_str()
-                    .map_err(|_| internal_err())?))
+                Ok(Return::LaTeXBlock(latex_writer.finish_str().map_err(|_| internal_err())?))
             }
             (Cmd::Recover(idx), e) => {
                 println!("History is index {:?}: {:#?}", idx, history);
@@ -155,9 +167,9 @@ fn parse_indices(s: &str) -> Result<(Vec<TreeIdx>, &str), Error> {
     while rest.starts_with("#") {
         let idx_end = rest.find(')')
             .ok_or_else(|| {
-                Error::new(Variant::IllFormattedIndex,
-                           format!("The index `{}` has an unclosed paren", s))
-            })?;
+                            Error::new(Variant::IllFormattedIndex,
+                                       format!("The index `{}` has an unclosed paren", s))
+                        })?;
         let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
         indices.push(idx);
         rest = &rest[(idx_end + 1)..].trim();
@@ -182,6 +194,14 @@ impl str::FromStr for Cmd {
                 } else {
                     Ok(Cmd::Delete(indices))
                 }
+            } else if s.starts_with("cancel") {
+                let (indices, rest) = parse_indices(&s[6..].trim())?;
+                if !rest.trim().is_empty() {
+                    println!("Rest isn't empty, it's `{}`", rest);
+                    Err(Error::from_variant(Variant::IllFormattedCommand))
+                } else {
+                    Ok(Cmd::Cancel(indices))
+                }
             } else if s.starts_with("swap") {
                 let (mut indices, rest) = parse_indices(&s[4..].trim())?;
                 if indices.len() != 2 || rest.trim().len() > 0 {
@@ -191,6 +211,14 @@ impl str::FromStr for Cmd {
                     let i2 = indices.pop().unwrap();
                     let i1 = indices.pop().unwrap();
                     Ok(Cmd::Swap(i1, i2))
+                }
+            } else if s.starts_with("simplify") {
+                let (mut indices, rest) = parse_indices(&s[8..].trim())?;
+                if indices.len() != 1 || rest.trim().len() > 0 {
+                    Err(Error::from_variant(Variant::IllFormattedCommand))
+                } else {
+                    let idx = indices.pop().unwrap();
+                    Ok(Cmd::Simplify(idx))
                 }
             } else if s.starts_with("map") {
                 let template = Expression::from_str(&s[3..].trim())?;
@@ -212,9 +240,10 @@ impl str::FromStr for Cmd {
             } else if s.starts_with("recover") {
                 let rest = &s[7..].trim();
                 let idx = usize::from_str(rest).map_err(|_| {
-                        Error::new(Variant::InvalidIdx,
-                                   format!("Recover expects history index, but found `{}`", rest))
-                    })?;
+                                 Error::new(Variant::InvalidIdx,
+                                            format!("Recover expects history index, but found `{}`",
+                                                    rest))
+                             })?;
                 Ok(Cmd::Recover(idx))
             } else if s.starts_with("+") {
                 let rest = &s[1..].trim();
@@ -241,9 +270,10 @@ impl str::FromStr for Cmd {
             } else if s.starts_with("code") {
                 let rest = &s[4..].trim();
                 let idx = usize::from_str(rest).map_err(|_| {
-                        Error::new(Variant::InvalidIdx,
-                                   format!("Recover expects history index, but found `{}`", rest))
-                    })?;
+                                 Error::new(Variant::InvalidIdx,
+                                            format!("Recover expects history index, but found `{}`",
+                                                    rest))
+                             })?;
                 Ok(Cmd::GetCode(idx))
             } else if s.starts_with("replace") {
                 let (indices, rest) = parse_indices(&s[7..].trim())?;
@@ -256,18 +286,19 @@ impl str::FromStr for Cmd {
             } else if s.starts_with("collapse") {
                 let rest = s[8..].trim();
 
-                let (n, rest) = if char::from(rest.as_bytes()
-                        .last()
-                        .ok_or(Error::from_variant(Variant::IllFormattedCommand))?
-                        .clone())
-                    .is_digit(10) {
+                let (n, rest) = if
+                    char::from(rest.as_bytes()
+                                   .last()
+                                   .ok_or(Error::from_variant(Variant::IllFormattedCommand))?
+                                   .clone())
+                            .is_digit(10) {
                     let splitpoint = rest.rfind(|c: char| !c.is_digit(10))
                         .ok_or(Error::from_variant(Variant::IllFormattedCommand))?;
                     let (fst, snd) = rest.split_at(splitpoint + 1);
 
                     (Some(snd.trim()
-                         .parse()
-                         .map_err(|_| Error::from_variant(Variant::IllFormattedCommand))?),
+                              .parse()
+                              .map_err(|_| Error::from_variant(Variant::IllFormattedCommand))?),
                      fst.trim())
                 } else {
                     (None, rest)
