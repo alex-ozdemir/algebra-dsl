@@ -1,11 +1,11 @@
 /* Disable the blue box that appears around equations when you click on them
  */
 .MathJax:focus, .mjx-chtml:focus, .MathJax_SVG:focus {
-   outline: none;
+     outline: none;
 }
 .CodeMirror {
-  border: 1px solid #eee;
-  height: auto;
+    border: 1px solid #eee;
+    height: auto;
 }
 
 body {
@@ -63,8 +63,8 @@ body {
 }
 
 .output {
-  padding: 0.1em;
-  margin: 0.3em;
+    padding: 0.1em;
+    margin: 0.3em;
 }
 
 .broken-reference {
@@ -83,17 +83,17 @@ button.getcode {
 }
 
 .algebra-dsl-error {
-  border: 1px solid red;
-  background-color: #fd8;
+    border: 1px solid red;
+    background-color: #fd8;
 }
 
 .latexoutputbox {
-  border: 1px solid #eee;
-  padding: 5px;
+    border: 1px solid #eee;
+    padding: 5px;
 
-  resize: none;
-  overflow: hidden;
-  width: 100%;
+    resize: none;
+    overflow: hidden;
+    width: 100%;
 
-  font-family: monospace;
+    font-family: monospace;
 }
