@@ -308,8 +308,13 @@ impl str::FromStr for Cmd {
 
                 Ok(Cmd::Collapse(idx, n))
             } else {
-                Err(Error::new(Variant::UnrecognizedCmd,
-                               format!("Did not recognize cmd `{}`", s)))
+                Err(if Math::from_str(&s[1..].trim()).is_ok() {
+                    Error::new(Variant::UnrecognizedCmd,
+                               format!("Did you mean to enter Math? Try using a dollar sign:\n\t$ {}", s))
+                } else {
+                    Error::new(Variant::UnrecognizedCmd,
+                               format!("Did not recognize cmd `{}`", s))
+                })
             }
         } else if s.starts_with("feedback@") {
             let s = &s[9..];
