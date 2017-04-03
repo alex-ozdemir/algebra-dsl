@@ -23,53 +23,71 @@ html
     script(src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous")
 
     //- my js
-    //- script(type="text/javascript" src="static/equation-highlight.js")
     script(type="text/javascript" src="static/dorepl.js")
 
     //- my css
     link(rel="stylesheet" type="text/css" href="static/disable-highlight.css")
     link(rel="stylesheet" type="text/css" href="static/math.css")
   body
-    div#topbar
-      button(type="button" class="btn btn-default btn-sm" onclick="sendOutputLatex()") Get Checked Math as LaTeX
-      button(type="button" class="btn btn-default btn-sm" onclick="downloadSession()") Download Session
-      input(type="file" id="loadsessioninput" onchange="loadSession(this.files[0]); this.files = null" style="display:none")
-      button(type="button" class="btn btn-default btn-sm" onclick="$('#loadsessioninput').click()") Load Session
-      button(type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#feedbackModal") Send feedback!
+    #main-area
+      #topbar
+        button(type="button" class="btn btn-default btn-sm" onclick="sendOutputLatex()") Get Checked Math as LaTeX
+        button(type="button" class="btn btn-default btn-sm" onclick="downloadSession()") Download Session
+        input(type="file" id="loadsessioninput" onchange="loadSession(this.files[0]); this.files = null" style="display:none")
+        button(type="button" class="btn btn-default btn-sm" onclick="$('#loadsessioninput').click()") Load Session
+        button(type="button" class="btn btn-default btn-sm" onclick="openhelp(this)") Close Help
+        button(type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#feedbackModal") Send feedback!
 
-    #repl
+      #repl
 
-    #feedbackModal.modal.fade(tabindex='-1', role='dialog', aria-labelledby='feedbackModalLabel')
-      .modal-dialog(role='document')
-        .modal-content
-          .modal-header
-            button.close(type='button', data-dismiss='modal', aria-label='Close')
-              span(aria-hidden='true') ×
-            h4#feedbackModalLabel.modal-title Feedback
-          .modal-body
-            textarea#feedbackText.form-control
-          .modal-footer
-            button.btn.btn-primary(type='button', data-dismiss='modal', onclick='sendFeedback()') Submit Feedback
-    #connectionlostmodal.modal.fade
-      .modal-dialog.modal-sm
-        .modal-content
-          .modal-header
-            button.close(type='button', data-dismiss='modal', aria-hidden='true') ×
-            h4.modal-title Connection Closed
-          .modal-body
-            p.text-warning The connection to the server was lost.
-          .modal-footer
-            button.btn.btn-primary(type='button', data-dismiss='modal') Close
-    #connectionerrormodal.modal.fade
-      .modal-dialog.modal-sm
-        .modal-content
-          .modal-header
-            button.close(type='button', data-dismiss='modal', aria-hidden='true') ×
-            h4.modal-title Connection Error
-          .modal-body
-            p.text-warning There was an error in the connection to the server.
-          .modal-footer
-            button.btn.btn-primary(type='button', data-dismiss='modal') Close
+      #feedbackModal.modal.fade(tabindex='-1', role='dialog', aria-labelledby='feedbackModalLabel')
+        .modal-dialog(role='document')
+          .modal-content
+            .modal-header
+              button.close(type='button', data-dismiss='modal', aria-label='Close')
+                span(aria-hidden='true') ×
+              h4#feedbackModalLabel.modal-title Feedback
+            .modal-body
+              textarea#feedbackText.form-control
+            .modal-footer
+              button.btn.btn-primary(type='button', data-dismiss='modal', onclick='sendFeedback()') Submit Feedback
+      #connectionlostmodal.modal.fade
+        .modal-dialog.modal-sm
+          .modal-content
+            .modal-header
+              button.close(type='button', data-dismiss='modal', aria-hidden='true') ×
+              h4.modal-title Connection Closed
+            .modal-body
+              p.text-warning The connection to the server was lost.
+            .modal-footer
+              button.btn.btn-primary(type='button', data-dismiss='modal') Close
+      #connectionerrormodal.modal.fade
+        .modal-dialog.modal-sm
+          .modal-content
+            .modal-header
+              button.close(type='button', data-dismiss='modal', aria-hidden='true') ×
+              h4.modal-title Connection Error
+            .modal-body
+              p.text-warning There was an error in the connection to the server.
+            .modal-footer
+              button.btn.btn-primary(type='button', data-dismiss='modal') Close
+    //-#help(style='display:none;')
+    #help
+      center
+        h1 Help
+      | Khwarizmi is a language based around manipulating an expression or equation. Expressions are represented as trees. Many commands operate on one or more tags (subtrees of the previous expression or equation). To select a tag, click on the previous expression or equation repeatedly until the correct part is highlighted. You can also click and drag to select, making sure to start and end on parts that you #[em want] to be selected.
+      ul
+        li #[strong $ &langle;LaTeX code&rangle;]: Set the current expression or equation
+        li #[strong simplify &langle;tag&rangle;]: Attempt to automatically simplify the tag.
+        li #[strong cancel &langle;tag&rangle; &langle;tag&rangle;]: If the tags are inverses, delete them.
+        li &langle;#[strong +], #[strong -], #[strong /], #[strong *], or #[strong ^]&rangle; #[strong &langle;LaTeX code&rangle;]: Perform the operation to both sides of the previous equation. For example, #[strong +y] will add #[em y] to both sides.
+        li #[strong map &langle;LaTeX code&rangle;]: Replaces each side of the current equation with the given code, replacing any #[em @] symbols with the side of the current equation.
+        li #[strong collapse &langle;tag&rangle; !{'&langle;[number]&rangle;'}]: Collapse a tower of exponents. If a number is given, collapse that many times.
+        li #[strong make &langle;tag(s)&rangle; &langle;LaTeX code&rangle;]: Replace all of the tags with the code. The tags must be part of the same sum or product.
+        li #[strong delete &langle;tag(s)&rangle;]: Deletes the tags.
+        li #[strong swap &langle;tag&rangle; &langle;tag&rangle;]: Swap the positions of the two tags.
+        li #[strong replace &langle;tag(s)&rangle; &langle;LaTeX code&rangle;]: Replace each of the tags with the given LaTeX code.
+
 
 //- vim: sw=2 sts=2 tw=0
-//- au BufWritePost * !pug -P index.pug
+//- au BufWritePost index.pug !pug -P index.pug

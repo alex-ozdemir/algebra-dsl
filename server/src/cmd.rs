@@ -279,7 +279,7 @@ impl str::FromStr for Cmd {
                 let (indices, rest) = parse_indices(&s[7..].trim())?;
                 if indices.len() == 0 {
                     return Err(Error::new(Variant::IllFormattedCommand,
-                                          "replace expects indices, but found nonw".to_string()));
+                                          "replace expects indices, but found none".to_string()));
                 }
                 let expr = Expression::from_str(rest.trim())?;
                 Ok(Cmd::Replace(indices, expr))

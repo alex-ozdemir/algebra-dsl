@@ -8,7 +8,8 @@ MathJax.Hub.Config({
     CommonHTML: {
         scale: 200,
         linebreaks: {
-            automatic: true
+            automatic: true,
+            width: "75% container"
         }
     },
     MathML: {
@@ -699,3 +700,16 @@ $(window).bind('beforeunload', function(){
     }
     return undefined;
 });
+
+function openhelp(helpbutton) {
+    var helpdiv = $('#help');
+    if (helpbutton.closed) {
+        helpdiv.show();
+        helpbutton.closed = false;
+        $(helpbutton).text('Close Help');
+    } else {
+        helpdiv.hide();
+        helpbutton.closed = true;
+        $(helpbutton).text('Open Help');
+    }
+}

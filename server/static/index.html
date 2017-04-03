@@ -15,61 +15,81 @@
     <link rel="stylesheet" type="text/css" href="static/math.css">
   </head>
   <body>
-    <div id="topbar">
-      <button class="btn btn-default btn-sm" type="button" onclick="sendOutputLatex()">Get Checked Math as LaTeX</button>
-      <button class="btn btn-default btn-sm" type="button" onclick="downloadSession()">Download Session</button>
-      <input type="file" id="loadsessioninput" onchange="loadSession(this.files[0]); this.files = null" style="display:none">
-      <button class="btn btn-default btn-sm" type="button" onclick="$('#loadsessioninput').click()">Load Session</button>
-      <button class="btn btn-default btn-sm" type="button" data-toggle="modal" data-target="#feedbackModal">Send feedback!</button>
-    </div>
-    <div id="repl"></div>
-    <div class="modal fade" id="feedbackModal" tabindex="-1" role="dialog" aria-labelledby="feedbackModalLabel">
-      <div class="modal-dialog" role="document">
-        <div class="modal-content">
-          <div class="modal-header">
-            <button class="close" type="button" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
-            <h4 class="modal-title" id="feedbackModalLabel">Feedback</h4>
+    <div id="main-area">
+      <div id="topbar">
+        <button class="btn btn-default btn-sm" type="button" onclick="sendOutputLatex()">Get Checked Math as LaTeX</button>
+        <button class="btn btn-default btn-sm" type="button" onclick="downloadSession()">Download Session</button>
+        <input type="file" id="loadsessioninput" onchange="loadSession(this.files[0]); this.files = null" style="display:none">
+        <button class="btn btn-default btn-sm" type="button" onclick="$('#loadsessioninput').click()">Load Session</button>
+        <button class="btn btn-default btn-sm" type="button" onclick="openhelp(this)">Close Help</button>
+        <button class="btn btn-default btn-sm" type="button" data-toggle="modal" data-target="#feedbackModal">Send feedback!</button>
+      </div>
+      <div id="repl"></div>
+      <div class="modal fade" id="feedbackModal" tabindex="-1" role="dialog" aria-labelledby="feedbackModalLabel">
+        <div class="modal-dialog" role="document">
+          <div class="modal-content">
+            <div class="modal-header">
+              <button class="close" type="button" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
+              <h4 class="modal-title" id="feedbackModalLabel">Feedback</h4>
+            </div>
+            <div class="modal-body">
+              <textarea class="form-control" id="feedbackText"></textarea>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-primary" type="button" data-dismiss="modal" onclick="sendFeedback()">Submit Feedback</button>
+            </div>
           </div>
-          <div class="modal-body">
-            <textarea class="form-control" id="feedbackText"></textarea>
+        </div>
+      </div>
+      <div class="modal fade" id="connectionlostmodal">
+        <div class="modal-dialog modal-sm">
+          <div class="modal-content">
+            <div class="modal-header">
+              <button class="close" type="button" data-dismiss="modal" aria-hidden="true">×</button>
+              <h4 class="modal-title">Connection Closed</h4>
+            </div>
+            <div class="modal-body">
+              <p class="text-warning">The connection to the server was lost.</p>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-primary" type="button" data-dismiss="modal">Close</button>
+            </div>
           </div>
-          <div class="modal-footer">
-            <button class="btn btn-primary" type="button" data-dismiss="modal" onclick="sendFeedback()">Submit Feedback</button>
+        </div>
+      </div>
+      <div class="modal fade" id="connectionerrormodal">
+        <div class="modal-dialog modal-sm">
+          <div class="modal-content">
+            <div class="modal-header">
+              <button class="close" type="button" data-dismiss="modal" aria-hidden="true">×</button>
+              <h4 class="modal-title">Connection Error</h4>
+            </div>
+            <div class="modal-body">
+              <p class="text-warning">There was an error in the connection to the server.</p>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-primary" type="button" data-dismiss="modal">Close</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-    <div class="modal fade" id="connectionlostmodal">
-      <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-          <div class="modal-header">
-            <button class="close" type="button" data-dismiss="modal" aria-hidden="true">×</button>
-            <h4 class="modal-title">Connection Closed</h4>
-          </div>
-          <div class="modal-body">
-            <p class="text-warning">The connection to the server was lost.</p>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-primary" type="button" data-dismiss="modal">Close</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="modal fade" id="connectionerrormodal">
-      <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-          <div class="modal-header">
-            <button class="close" type="button" data-dismiss="modal" aria-hidden="true">×</button>
-            <h4 class="modal-title">Connection Error</h4>
-          </div>
-          <div class="modal-body">
-            <p class="text-warning">There was an error in the connection to the server.</p>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-primary" type="button" data-dismiss="modal">Close</button>
-          </div>
-        </div>
-      </div>
+    <div id="help">
+      <center>
+        <h1>Help</h1>
+      </center>Khwarizmi is a language based around manipulating an expression or equation. Expressions are represented as trees. Many commands operate on one or more tags (subtrees of the previous expression or equation). To select a tag, click on the previous expression or equation repeatedly until the correct part is highlighted. You can also click and drag to select, making sure to start and end on parts that you <em>want</em> to be selected.
+      <ul>
+        <li><strong>$ &langle;LaTeX code&rangle;</strong>: Set the current expression or equation</li>
+        <li><strong>simplify &langle;tag&rangle;</strong>: Attempt to automatically simplify the tag.</li>
+        <li><strong>cancel &langle;tag&rangle; &langle;tag&rangle;</strong>: If the tags are inverses, delete them.</li>
+        <li>&langle;<strong>+</strong>, <strong>-</strong>, <strong>/</strong>, <strong>*</strong>, or <strong>^</strong>&rangle; <strong>&langle;LaTeX code&rangle;</strong>: Perform the operation to both sides of the previous equation. For example, <strong>+y</strong> will add <em>y</em> to both sides.</li>
+        <li><strong>map &langle;LaTeX code&rangle;</strong>: Replaces each side of the current equation with the given code, replacing any <em>@</em> symbols with the side of the current equation.</li>
+        <li><strong>collapse &langle;tag&rangle; &langle;[number]&rangle;</strong>: Collapse a tower of exponents. If a number is given, collapse that many times.</li>
+        <li><strong>make &langle;tag(s)&rangle; &langle;LaTeX code&rangle;</strong>: Replace all of the tags with the code. The tags must be part of the same sum or product.</li>
+        <li><strong>delete &langle;tag(s)&rangle;</strong>: Deletes the tags.</li>
+        <li><strong>swap &langle;tag&rangle; &langle;tag&rangle;</strong>: Swap the positions of the two tags.</li>
+        <li><strong>replace &langle;tag(s)&rangle; &langle;LaTeX code&rangle;</strong>: Replace each of the tags with the given LaTeX code.</li>
+      </ul>
     </div>
   </body>
 </html>

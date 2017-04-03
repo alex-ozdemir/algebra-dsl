@@ -25,9 +25,6 @@ body {
     margin:auto;
     left: 0;
     right: 0;
-    width: 100%;
-
-    background-color: #ffffff;
 }
 
 [highlighted="0"]  { border-color: purple !important; outline-color: purple; }
@@ -96,4 +93,15 @@ button.getcode {
     width: 100%;
 
     font-family: monospace;
+}
+
+#main-area {
+    display: inline-block;
+    width: 75%;
+}
+
+#help {
+    display: inline-block;
+    position: fixed;
+    padding: 10px;
 }
