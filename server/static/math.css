@@ -62,6 +62,8 @@ body {
 .output {
     padding: 0.1em;
     margin: 0.3em;
+    margin-right: 2em;
+    vertical-align:middle;
 }
 
 .broken-reference {
@@ -70,13 +72,12 @@ body {
 
 button.recover {
     left-margin: fill;
-    border-radius: 1em;
+    vertical-align:middle;
 }
 
 button.getcode {
     left-margin: fill;
-    font-family: monospace;
-    border-radius: 0.25em;
+    vertical-align:middle;
 }
 
 .algebra-dsl-error {

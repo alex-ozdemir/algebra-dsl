@@ -287,6 +287,12 @@ socket.onmessage = function(event) {
         // Hide until the math is done typesetting
         fullDiv.style.display = 'none';
 
+        var mathBox = document.createElement('span');
+        mathBox.id = 'formula'+formulaNum;
+        mathBox.className += ' output disable-highlight';
+        mathBox.innerHTML = html;
+        fullDiv.appendChild(mathBox);
+
         var checkbox = document.createElement('input');
         checkbox.setAttribute('type', 'checkbox');
         fullDiv.appendChild(checkbox);
@@ -297,12 +303,6 @@ socket.onmessage = function(event) {
         checkbox.setAttribute('title',
                 "Select this equation for output");
         $(checkbox).tooltip();
-
-        var mathBox = document.createElement('span');
-        mathBox.id = 'formula'+formulaNum;
-        mathBox.className += ' output disable-highlight';
-        mathBox.innerHTML = html;
-        fullDiv.appendChild(mathBox);
 
         createRecoverButtom(fullDiv);
         createGetCodeButton(fullDiv);
@@ -340,10 +340,14 @@ socket.onerror = function(event) {
 }
 
 function createRecoverButtom(fullDiv) {
+
+    //<span class="glyphicon glyphicon-search" aria-hidden="true"></span>
     var recoverButton = document.createElement('button');
-    const recoverClass = "recover";
-    recoverButton.innerHTML = "&#x27f2;";
+    //const recoverClass = "recover glyphicon glyphicon-repeat";
+    const recoverClass = "recover btn btn-default btn-sm glyphicon glyphicon-repeat";
+    //recoverButton.innerHTML = "&#x27f2;";
     recoverButton.className += " " + recoverClass;
+    recoverButton.setAttribute('aria-hidden', 'true');
     // Add a bootstrap tooltip
     recoverButton.setAttribute('data-toggle', 'tooltip');
     recoverButton.setAttribute('data-placement', 'top');
@@ -363,11 +367,13 @@ function createRecoverButtom(fullDiv) {
 
 function createGetCodeButton(fullDiv) {
     var getcodeButton = document.createElement('button');
-    const recoverClass = "getcode";
-    getcodeButton.innerHTML = "&lt;/&gt;";
+    const recoverClass = "getcode btn btn-default btn-sm glyphicon glyphicon-pencil";
+    //const recoverClass = "getcode";
+    //getcodeButton.innerHTML = "&lt;/&gt;";
     getcodeButton.className += " " + recoverClass;
 
     // Add a bootstrap tooltip
+    getcodeButton.setAttribute('aria-hidden', 'true');
     getcodeButton.setAttribute('data-toggle', 'tooltip');
     getcodeButton.setAttribute('data-placement', 'top');
     getcodeButton.setAttribute('title',
