@@ -45,6 +45,7 @@ pub enum ErrorVariant {
     InvalidSiblingIndices,
     MapExpression,
     NeedsExpression,
+    NeedsEquation,
     UnrecognizedCmd,
     InternalError,
     Unimplemented,
@@ -322,6 +323,12 @@ impl Equation {
         Equation {
             left: self.left.simplify_constants(),
             right: self.right.simplify_constants(),
+        }
+    }
+    pub fn flip(self) -> Self {
+        Equation {
+            left: self.right,
+            right: self.left,
         }
     }
 }

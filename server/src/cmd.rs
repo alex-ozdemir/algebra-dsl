@@ -39,6 +39,7 @@ pub enum Cmd {
     Collapse(TreeIdx, Option<usize>),
     Cancel(Vec<TreeIdx>),
     Simplify(TreeIdx),
+    Flip,
 }
 
 fn internal_err() -> Error {
@@ -151,7 +152,13 @@ impl Cmd {
 
                 Ok(Return::Math(e))
             }
-
+            (Cmd::Flip, Some(&Math::Eq(ref eq))) => {
+                Ok(Return::Math(Math::Eq(eq.clone().flip())))
+            },
+            (Cmd::Flip, Some(_)) => {
+                Err(Error::new(Variant::NeedsEquation, "Flip only works on \
+                               equations".to_string()))
+            },
             (c, None) => {
                 Err(Error::new(Variant::NeedsExpression,
                                format!("The command `{:?}` needs an expression", c)))
@@ -307,6 +314,8 @@ impl str::FromStr for Cmd {
                 let idx = TreeIdx::from_str(rest)?;
 
                 Ok(Cmd::Collapse(idx, n))
+            } else if s == "flip" {
+                Ok(Cmd::Flip)
             } else {
                 Err(if Math::from_str(&s[1..].trim()).is_ok() {
                     Error::new(Variant::UnrecognizedCmd,
