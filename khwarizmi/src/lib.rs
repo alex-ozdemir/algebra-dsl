@@ -695,6 +695,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
             Ok(())
         }
     }
+
     fn distribute_power(mut self, whole: &TreeIdx) -> Result<Self, AlgebraDSLError> {
         {
             let location = self.get_mut(whole)?;

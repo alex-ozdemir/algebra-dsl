@@ -334,14 +334,43 @@ fn fmt_as_math_ml(expr: &Expression,
             };
         }
         &Expression::Power(ref b, ref p) => {
-            let mut base_string = String::from(prev_index);
-            write!(f, "<msup>")?;
-            base_string.push_str(",0");
-            fmt_as_math_ml(b, f, &base_string, (expr, false, false))?;
-            let mut base_string = String::from(prev_index);
-            base_string.push_str(",1");
-            fmt_as_math_ml(p, f, &base_string, (expr, true, false))?;
-            write!(f, "</msup>")?;
+            let mut issqrt = false;
+            if let &box Expression::Division(ref top, ref bot) = p {
+                if top == &vec![Expression::Atom(Atom::Natural(1))] && bot.len() == 1 {
+                    if let Expression::Atom(Atom::Natural(root)) = bot[0] {
+
+                        if root == 2 {
+                            write!(f, "<msqrt>")?;
+                        } else {
+                            write!(f, "<mroot>")?;
+                        }
+
+                        let mut base_string = String::from(prev_index);
+                        base_string.push_str(",0");
+                        fmt_as_math_ml(b, f, &base_string, (expr, false, true))?;
+
+                        if root == 2 {
+                            write!(f, "</msqrt>")?;
+                        } else {
+                            let mut base_string = String::from(prev_index);
+                            base_string.push_str(",1");
+                            fmt_as_math_ml(&bot[0], f, &base_string, (expr, false, true))?;
+                            write!(f, "</mroot>")?;
+                        }
+                        issqrt = true;
+                    }
+                }
+            }
+            if !issqrt {
+                let mut base_string = String::from(prev_index);
+                write!(f, "<msup>")?;
+                base_string.push_str(",0");
+                fmt_as_math_ml(b, f, &base_string, (expr, false, false))?;
+                let mut base_string = String::from(prev_index);
+                base_string.push_str(",1");
+                fmt_as_math_ml(p, f, &base_string, (expr, true, false))?;
+                write!(f, "</msup>")?;
+            }
         }
         &Expression::Negation(ref n) => {
             let mut base_string = String::from(prev_index);
