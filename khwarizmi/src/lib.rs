@@ -1011,19 +1011,37 @@ impl Expression {
         Expression::Power(box self, box expr)
     }
 
-    fn simplify_product(exprs: Vec<Expression>) -> (f64, i64, Vec<Expression>) {
+    /// Simplifies constant expressions in this product.
+    ///
+    /// ## Returns
+    ///    * Any floating point constant extracted
+    ///    * Any natural constant extracted
+    ///    * The first index at which a constant was found
+    ///    * The remaining (non-constant) terms
+    fn simplify_product(exprs: Vec<Expression>) -> (f64, i64, Option<usize>, Vec<Expression>) {
         use Expression as Ex;
         let mut f_acc = 1.0;
         let mut n_acc = 1;
         let mut new_exprs = vec![];
-        for ex in exprs.into_iter().map(Ex::simplify_constants) {
+        let mut first_constant_idx = None;
+        for (i, ex) in exprs.into_iter().map(Ex::simplify_constants).enumerate() {
             match ex {
-                Ex::Atom(Atom::Natural(n)) => n_acc *= n,
-                Ex::Atom(Atom::Floating(f)) => f_acc *= f,
+                Ex::Atom(Atom::Natural(n)) => {
+                    n_acc *= n;
+                    if first_constant_idx.is_none() {
+                        first_constant_idx = Some(i);
+                    }
+                }
+                Ex::Atom(Atom::Floating(f)) => {
+                    f_acc *= f;
+                    if first_constant_idx.is_none() {
+                        first_constant_idx = Some(i);
+                    }
+                }
                 e => new_exprs.push(e),
             }
         }
-        (f_acc, n_acc, new_exprs)
+        (f_acc, n_acc, first_constant_idx, new_exprs)
     }
 
     pub fn simplify_constants(self) -> Self {
@@ -1064,18 +1082,31 @@ impl Expression {
                 let mut f_acc = 0.0;
                 let mut n_acc = 0;
                 let mut new_exprs = vec![];
-                for ex in exprs.into_iter().map(Ex::simplify_constants) {
+                let mut first_id_of_constant = None;
+                for (idx, ex) in exprs.into_iter().map(Ex::simplify_constants).enumerate() {
                     match ex {
-                        Ex::Atom(Atom::Natural(n)) => n_acc += n,
-                        Ex::Atom(Atom::Floating(f)) => f_acc += f,
+                        Ex::Atom(Atom::Natural(n)) => {
+                            n_acc += n;
+                            if first_id_of_constant.is_none() {
+                                first_id_of_constant = Some(idx);
+                            }
+                        }
+                        Ex::Atom(Atom::Floating(f)) => {
+                            f_acc += f;
+                            if first_id_of_constant.is_none() {
+                                first_id_of_constant = Some(idx);
+                            }
+                        }
                         e => new_exprs.push(e),
                     }
                 }
-                if f_acc != 0. {
-                    new_exprs.push(Ex::Atom(Atom::Floating(f_acc + n_acc as f64)));
-                } else {
-                    if n_acc != 0 || new_exprs.len() == 0 {
-                        new_exprs.push(Ex::Atom(Atom::Natural(n_acc)));
+                if let Some(i) = first_id_of_constant {
+                    if f_acc != 0.0 {
+                        new_exprs.insert(i, Ex::Atom(Atom::Floating(f_acc + n_acc as f64)));
+                    } else {
+                        if n_acc != 0 || new_exprs.len() == 0 {
+                            new_exprs.insert(i, Ex::Atom(Atom::Natural(n_acc)));
+                        }
                     }
                 }
                 if new_exprs.len() == 1 {
@@ -1085,19 +1116,20 @@ impl Expression {
                 }
             }
             Ex::Division(top, bottom) => {
-                let (top_float, top_nat, mut top_exprs) = Ex::simplify_product(top);
-                let (bottom_float, bottom_nat, mut bottom_exprs) = Ex::simplify_product(bottom);
+                let (top_float, top_nat, ci_1, mut top_exprs) = Ex::simplify_product(top);
+                let (bottom_float, bottom_nat, ci_2, mut bottom_exprs) = Ex::simplify_product(bottom);
+
                 let float = top_float / bottom_float;
                 let (r_top_nat, r_bottom_nat) = reduce_division(top_nat, bottom_nat);
                 if float != 1.0 {
                     let net_float = float * (r_top_nat as f64) / (r_bottom_nat as f64);
-                    top_exprs.insert(0, Ex::Atom(Atom::Floating(net_float)));
+                    top_exprs.insert(ci_1.unwrap_or(0), Ex::Atom(Atom::Floating(net_float)));
                 } else {
-                    if r_top_nat != 1 {
-                        top_exprs.insert(0, Ex::Atom(Atom::Natural(r_top_nat)));
+                    if let Some(i) = ci_1 {
+                        top_exprs.insert(i, Ex::Atom(Atom::Natural(r_top_nat)));
                     }
-                    if r_bottom_nat != 1 {
-                        bottom_exprs.insert(0, Ex::Atom(Atom::Natural(r_bottom_nat)));
+                    if let Some(i) = ci_2 {
+                        bottom_exprs.insert(i, Ex::Atom(Atom::Natural(r_bottom_nat)));
                     }
                 }
                 Ex::divide_products_flatten(top_exprs, bottom_exprs)
