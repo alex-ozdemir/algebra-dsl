@@ -109,9 +109,9 @@ fn main() {
                             }
                             Ok(cmd::Return::LaTeXBlock(s)) => {
                                 (history.last().cloned().map(|last| {
-                                                                 history.push(last.clone());
-                                                                 last
-                                                             }),
+                                     history.push(last.clone());
+                                     last
+                                 }),
                                  Some(format!("LaTeXBlock@{}", s)))
                             }
                             Ok(cmd::Return::LaTeXLine(code)) => {
@@ -120,9 +120,9 @@ fn main() {
                             Ok(cmd::Return::NoReturn) => (None, None),
                             Err(e) => {
                                 (history.last().cloned().map(|last| {
-                                                                 history.push(last.clone());
-                                                                 last
-                                                             }),
+                                     history.push(last.clone());
+                                     last
+                                 }),
                                  Some(format!("Err@{}", e)))
                             }
                         };
