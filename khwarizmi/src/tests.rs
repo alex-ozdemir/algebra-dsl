@@ -28,6 +28,10 @@ fn float(f: f64) -> Ex {
     Ex::Atom(Atom::Floating(f))
 }
 
+fn prod(v: Vec<Ex>) -> Ex {
+    Ex::Division(v, vec![])
+}
+
 #[test]
 fn format_power() {
     let expr = Ex::Power(box var('x'), box var('y'));
@@ -348,7 +352,7 @@ fn make_in_denominator_flatten() {
 
 #[test]
 fn subtract_to_0() {
-    let mut b = Eq {
+    let b = Eq {
         left: var('x'),
         right: nat(-5),
     };
@@ -356,9 +360,10 @@ fn subtract_to_0() {
         left: Ex::Sum(vec![var('x'), nat(5)]),
         right: nat(0),
     };
-    b.plus_to_both(nat(5));
-    b = b.simplify_constants();
-    assert_expected_eq_actual!(a, b);
+    let placeholder = Expression::Atom(Atom::Escaped(PLACEHOLDER.to_string()));
+    let b2 = b.map(Ex::Sum(vec![placeholder, nat(5)])).unwrap();
+    let b3 = b2.simplify_constants();
+    assert_expected_eq_actual!(a, b3);
 }
 
 #[test]
@@ -630,4 +635,56 @@ fn cancel_inverse_div_fail() {
     let siblings = expr.sibling_indices(indices.as_slice()).unwrap();
     let actual = expr.cancel_inverse(siblings).unwrap_err();
     assert_expected_eq_actual!(expect, actual);
+}
+
+#[test]
+fn distribute_2() {
+    let e = prod(vec![var('t'), Ex::Sum(vec![var('x'), var('y')])]);
+    let after = Ex::Sum(vec![
+                        prod(vec![var('t'), var('x')]),
+                        prod(vec![var('t'), var('y')])
+    ]);
+    let i1 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
+    let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
+    let e2 = e.distribute(&i1, &i2).unwrap();
+    assert_expected_eq_actual!(after, e2);
+}
+
+#[test]
+fn distribute_3_left() {
+    let e = prod(vec![var('s'), var('t'), Ex::Sum(vec![var('x'), var('y')])]);
+    let after = prod(vec![var('s'), Ex::Sum(vec![
+                        prod(vec![var('t'), var('x')]),
+                        prod(vec![var('t'), var('y')])
+    ])]);
+    let i1 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
+    let i2 = TreeIdx::from_str("#(mtn:0,2)").unwrap();
+    let e2 = e.distribute(&i1, &i2).unwrap();
+    assert_expected_eq_actual!(after, e2);
+}
+
+#[test]
+fn distribute_3_right() {
+    let e = prod(vec![var('s'), Ex::Sum(vec![var('x'), var('y')]), var('t')]);
+    let after = prod(vec![var('s'), Ex::Sum(vec![
+                        prod(vec![var('x'), var('t')]),
+                        prod(vec![var('y'), var('t')])
+    ])]);
+    let i1 = TreeIdx::from_str("#(mtn:0,2)").unwrap();
+    let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
+    let e2 = e.distribute(&i1, &i2).unwrap();
+    assert_expected_eq_actual!(after, e2);
+}
+
+#[test]
+fn distribute_flatten() {
+    let e = prod(vec![var('t'), Ex::Sum(vec![prod(vec![var('x'), nat(2)]), var('y')])]);
+    let after = Ex::Sum(vec![
+                        prod(vec![var('t'), var('x'), nat(2)]),
+                        prod(vec![var('t'), var('y')])
+    ]);
+    let i1 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
+    let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
+    let e2 = e.distribute(&i1, &i2).unwrap();
+    assert_expected_eq_actual!(after, e2);
 }

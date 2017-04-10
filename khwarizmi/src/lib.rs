@@ -1,5 +1,4 @@
-#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from,
-           pub_restricted)]
+#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from)]
 #[macro_use]
 extern crate nom;
 mod parser;
@@ -7,7 +6,7 @@ mod output;
 mod symbols;
 mod iter;
 
-pub use output::LatexWriter;
+pub use output::{LatexWriter,KhwarizmiOutput};
 
 pub use symbols::{Symbol, StandaloneSymbol, OperatorSymbol, FunctionSymbol};
 
@@ -17,6 +16,7 @@ use std::ops::Deref;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::{cmp, fmt, mem};
+
 
 use parser::ParseError;
 
@@ -286,8 +286,12 @@ impl TreeIdxSlice {
 
     /// Returns whether `self` contains (or equals) `other`
     pub fn contains(&self, other: &TreeIdxSlice) -> bool {
-
         return self.nested(other) && self.len() <= other.len();
+    }
+
+    /// Returns whether `self` is the child of `other`
+    pub fn is_child_of(&self, other: &TreeIdxSlice) -> bool {
+        other.contains(self) && self.len() == other.len() + 1
     }
 }
 
@@ -300,25 +304,6 @@ impl Equation {
             .map_err(ErrorVariant::Parse)
             .map_err(AlgebraDSLError::from_variant)
     }
-    pub fn plus_to_both(&mut self, expr: Expression) {
-        self.left = self.left.take().inflate_addition(expr.clone());
-        self.right = self.right.take().inflate_addition(expr);
-    }
-    pub fn minus_to_both(&mut self, expr: Expression) {
-        self.plus_to_both(Expression::Negation(box expr))
-    }
-    pub fn times_to_both(&mut self, expr: Expression) {
-        self.left = self.left.take().inflate_multiplication(expr.clone());
-        self.right = self.right.take().inflate_multiplication(expr);
-    }
-    pub fn div_to_both(&mut self, expr: Expression) {
-        self.left = self.left.take().inflate_division(expr.clone());
-        self.right = self.right.take().inflate_division(expr);
-    }
-    pub fn power_to_both(&mut self, expr: Expression) {
-        self.left = self.left.take().inflate_power(expr.clone());
-        self.right = self.right.take().inflate_power(expr);
-    }
     pub fn simplify_constants(self) -> Self {
         Equation {
             left: self.left.simplify_constants(),
@@ -330,6 +315,13 @@ impl Equation {
             left: self.right,
             right: self.left,
         }
+    }
+    pub fn map(self, template: Expression) -> Result<Self, AlgebraDSLError> {
+        let Equation { left, right } = self;
+        Ok(Equation {
+            left: left.map(template.clone())?,
+            right: right.map(template)?,
+        })
     }
 }
 
@@ -365,17 +357,17 @@ impl SiblingIndices {
     }
 }
 
-pub trait Indexable: fmt::Display + fmt::Debug + Clone {
+pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
     fn get<Idx: AsRef<TreeIdxSlice> + ?Sized>(&self,
                                               index: &Idx)
                                               -> Result<&Expression, AlgebraDSLError> {
-        let err = bad_idx_err(format!("Cannot index `{:#?}` by `{}`", self, index.as_ref()));
+        let err = bad_idx_err(format!("Cannot index `{}` by `{}`", self.as_khwarizmi_latex(), index.as_ref()));
         self.get_opt(index).ok_or(err)
     }
     fn get_mut<Idx: AsRef<TreeIdxSlice> + ?Sized>(&mut self,
                                                   index: &Idx)
                                                   -> Result<&mut Expression, AlgebraDSLError> {
-        let err = bad_idx_err(format!("Cannot index `{:#?}` by `{}`", self, index.as_ref()));
+        let err = bad_idx_err(format!("Cannot index `{}` by `{}`", self.as_khwarizmi_latex(), index.as_ref()));
         self.get_mut_opt(index).ok_or(err)
     }
     fn get_opt<Idx: AsRef<TreeIdxSlice> + ?Sized>(&self, index: &Idx) -> Option<&Expression>;
@@ -831,6 +823,68 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone {
             _ => Ok(()),
         }
     }
+    fn distribute(mut self, term: &TreeIdx, sum: &TreeIdx) -> Result<Self, AlgebraDSLError> {
+        let parent = term.parent().ok_or(AlgebraDSLError::from_variant(ErrorVariant::InvalidIdx))?;
+        if !sum.is_child_of(parent) {
+            println!("{}, {}, {}", term, sum, parent);
+            return Err(AlgebraDSLError::new(ErrorVariant::InvalidIdx,
+            format!("Indices {} and {} are not siblings, so can't be distributed.", sum, term)));
+        }
+        {
+            let location = self.get_mut(parent)?;
+            let mut contents = location.take();
+            let term_idx = term.last().ok_or(AlgebraDSLError::from_variant(ErrorVariant::InvalidIdx))?;
+            let sum_idx = sum.last().ok_or(AlgebraDSLError::from_variant(ErrorVariant::InvalidIdx))?;
+            let left_multiply = term_idx < sum_idx;
+            match &mut contents {
+                &mut Expression::Division(ref mut top, _) => {
+                    if term_idx < top.len() && sum_idx < top.len() {
+                        let term_expr = top[term_idx].clone();
+                        match &mut top[sum_idx] {
+                            &mut Expression::Sum(ref mut summands) => {
+                                // Multiply each summand by the term
+                                for summand in summands.iter_mut() {
+                                    let contents = summand.take();
+                                    *summand = if left_multiply {
+                                        Expression::multiply(term_expr.clone(), contents)
+                                    } else {
+                                        Expression::multiply(contents, term_expr.clone())
+                                    };
+                                }
+                            }
+                            _ => {
+                                return Err(AlgebraDSLError::new(ErrorVariant::InvalidIdx,
+                                                                format!("Index {} does not refer to a sum, so cannot distribute",
+                                                                        sum)));
+                            }
+                        }
+                        top.remove(term_idx);
+                    }
+                    else {
+                        return Err(AlgebraDSLError::new(ErrorVariant::InvalidIdx,
+                                                        format!("Index {} does not refer to a product, so cannot distribute",
+                                                                sum)));
+                    }
+                }
+                _ => {
+                    return Err(AlgebraDSLError::new(ErrorVariant::InvalidIdx,
+                                                    format!("Index {} does not refer to a product, so cannot distribute",
+                                                            sum)));
+                }
+            }
+            *location = match contents {
+                Expression::Division(mut top, bot) => {
+                    if top.len() == 1 && bot.len() == 0 {
+                        top.pop().unwrap()
+                    } else {
+                        Expression::Division(top, bot)
+                    }
+                }
+                e => e,
+            };
+        }
+        Ok(self)
+    }
 }
 
 fn delete_prod(mut p: Vec<Expression>, is: &[TreeInt]) -> Vec<Expression> {
@@ -844,10 +898,14 @@ fn remove_args(args: &mut Vec<Expression>, idxs: &[TreeInt]) {
     }
 }
 
-impl Expression {
-    pub fn from_str(expr: &str) -> Result<Self, AlgebraDSLError> {
+impl FromStr for Expression {
+    type Err = AlgebraDSLError;
+    fn from_str(expr: &str) -> Result<Self, Self::Err> {
         parser::parse_expr(expr).map_err(ErrorVariant::Parse).map_err(AlgebraDSLError::from_variant)
     }
+}
+
+impl Expression {
     pub fn take(&mut self) -> Self {
         mem::replace(self, NULL_EXPRESSION)
     }
@@ -1266,14 +1324,9 @@ impl Math {
     pub fn map(self, template: Expression) -> Result<Self, AlgebraDSLError> {
         use self::Math::*;
         Ok(match self {
-               Eq(Equation { left, right }) => {
-                   Eq(Equation {
-                          left: left.map(template.clone())?,
-                          right: right.map(template)?,
-                      })
-               }
-               Ex(ex) => Ex(ex.map(template)?),
-           })
+            Eq(eq) => Eq(eq.map(template)?),
+            Ex(ex) => Ex(ex.map(template)?),
+        })
     }
 }
 

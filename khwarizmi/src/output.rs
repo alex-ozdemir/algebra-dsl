@@ -51,8 +51,12 @@ impl fmt::Display for Atom {
     }
 }
 
-impl Equation {
-    pub fn as_khwarizmi_latex(&self) -> String {
+pub trait KhwarizmiOutput {
+    fn as_khwarizmi_latex(&self) -> String;
+}
+
+impl KhwarizmiOutput for Equation {
+    fn as_khwarizmi_latex(&self) -> String {
         struct DisplaysAsLatex<'a>(&'a Equation);
         impl<'a> fmt::Display for DisplaysAsLatex<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -72,8 +76,8 @@ impl Equation {
     }
 }
 
-impl Expression {
-    pub fn as_khwarizmi_latex(&self) -> String {
+impl KhwarizmiOutput for Expression {
+    fn as_khwarizmi_latex(&self) -> String {
         struct DisplaysAsLatex<'a>(&'a Expression);
         impl<'a> fmt::Display for DisplaysAsLatex<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -85,8 +89,8 @@ impl Expression {
     }
 }
 
-impl Math {
-    pub fn as_khwarizmi_latex(&self) -> String {
+impl KhwarizmiOutput for Math {
+    fn as_khwarizmi_latex(&self) -> String {
         match self {
             &Math::Eq(ref eq) => eq.as_khwarizmi_latex(),
             &Math::Ex(ref ex) => ex.as_khwarizmi_latex(),

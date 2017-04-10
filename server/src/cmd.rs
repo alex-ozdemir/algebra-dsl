@@ -1,10 +1,9 @@
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::str;
-use std::str::FromStr;
+use std::str::{self, FromStr};
 
 use khwarizmi::{AlgebraDSLError as Error, ErrorVariant as Variant, Expression, Indexable,
-                LatexWriter, Math, TreeIdx};
+                LatexWriter, Math, TreeIdx, KhwarizmiOutput};
 
 
 #[derive(Debug, PartialEq, Clone)]
