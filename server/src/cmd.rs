@@ -1,6 +1,6 @@
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::str::{self, FromStr};
+use std::str::FromStr;
 
 use khwarizmi::{AlgebraDSLError as Error, ErrorVariant as Variant, Expression, Indexable,
                 LatexWriter, Math, TreeIdx, KhwarizmiOutput};
@@ -44,6 +44,7 @@ pub enum Cmd {
     Replace(Vec<TreeIdx>, ExprOrIdx),
     Collapse(TreeIdx, Option<usize>),
     Cancel(Vec<TreeIdx>),
+    Distribute(TreeIdx, TreeIdx),
     Simplify(TreeIdx),
     Flip,
 }
@@ -77,7 +78,7 @@ impl ExprOrIdx {
     }
 }
 
-impl str::FromStr for ExprOrIdx {
+impl FromStr for ExprOrIdx {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if !s.starts_with("*") {
@@ -196,6 +197,9 @@ impl Cmd {
                 Err(Error::new(Variant::NeedsEquation,
                                "Flip only works on equations".to_string()))
             }
+            (Cmd::Distribute(i1, i2), Some(old_expr)) => {
+                Ok(Return::Math(old_expr.clone().distribute(&i1, &i2)?))
+            }
             (c, None) => {
                 Err(Error::new(Variant::NeedsExpression,
                                format!("The command `{:?}` needs an expression", c)))
@@ -221,7 +225,7 @@ fn parse_indices(s: &str) -> Result<(Vec<TreeIdx>, &str), Error> {
     Ok((indices, rest))
 }
 
-impl str::FromStr for Cmd {
+impl FromStr for Cmd {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.starts_with("cmd@") {
@@ -350,6 +354,16 @@ impl str::FromStr for Cmd {
                 Ok(Cmd::Collapse(idx, n))
             } else if s == "flip" {
                 Ok(Cmd::Flip)
+            } else if s.starts_with("distribute") {
+                let (mut indices, rest) = parse_indices(&s[10..].trim())?;
+                if indices.len() != 2 || rest.trim().len() > 0 {
+                    Err(Error::new(Variant::IllFormattedCommand,
+                                   "distribute expects two indices (term then summation)".to_string()))
+                } else {
+                    let i2 = indices.pop().unwrap();
+                    let i1 = indices.pop().unwrap();
+                    Ok(Cmd::Distribute(i1, i2))
+                }
             } else {
                 Err(if Math::from_str(s).is_ok() {
                     Error::new(Variant::UnrecognizedCmd,

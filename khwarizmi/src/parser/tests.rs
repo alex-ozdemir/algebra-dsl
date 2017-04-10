@@ -206,7 +206,8 @@ fn equation() {
 #[test]
 fn sqrt() {
     let expected = Ex::Power(box Ex::Atom(At::PlainVariable('x')),
-                             box Ex::Atom(At::Floating(0.5)));
+                             box Ex::Division(vec![Ex::Atom(Atom::Natural(1))],
+                                              vec![Ex::Atom(Atom::Natural(2))]));
     assert_expected_eq_actual!(Ok(expected), parse_expr("\\sqrt x"));
 }
 

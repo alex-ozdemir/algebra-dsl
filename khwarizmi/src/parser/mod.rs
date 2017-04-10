@@ -41,7 +41,8 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
     match input {
         PostMac::Sqrt(radical) => {
             Ok(Ex::Power(box parse_operators(*radical)?,
-                         box Ex::Atom(Atom::Floating(0.5))))
+                         box Ex::Division(vec![Ex::Atom(Atom::Natural(1))],
+                                          vec![Ex::Atom(Atom::Natural(2))])))
         }
         PostMac::Char(c) => Ok(Ex::Atom(Atom::PlainVariable(c))),
         PostMac::Escaped(string) => Ok(Ex::Atom(Atom::Escaped(string))),
