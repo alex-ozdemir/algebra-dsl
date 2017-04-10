@@ -123,7 +123,7 @@ impl Cmd {
             }
             (Cmd::Simplify(idx), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
-                expr.simplify(&idx)?;
+                expr = expr.simplify(&idx)?;
                 Ok(Return::Math(expr))
             }
             (Cmd::Swap(i1, i2), Some(old_expr)) => {
@@ -149,8 +149,10 @@ impl Cmd {
             (Cmd::Output(math_idxs_to_output), _) => {
                 let mut latex_writer = LatexWriter::new();
                 for idx in math_idxs_to_output {
-                    latex_writer.add_math(history.get(idx)
-                            .ok_or_else(|| invalid_hist_idx_err(idx))?)
+                    latex_writer
+                        .add_math(history
+                                      .get(idx)
+                                      .ok_or_else(|| invalid_hist_idx_err(idx))?)
                         .map_err(|_| internal_err())
                         .unwrap();
                 }
@@ -158,30 +160,37 @@ impl Cmd {
             }
             (Cmd::Recover(idx), e) => {
                 println!("History is index {:?}: {:#?}", idx, history);
-                let recover_math = history.get(idx).ok_or_else(|| invalid_hist_idx_err(idx))?;
+                let recover_math = history
+                    .get(idx)
+                    .ok_or_else(|| invalid_hist_idx_err(idx))?;
                 let latex_string = recover_math.as_khwarizmi_latex();
                 let parsed = Math::from_str(latex_string.as_str().trim())?;
                 Cmd::New(parsed).execute(e, history)
             }
             (Cmd::GetCode(idx), _) => {
-                let recover_math = history.get(idx).ok_or_else(|| invalid_hist_idx_err(idx))?;
+                let recover_math = history
+                    .get(idx)
+                    .ok_or_else(|| invalid_hist_idx_err(idx))?;
                 let latex_string = recover_math.as_khwarizmi_latex();
                 Ok(Return::LaTeXLine(latex_string))
             }
             (Cmd::Feedback(text, html), _) => {
-                let mut f = OpenOptions::new().create(true)
+                let mut f = OpenOptions::new()
+                    .create(true)
                     .append(true)
                     .open(::REPORTFILE)
                     .map_err(|_| internal_err())?;
                 write!(f,
                        "Feedback text:\n{}\nFeedback html:\n{}\n\n\n",
                        text,
-                       html).map_err(|_| internal_err())?;
+                       html)
+                        .map_err(|_| internal_err())?;
                 Ok(Return::NoReturn)
             }
             (Cmd::Replace(indices, new_expr), Some(old_eqorexpr)) => {
                 let mut eqorexpr = old_eqorexpr.clone();
-                eqorexpr.replace_all(indices.iter(), new_expr.as_expr(last)?)?;
+                eqorexpr
+                    .replace_all(indices.iter(), new_expr.as_expr(last)?)?;
                 Ok(Return::Math(eqorexpr))
             }
             (Cmd::Collapse(idx, howfar), Some(old)) => {
@@ -219,9 +228,9 @@ fn parse_indices(s: &str) -> Result<(Vec<TreeIdx>, &str), Error> {
     while rest.starts_with("#") {
         let idx_end = rest.find(')')
             .ok_or_else(|| {
-                Error::new(Variant::IllFormattedIndex,
-                           format!("The index `{}` has an unclosed paren", s))
-            })?;
+                            Error::new(Variant::IllFormattedIndex,
+                                       format!("The index `{}` has an unclosed paren", s))
+                        })?;
         let idx = TreeIdx::from_str(&rest[..(idx_end + 1)])?;
         indices.push(idx);
         rest = &rest[(idx_end + 1)..].trim();
@@ -281,7 +290,7 @@ impl FromStr for Cmd {
                 loop {
                     if let Some(comma_idx) = rest.find(',') {
                         indices.push(usize::from_str(&rest[..comma_idx])
-                                     .map_err(|_| internal_err())?);
+                                         .map_err(|_| internal_err())?);
                         rest = rest[comma_idx + 1..].trim();
                     } else {
                         indices.push(usize::from_str(rest).map_err(|_| internal_err())?);
@@ -291,10 +300,12 @@ impl FromStr for Cmd {
                 Ok(Cmd::Output(indices))
             } else if s.starts_with("recover") {
                 let rest = &s[7..].trim();
-                let idx = usize::from_str(rest).map_err(|_| {
-                        Error::new(Variant::InvalidIdx,
-                                   format!("Recover expects history index, but found `{}`", rest))
-                    })?;
+                let idx = usize::from_str(rest)
+                    .map_err(|_| {
+                                 Error::new(Variant::InvalidIdx,
+                                            format!("Recover expects history index, but found `{}`",
+                                                    rest))
+                             })?;
                 Ok(Cmd::Recover(idx))
             } else if s.starts_with("+") {
                 let rest = &s[1..].trim();
@@ -320,10 +331,12 @@ impl FromStr for Cmd {
                 Ok(Cmd::New(Math::from_str(&s[1..].trim())?))
             } else if s.starts_with("code") {
                 let rest = &s[4..].trim();
-                let idx = usize::from_str(rest).map_err(|_| {
-                        Error::new(Variant::InvalidIdx,
-                                   format!("Recover expects history index, but found `{}`", rest))
-                    })?;
+                let idx = usize::from_str(rest)
+                    .map_err(|_| {
+                                 Error::new(Variant::InvalidIdx,
+                                            format!("Recover expects history index, but found `{}`",
+                                                    rest))
+                             })?;
                 Ok(Cmd::GetCode(idx))
             } else if s.starts_with("replace") {
                 let (indices, rest) = parse_indices(&s[7..].trim())?;
@@ -336,18 +349,19 @@ impl FromStr for Cmd {
             } else if s.starts_with("collapse") {
                 let rest = s[8..].trim();
 
-                let (n, rest) = if char::from(rest.as_bytes()
-                        .last()
-                        .ok_or(Error::from_variant(Variant::IllFormattedCommand))?
-                        .clone())
-                    .is_digit(10) {
+                let (n, rest) = if
+                    char::from(rest.as_bytes()
+                                   .last()
+                                   .ok_or(Error::from_variant(Variant::IllFormattedCommand))?
+                                   .clone())
+                            .is_digit(10) {
                     let splitpoint = rest.rfind(|c: char| !c.is_digit(10))
                         .ok_or(Error::from_variant(Variant::IllFormattedCommand))?;
                     let (fst, snd) = rest.split_at(splitpoint + 1);
 
                     (Some(snd.trim()
-                         .parse()
-                         .map_err(|_| Error::from_variant(Variant::IllFormattedCommand))?),
+                              .parse()
+                              .map_err(|_| Error::from_variant(Variant::IllFormattedCommand))?),
                      fst.trim())
                 } else {
                     (None, rest)
@@ -362,7 +376,8 @@ impl FromStr for Cmd {
                 let (mut indices, rest) = parse_indices(&s[14..].trim())?;
                 if indices.len() != 1 || rest.trim().len() > 0 {
                     Err(Error::new(Variant::IllFormattedCommand,
-                                   "distribute-pow expects one index (the whole power)".to_string()))
+                                   "distribute-pow expects one index (the whole power)"
+                                       .to_string()))
                 } else {
                     let i = indices.pop().unwrap();
                     Ok(Cmd::DistributePower(i))
@@ -371,7 +386,8 @@ impl FromStr for Cmd {
                 let (mut indices, rest) = parse_indices(&s[10..].trim())?;
                 if indices.len() != 2 || rest.trim().len() > 0 {
                     Err(Error::new(Variant::IllFormattedCommand,
-                                   "distribute expects two indices (term then summation)".to_string()))
+                                   "distribute expects two indices (term then summation)"
+                                       .to_string()))
                 } else {
                     let i2 = indices.pop().unwrap();
                     let i1 = indices.pop().unwrap();
@@ -379,14 +395,14 @@ impl FromStr for Cmd {
                 }
             } else {
                 Err(if Math::from_str(s).is_ok() {
-                    Error::new(Variant::UnrecognizedCmd,
-                               format!("Did you mean to enter Math? Try using a dollar \
+                        Error::new(Variant::UnrecognizedCmd,
+                                   format!("Did you mean to enter Math? Try using a dollar \
                                         sign:\n\t$ {}",
-                                       s))
-                } else {
-                    Error::new(Variant::UnrecognizedCmd,
-                               format!("Did not recognize cmd `{}`", s))
-                })
+                                           s))
+                    } else {
+                        Error::new(Variant::UnrecognizedCmd,
+                                   format!("Did not recognize cmd `{}`", s))
+                    })
             }
         } else if s.starts_with("feedback@") {
             let s = &s[9..];

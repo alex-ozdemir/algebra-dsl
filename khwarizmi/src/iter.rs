@@ -87,7 +87,10 @@ impl<'a> Iterator for ExpressionIter<'a> {
         loop {
             let new_child_iter = match self.iter_stack.last_mut() {
                 None => return None,
-                Some(last) => last.next().map(|(i, e)| (i, ChildIter::new(MathRef::Ex(e)), e)),
+                Some(last) => {
+                    last.next()
+                        .map(|(i, e)| (i, ChildIter::new(MathRef::Ex(e)), e))
+                }
             };
             match new_child_iter {
                 None => {

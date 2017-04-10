@@ -50,7 +50,9 @@ fn main() {
         router.get("/", send_mainpage);
 
         let mut mount = Mount::new();
-        mount.mount("/", router).mount("/static/", Static::new(Path::new("static")));
+        mount
+            .mount("/", router)
+            .mount("/static/", Static::new(Path::new("static")));
 
         Iron::new(mount).http("0.0.0.0:8080").unwrap();
     });
@@ -71,7 +73,9 @@ fn main() {
             if let Some(&WebSocketProtocol(ref protocols)) = headers.get() {
                 if protocols.contains(&("rust-websocket".to_string())) {
                     // We have a protocol we want to use
-                    response.headers.set(WebSocketProtocol(vec!["rust-websocket".to_string()]));
+                    response
+                        .headers
+                        .set(WebSocketProtocol(vec!["rust-websocket".to_string()]));
                 }
             }
 
@@ -108,10 +112,13 @@ fn main() {
                                 (Some(simpler), None)
                             }
                             Ok(cmd::Return::LaTeXBlock(s)) => {
-                                (history.last().cloned().map(|last| {
-                                     history.push(last.clone());
-                                     last
-                                 }),
+                                (history
+                                     .last()
+                                     .cloned()
+                                     .map(|last| {
+                                              history.push(last.clone());
+                                              last
+                                          }),
                                  Some(format!("LaTeXBlock@{}", s)))
                             }
                             Ok(cmd::Return::LaTeXLine(code)) => {
@@ -119,10 +126,13 @@ fn main() {
                             }
                             Ok(cmd::Return::NoReturn) => (None, None),
                             Err(e) => {
-                                (history.last().cloned().map(|last| {
-                                     history.push(last.clone());
-                                     last
-                                 }),
+                                (history
+                                     .last()
+                                     .cloned()
+                                     .map(|last| {
+                                              history.push(last.clone());
+                                              last
+                                          }),
                                  Some(format!("Err@{}", e)))
                             }
                         };

@@ -84,7 +84,8 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                               next_op.left_precedence() {
                             let combinator = operator_stack.pop().expect(UNREACH);
                             let second = expression_stack.pop().ok_or(ParseError::OperatorError)?;
-                            let new_expr = if combinator.arity()
+                            let new_expr = if combinator
+                                   .arity()
                                    .ok_or_else(|| {
                                                    ParseError::UnmatchGrouping(combinator.clone())
                                                })? ==
@@ -149,14 +150,16 @@ macro_rules! combine_associative {
 }
 
 fn post_process_all(exprs: Vec<Expression>) -> Result<Vec<Expression>, ParseError> {
-    exprs.into_iter().fold(Ok(Vec::new()), |earlier, this| {
-        earlier.and_then(|mut vec| {
-                             post_process(this).map(|post_this| {
-                                                        vec.push(post_this);
-                                                        vec
-                                                    })
-                         })
-    })
+    exprs
+        .into_iter()
+        .fold(Ok(Vec::new()), |earlier, this| {
+            earlier.and_then(|mut vec| {
+                                 post_process(this).map(|post_this| {
+                                                            vec.push(post_this);
+                                                            vec
+                                                        })
+                             })
+        })
 }
 
 fn post_process(expr: Expression) -> Result<Expression, ParseError> {
@@ -248,7 +251,8 @@ pub fn parse_equation(input: &str) -> Result<Equation, ParseError> {
 }
 
 pub fn parse_expr(input: &str) -> Result<Expression, ParseError> {
-    let latex_tokens = latex::parse_tokens(input).map_err(ParseError::LatexError)?;
+    let latex_tokens = latex::parse_tokens(input)
+        .map_err(ParseError::LatexError)?;
     // println!("{:#?}", latex_tokens);
     let expanded = mac::to_known(latex_tokens)?;
     // println!("{:#?}", expanded);
