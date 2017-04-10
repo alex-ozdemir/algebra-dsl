@@ -702,19 +702,57 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
             let contents = location.take();
             *location = match contents {
                 Expression::Power(box base, box power) => {
-                    if let Expression::Division(top, bot) = base {
-                        Expression::Division(top.into_iter()
-                                                 .map(|t| t.inflate_power(power.clone()))
-                                                 .collect(),
-                                             bot.into_iter()
-                                                 .map(|t| t.inflate_power(power.clone()))
-                                                 .collect())
-                    } else {
-                        return Err(AlgebraDSLError::new(ErrorVariant::InvalidIdx,
-                                                        format!("The index `{}` does not \
-                                                        refer to a power \
-                                                        with a product in it.",
-                                                                whole)));
+                    match base {
+                        Expression::Division(top, bot) => {
+                            Expression::Division(top.into_iter()
+                                                     .map(|t| t.inflate_power(power.clone()))
+                                                     .collect(),
+                                                 bot.into_iter()
+                                                     .map(|t| t.inflate_power(power.clone()))
+                                                     .collect())
+                        }
+                        Expression::Negation(box e) => {
+                            if let Expression::Division(top, bot) = e {
+                                let mut newtop = top.into_iter()
+                                    .map(|t| t.inflate_power(power.clone()))
+                                    .collect();
+                                let newbot = bot.into_iter()
+                                    .map(|t| t.inflate_power(power.clone()))
+                                    .collect();
+                                match power {
+                                    Expression::Atom(Atom::Natural(n)) => {
+                                        if n % 2 == 0 {
+                                            Expression::Division(newtop, newbot)
+                                        } else {
+                                            Expression::Negation(box Expression::Division(newtop,
+                                                                                          newbot))
+                                        }
+                                    }
+                                    _ => {
+                                        newtop.insert(0,
+                                                      Expression::Power(
+                                                          box Expression::Negation(
+                                                              box Expression::Atom(
+                                                                  Atom::Natural(1))),
+                                                          box power.clone()));
+                                        Expression::Division(newtop, newbot)
+                                    }
+                                }
+                            } else {
+                                return Err(AlgebraDSLError::new(ErrorVariant::InvalidIdx,
+                                                                format!("The index `{}` does \
+                                                                         not refer to a power \
+                                                                         with a product in it.",
+                                                                        whole)));
+                            }
+                        }
+                        _ => {
+                            return Err(AlgebraDSLError::new(ErrorVariant::InvalidIdx,
+                                                            format!("The index `{}` does not \
+                                                                     refer to a power with a \
+                                                                     product in it.",
+                                                                    whole)));
+                        }
                     }
                 }
                 _ => {
