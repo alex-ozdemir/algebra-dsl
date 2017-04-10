@@ -317,7 +317,7 @@ impl str::FromStr for Cmd {
             } else if s == "flip" {
                 Ok(Cmd::Flip)
             } else {
-                Err(if Math::from_str(&s[1..].trim()).is_ok() {
+                Err(if Math::from_str(s).is_ok() {
                     Error::new(Variant::UnrecognizedCmd,
                                format!("Did you mean to enter Math? Try using a dollar sign:\n\t$ {}", s))
                 } else {
