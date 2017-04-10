@@ -823,6 +823,38 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
             _ => Ok(()),
         }
     }
+
+    fn distribute_power(mut self, whole: &TreeIdx) -> Result<Self, AlgebraDSLError> {
+        {
+            let location = self.get_mut(whole)?;
+            let contents = location.take();
+            *location = match contents {
+                Expression::Power(box base, box power) => {
+                    if let Expression::Division(top, bot) = base {
+                        Expression::Division(
+                            top.into_iter().map(|t| t.inflate_power(power.clone())).collect(),
+                            bot.into_iter().map(|t| t.inflate_power(power.clone())).collect()
+                        )
+                    } else {
+                        return Err(AlgebraDSLError::new(ErrorVariant::InvalidIdx,
+                             format!("The index `{}` does not refer to a power \
+                                      with a product in it.", whole)));
+                    }
+                }
+                _ => {
+                    return Err(AlgebraDSLError::new(ErrorVariant::InvalidIdx,
+                         format!("The index `{}` does not refer to a power.", whole)));
+                }
+            };
+        }
+        Ok(self)
+    }
+
+    /// Takes two indices refering to siblings of a product `term` and `sum`.
+    /// Assuming that `sum` refers to a summation, it distrubtes term across the summands
+    ///
+    /// Left multiplies or right multiplies according to the relative positions of the original
+    /// referents.
     fn distribute(mut self, term: &TreeIdx, sum: &TreeIdx) -> Result<Self, AlgebraDSLError> {
         let parent = term.parent().ok_or(AlgebraDSLError::from_variant(ErrorVariant::InvalidIdx))?;
         if !sum.is_child_of(parent) {

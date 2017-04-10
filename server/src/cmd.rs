@@ -45,6 +45,7 @@ pub enum Cmd {
     Collapse(TreeIdx, Option<usize>),
     Cancel(Vec<TreeIdx>),
     Distribute(TreeIdx, TreeIdx),
+    DistributePower(TreeIdx),
     Simplify(TreeIdx),
     Flip,
 }
@@ -200,6 +201,9 @@ impl Cmd {
             (Cmd::Distribute(i1, i2), Some(old_expr)) => {
                 Ok(Return::Math(old_expr.clone().distribute(&i1, &i2)?))
             }
+            (Cmd::DistributePower(i), Some(old_expr)) => {
+                Ok(Return::Math(old_expr.clone().distribute_power(&i)?))
+            }
             (c, None) => {
                 Err(Error::new(Variant::NeedsExpression,
                                format!("The command `{:?}` needs an expression", c)))
@@ -354,6 +358,15 @@ impl FromStr for Cmd {
                 Ok(Cmd::Collapse(idx, n))
             } else if s == "flip" {
                 Ok(Cmd::Flip)
+            } else if s.starts_with("distribute-pow") {
+                let (mut indices, rest) = parse_indices(&s[14..].trim())?;
+                if indices.len() != 1 || rest.trim().len() > 0 {
+                    Err(Error::new(Variant::IllFormattedCommand,
+                                   "distribute-pow expects one index (the whole power)".to_string()))
+                } else {
+                    let i = indices.pop().unwrap();
+                    Ok(Cmd::DistributePower(i))
+                }
             } else if s.starts_with("distribute") {
                 let (mut indices, rest) = parse_indices(&s[10..].trim())?;
                 if indices.len() != 2 || rest.trim().len() > 0 {
