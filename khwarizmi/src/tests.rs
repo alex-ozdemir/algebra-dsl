@@ -7,7 +7,7 @@ macro_rules! assert_expected_eq_actual {
     ($a:expr, $b:expr) => ({
         let (a, b) = (&$a, &$b);
         assert!(*a == *b,
-                "\nExpected `{:?}` is not equal to Actual `{:?}`\
+                "\nExpected `{:#?}` is not equal to Actual `{:#?}`\
                  \nAssertion: `assert_expected_eq_actual!({}, {})`",
                 *a,
                 *b,
@@ -160,8 +160,7 @@ fn make_siblings() {
     let mut before = Ex::Division(vec![nat(3), nat(4), var('x'), nat(7)], vec![]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
     let after = Ex::Division(vec![nat(84), var('x')], vec![]);
-    let indices: Vec<_> = index_strings
-        .into_iter()
+    let indices: Vec<_> = index_strings.into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -177,8 +176,7 @@ fn replace_division_all_top() {
     let mut before = Ex::Division(vec![nat(3), nat(4), nat(7)], vec![]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,2)"];
     let after = nat(84);
-    let indices: Vec<_> = index_strings
-        .into_iter()
+    let indices: Vec<_> = index_strings.into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -193,8 +191,7 @@ fn replace_division_end_of_top() {
     let mut before = Ex::Division(vec![nat(3), nat(4), nat(7)], vec![]);
     let index_strings = vec!["#(mtn:0,1)", "#(mtn:0,2)"];
     let after = Ex::Division(vec![nat(3), nat(21)], vec![]);
-    let indices: Vec<_> = index_strings
-        .into_iter()
+    let indices: Vec<_> = index_strings.into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -209,8 +206,7 @@ fn replace_division_all_bottom() {
     let mut before = Ex::Division(vec![nat(3), nat(4)], vec![nat(6), nat(7)]);
     let index_strings = vec!["#(mtn:0,2)", "#(mtn:0,3)"];
     let after = Ex::Division(vec![nat(3), nat(4)], vec![nat(42)]);
-    let indices: Vec<_> = index_strings
-        .into_iter()
+    let indices: Vec<_> = index_strings.into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -225,8 +221,7 @@ fn replace_division_mid_top_mid_bottom() {
     let mut before = Ex::Division(vec![nat(3), nat(4), nat(4)], vec![nat(6), nat(4), nat(7)]);
     let index_strings = vec!["#(mtn:0,1)", "#(mtn:0,4)"];
     let after = Ex::Division(vec![nat(3), nat(42), nat(4)], vec![nat(6), nat(7)]);
-    let indices: Vec<_> = index_strings
-        .into_iter()
+    let indices: Vec<_> = index_strings.into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -241,8 +236,7 @@ fn make_siblings_sum() {
     let mut before = Ex::Sum(vec![nat(3), nat(4), var('x'), nat(7)]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
     let after = Ex::Sum(vec![nat(84), var('x')]);
-    let indices: Vec<_> = index_strings
-        .into_iter()
+    let indices: Vec<_> = index_strings.into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -258,8 +252,7 @@ fn make_siblings_sum_flatten() {
     let mut before = Ex::Sum(vec![nat(3), nat(4), var('x'), nat(7)]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
     let after = Ex::Sum(vec![var('z'), nat(84), var('x')]);
-    let indices: Vec<_> = index_strings
-        .into_iter()
+    let indices: Vec<_> = index_strings.into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -600,8 +593,7 @@ fn cancel_inverse_div() {
     let expect = Ex::Division(vec![var('y')], vec![]);
     let mut actual = Ex::Division(vec![var('x'), var('y')], vec![var('x')]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,2)"];
-    let indices: Vec<_> = index_strings
-        .into_iter()
+    let indices: Vec<_> = index_strings.into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -615,8 +607,7 @@ fn cancel_inverse_sum() {
     let expect = var('y');
     let mut actual = Ex::Sum(vec![var('x'), var('y'), Ex::Negation(box var('x'))]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,2)"];
-    let indices: Vec<_> = index_strings
-        .into_iter()
+    let indices: Vec<_> = index_strings.into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -630,8 +621,7 @@ fn cancel_inverse_sum_fail() {
     let expect = AlgebraDSLError::from_variant(ErrorVariant::InvalidCancel);
     let mut expr = Ex::Sum(vec![var('x'), var('y'), Ex::Negation(box var('x'))]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)"];
-    let indices: Vec<_> = index_strings
-        .into_iter()
+    let indices: Vec<_> = index_strings.into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -645,8 +635,7 @@ fn cancel_inverse_div_fail() {
     let expect = AlgebraDSLError::from_variant(ErrorVariant::InvalidCancel);
     let mut expr = Ex::Division(vec![var('x'), var('y')], vec![var('x')]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)"];
-    let indices: Vec<_> = index_strings
-        .into_iter()
+    let indices: Vec<_> = index_strings.into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -658,10 +647,7 @@ fn cancel_inverse_div_fail() {
 #[test]
 fn distribute_2() {
     let e = prod(vec![var('t'), Ex::Sum(vec![var('x'), var('y')])]);
-    let after = Ex::Sum(vec![
-                        prod(vec![var('t'), var('x')]),
-                        prod(vec![var('t'), var('y')])
-    ]);
+    let after = Ex::Sum(vec![prod(vec![var('t'), var('x')]), prod(vec![var('t'), var('y')])]);
     let i1 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
     let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
     let e2 = e.distribute(&i1, &i2).unwrap();
@@ -671,10 +657,9 @@ fn distribute_2() {
 #[test]
 fn distribute_3_left() {
     let e = prod(vec![var('s'), var('t'), Ex::Sum(vec![var('x'), var('y')])]);
-    let after = prod(vec![var('s'), Ex::Sum(vec![
-                        prod(vec![var('t'), var('x')]),
-                        prod(vec![var('t'), var('y')])
-    ])]);
+    let after = prod(vec![var('s'),
+                          Ex::Sum(vec![prod(vec![var('t'), var('x')]),
+                                       prod(vec![var('t'), var('y')])])]);
     let i1 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
     let i2 = TreeIdx::from_str("#(mtn:0,2)").unwrap();
     let e2 = e.distribute(&i1, &i2).unwrap();
@@ -684,10 +669,9 @@ fn distribute_3_left() {
 #[test]
 fn distribute_3_right() {
     let e = prod(vec![var('s'), Ex::Sum(vec![var('x'), var('y')]), var('t')]);
-    let after = prod(vec![var('s'), Ex::Sum(vec![
-                        prod(vec![var('x'), var('t')]),
-                        prod(vec![var('y'), var('t')])
-    ])]);
+    let after = prod(vec![var('s'),
+                          Ex::Sum(vec![prod(vec![var('x'), var('t')]),
+                                       prod(vec![var('y'), var('t')])])]);
     let i1 = TreeIdx::from_str("#(mtn:0,2)").unwrap();
     let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
     let e2 = e.distribute(&i1, &i2).unwrap();
@@ -697,10 +681,8 @@ fn distribute_3_right() {
 #[test]
 fn distribute_flatten() {
     let e = prod(vec![var('t'), Ex::Sum(vec![prod(vec![var('x'), nat(2)]), var('y')])]);
-    let after = Ex::Sum(vec![
-                        prod(vec![var('t'), var('x'), nat(2)]),
-                        prod(vec![var('t'), var('y')])
-    ]);
+    let after = Ex::Sum(vec![prod(vec![var('t'), var('x'), nat(2)]),
+                             prod(vec![var('t'), var('y')])]);
     let i1 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
     let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
     let e2 = e.distribute(&i1, &i2).unwrap();
@@ -709,19 +691,18 @@ fn distribute_flatten() {
 
 #[test]
 fn combine_coeff_sum_1() {
-    let expect = Ex::Division(vec![nat(2),var('x')], vec![]);
-    let mut expr = Ex::Sum(vec![var('x'),var('x')]);
-    expr.combine_in_sum(vec![var('x'),var('x')], &TreeIdx::from_vec(vec![]))
+    let expect = Ex::Division(vec![nat(2), var('x')], vec![]);
+    let mut expr = Ex::Sum(vec![var('x'), var('x')]);
+    expr.combine_in_sum(vec![var('x'), var('x')], &TreeIdx::from_vec(vec![]))
         .unwrap();
     assert_expected_eq_actual!(expect, expr);
 }
 
 #[test]
 fn combine_coeff_sum_2() {
-    let expect = Ex::Division(vec![nat(3),var('x')], vec![]);
-    let mut expr = Ex::Sum(vec![Ex::Division(vec![nat(2),var('x')],vec![]),var('x')]);
-    expr.combine_in_sum(vec![Ex::Division(vec![nat(2),var('x')],
-            vec![]),var('x')],
+    let expect = Ex::Division(vec![nat(3), var('x')], vec![]);
+    let mut expr = Ex::Sum(vec![Ex::Division(vec![nat(2), var('x')], vec![]), var('x')]);
+    expr.combine_in_sum(vec![Ex::Division(vec![nat(2), var('x')], vec![]), var('x')],
                         &TreeIdx::from_vec(vec![]))
         .unwrap();
     assert_expected_eq_actual!(expect, expr);
@@ -729,10 +710,9 @@ fn combine_coeff_sum_2() {
 
 #[test]
 fn combine_coeff_sum_3() {
-    let expect = Ex::Division(vec![nat(3),var('x')], vec![]);
-    let mut expr = Ex::Sum(vec![var('x'),Ex::Division(vec![nat(2),var('x')],vec![])]);
-    expr.combine_in_sum(vec![var('x'),Ex::Division(vec![nat(2),var('x')],
-            vec![])],
+    let expect = Ex::Division(vec![nat(3), var('x')], vec![]);
+    let mut expr = Ex::Sum(vec![var('x'), Ex::Division(vec![nat(2), var('x')], vec![])]);
+    expr.combine_in_sum(vec![var('x'), Ex::Division(vec![nat(2), var('x')], vec![])],
                         &TreeIdx::from_vec(vec![]))
         .unwrap();
     assert_expected_eq_actual!(expect, expr);
@@ -740,11 +720,11 @@ fn combine_coeff_sum_3() {
 
 #[test]
 fn combine_coeff_sum_4() {
-    let expect = Ex::Division(vec![nat(4),var('x')], vec![]);
-    let mut expr = Ex::Sum(vec![Ex::Division(vec![nat(2),var('x')],vec![]),
-            Ex::Division(vec![nat(2),var('x')],vec![])]);
-    expr.combine_in_sum(vec![Ex::Division(vec![nat(2),var('x')],vec![]),
-            Ex::Division(vec![nat(2),var('x')],vec![])],
+    let expect = Ex::Division(vec![nat(4), var('x')], vec![]);
+    let mut expr = Ex::Sum(vec![Ex::Division(vec![nat(2), var('x')], vec![]),
+                                Ex::Division(vec![nat(2), var('x')], vec![])]);
+    expr.combine_in_sum(vec![Ex::Division(vec![nat(2), var('x')], vec![]),
+                             Ex::Division(vec![nat(2), var('x')], vec![])],
                         &TreeIdx::from_vec(vec![]))
         .unwrap();
     assert_expected_eq_actual!(expect, expr);
@@ -753,8 +733,8 @@ fn combine_coeff_sum_4() {
 #[test]
 fn combine_coeff_div_1() {
     let expect = Ex::Power(box var('x'), box nat(2));
-    let mut expr = Ex::Division(vec![var('x'),var('x')], vec![]);
-    expr.combine_in_div(vec![var('x'),var('x')], vec![], &TreeIdx::from_vec(vec![]))
+    let mut expr = Ex::Division(vec![var('x'), var('x')], vec![]);
+    expr.combine_in_div(vec![var('x'), var('x')], vec![], &TreeIdx::from_vec(vec![]))
         .unwrap();
     assert_expected_eq_actual!(expect, expr);
 }
@@ -762,9 +742,8 @@ fn combine_coeff_div_1() {
 #[test]
 fn combine_coeff_div_2() {
     let expect = Ex::Power(box var('x'), box nat(3));
-    let mut expr = Ex::Division(vec![Ex::Power(box var('x'), box nat(2)),var('x')], vec![]);
-    expr.combine_in_div(vec![Ex::Power(box var('x'), box nat(2)),
-            var('x')],
+    let mut expr = Ex::Division(vec![Ex::Power(box var('x'), box nat(2)), var('x')], vec![]);
+    expr.combine_in_div(vec![Ex::Power(box var('x'), box nat(2)), var('x')],
                         vec![],
                         &TreeIdx::from_vec(vec![]))
         .unwrap();
@@ -774,8 +753,8 @@ fn combine_coeff_div_2() {
 #[test]
 fn combine_coeff_div_3() {
     let expect = Ex::Power(box var('x'), box nat(3));
-    let mut expr = Ex::Division(vec![var('x'),Ex::Power(box var('x'), box nat(2))], vec![]);
-    expr.combine_in_div(vec![var('x'),Ex::Power(box var('x'), box nat(2))],
+    let mut expr = Ex::Division(vec![var('x'), Ex::Power(box var('x'), box nat(2))], vec![]);
+    expr.combine_in_div(vec![var('x'), Ex::Power(box var('x'), box nat(2))],
                         vec![],
                         &TreeIdx::from_vec(vec![]))
         .unwrap();
@@ -786,12 +765,22 @@ fn combine_coeff_div_3() {
 fn combine_coeff_div_4() {
     let expect = Ex::Power(box var('x'), box nat(4));
     let mut expr = Ex::Division(vec![Ex::Power(box var('x'), box nat(2)),
-            Ex::Power(box var('x'), box nat(2))],
+                                     Ex::Power(box var('x'), box nat(2))],
                                 vec![]);
     expr.combine_in_div(vec![Ex::Power(box var('x'), box nat(2)),
-            Ex::Power(box var('x'), box nat(2))],
+                             Ex::Power(box var('x'), box nat(2))],
                         vec![],
                         &TreeIdx::from_vec(vec![]))
         .unwrap();
     assert_expected_eq_actual!(expect, expr);
+}
+
+#[test]
+fn distribute_flatten_fraction() {
+    let expect = Ex::Sum(vec![Ex::Division(vec![var('x'), nat(6)],vec![var('y')]), prod(vec![var('x'), var('x')])]);
+    let start = prod(vec![var('x'), Ex::Sum(vec![Ex::Division(vec![nat(6)],vec![var('y')]), var('x')])]);
+    let i1 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
+    let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
+    let res = start.distribute(&i1, &i2).unwrap();
+    assert_expected_eq_actual!(expect, res);
 }

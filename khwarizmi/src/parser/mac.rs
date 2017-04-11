@@ -193,8 +193,8 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
         Token::Char(c) if c.is_numeric() => Ok(PostMac::Num(Numeric(c.to_string(), None))),
         Token::Char(c) => Err(ParseError::UnimplementedCharacter(c)),
         Token::ControlSequence(cs) => {
-            let known_cs = KnownCS::from_str(cs.as_str())
-                .ok_or(ParseError::UnknownControlSequence(cs))?;
+            let known_cs =
+                KnownCS::from_str(cs.as_str()).ok_or(ParseError::UnknownControlSequence(cs))?;
             match known_cs {
                 KnownCS::div => Ok(PostMac::Op(UniOp::Std(Operator::Div))),
                 KnownCS::cdot | KnownCS::times => Ok(PostMac::Op(UniOp::Std(Operator::Times))),
@@ -262,8 +262,7 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                     (last, mut next) => {
                         last.map(|last| result_list.push(last));
                         // Potentially insert multiplication
-                        let op_expected = result_list
-                            .last()
+                        let op_expected = result_list.last()
                             .map(PostMac::expects_op_after)
                             .unwrap_or(false);
                         let implicit_times = op_expected && next.expects_op_before();
@@ -287,19 +286,16 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
 }
 
 fn one_expression(input: &mut Vec<latex::Token>) -> Result<PostMac, ParseError> {
-    let first = to_known(input
-                             .pop()
-                             .ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
+    let first = to_known(input.pop()
+        .ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
     Ok(first)
 }
 
 fn two_expressions(input: &mut Vec<latex::Token>) -> Result<(PostMac, PostMac), ParseError> {
-    let first = to_known(input
-                             .pop()
-                             .ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
-    let second = to_known(input
-                              .pop()
-                              .ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
+    let first = to_known(input.pop()
+        .ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
+    let second = to_known(input.pop()
+        .ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
     Ok((first, second))
 }
 
