@@ -27,6 +27,10 @@ body {
     right: 0;
 }
 
+#model-output {
+    display: none;
+}
+
 [highlighted="0"]  { border-color: purple !important; outline-color: purple; }
 [highlighted="1"]  { border-color: orange !important; outline-color: orange; }
 [highlighted="2"]  { border-color: lightblue !important; outline-color: lightblue; }
@@ -70,16 +74,6 @@ body {
     border: solid 4px black;
 }
 
-button.recover {
-    left-margin: fill;
-    vertical-align:middle;
-}
-
-button.getcode {
-    left-margin: fill;
-    vertical-align:middle;
-}
-
 .algebra-dsl-error {
     border: 1px solid red;
     background-color: #fd8;
@@ -94,6 +88,14 @@ button.getcode {
     width: 100%;
 
     font-family: monospace;
+}
+
+.output-buttons {
+    padding-left: 5em;
+}
+
+input.output-latex {
+    vertical-align: middle;
 }
 
 #main-area {

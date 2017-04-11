@@ -40,6 +40,16 @@ html
 
       #repl
 
+      #model-output.output.math-output.new-math-output
+        span.output.disable-highlight.formula
+        .btn-group(role="group", aria-label="...")
+          input.output-latex(type="checkbox" data-toggle="tooltip" data-placement="top" title="Select this equation for output")
+        .btn-group(role="group", aria-label="...")
+          button.recover.btn.btn-default.btn-sm(type="button" data-toggle="tooltip" data-placement="top" title="Recover this equation")
+            .glyphicon.glyphicon-repeat
+          button.getcode.btn.btn-default.btn-sm(type="button" data-toggle="tooltip" data-placement="top" title="Insert the LaTeX for this equation into current input")
+            .glyphicon.glyphicon-pencil
+
       #feedbackModal.modal.fade(tabindex='-1', role='dialog', aria-labelledby='feedbackModalLabel')
         .modal-dialog(role='document')
           .modal-content

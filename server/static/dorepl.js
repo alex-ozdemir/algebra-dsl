@@ -278,46 +278,43 @@ socket.onmessage = function(event) {
 
         var html = data.slice(nextNextAtIdx + 1);
 
-        // Contains the checkbox, math, and buttons
-        var fullDiv = document.createElement('div');
-        fullDiv.className = 'output math-output';
-        fullDiv.id = 'mathout'+formulaNum;
-        fullDiv.setAttribute("formulanum", formulaNum);
-        fullDiv.className += ' new-math-output';
-        // Hide until the math is done typesetting
-        fullDiv.style.display = 'none';
 
-        var mathBox = document.createElement('span');
+
+        var newMathOutput = document.querySelector("#model-output").cloneNode(true);
+        newMathOutput.id = 'mathout'+formulaNum;
+        newMathOutput.setAttribute("formulanum", formulaNum);
+
+        var mathBox = newMathOutput.querySelector(".formula");
         mathBox.id = 'formula'+formulaNum;
-        mathBox.className += ' output disable-highlight';
         mathBox.innerHTML = html;
-        fullDiv.appendChild(mathBox);
 
-        var checkbox = document.createElement('input');
-        checkbox.setAttribute('type', 'checkbox');
-        fullDiv.appendChild(checkbox);
-        checkbox.checked = checkCheckbox;
-        // Add a bootstrap tooltip
-        checkbox.setAttribute('data-toggle', 'tooltip');
-        checkbox.setAttribute('data-placement', 'top');
-        checkbox.setAttribute('title',
-                "Select this equation for output");
-        $(checkbox).tooltip();
+        newMathOutput.querySelector(".recover").addEventListener("click", function(e) {
+            var formulaNum = $(e.target).closest("[formulanum]").attr("formulanum");
+            var cm = currentCM;
+            putIntoCM(cm, "recover " + formulaNum, true);
+            sendToServer(cm);
+        });
 
-        createRecoverButtom(fullDiv);
-        createGetCodeButton(fullDiv);
+        newMathOutput.querySelector(".getcode").addEventListener("click", function(e) {
+            var formulaNum = $(e.target).closest("[formulanum]").attr("formulanum");
+            socket.send("cmd@code " + formulaNum);
+        });
 
-        document.getElementById('repl').appendChild(fullDiv);
+        $( newMathOutput ).find( '[data-toggle="tooltip"]' ).tooltip({
+          container: 'body'
+        });
+
+        document.getElementById('repl').appendChild(newMathOutput);
 
         var cm = createCM();
-        cm.prevOutput = fullDiv;
+        cm.prevOutput = newMathOutput;
         currentCM = cm;
 
         currentMath = mathBox;
 
         // Handle Actual Formula
         MathJax.Hub.Queue(["Typeset", MathJax.Hub, mathBox.id]);
-        MathJax.Hub.Queue([onFinishTypesetting, mathBox, fullDiv, cm]);
+        MathJax.Hub.Queue([onFinishTypesetting, mathBox, newMathOutput, cm]);
 
         executeBatchCommands(cm);
     }
@@ -337,56 +334,6 @@ socket.onclose = function(event) {
 
 socket.onerror = function(event) {
     $('#connectionerrormodal').modal('show');
-}
-
-function createRecoverButtom(fullDiv) {
-
-    //<span class="glyphicon glyphicon-search" aria-hidden="true"></span>
-    var recoverButton = document.createElement('button');
-    //const recoverClass = "recover glyphicon glyphicon-repeat";
-    const recoverClass = "recover btn btn-default btn-sm glyphicon glyphicon-repeat";
-    //recoverButton.innerHTML = "&#x27f2;";
-    recoverButton.className += " " + recoverClass;
-    recoverButton.setAttribute('aria-hidden', 'true');
-    // Add a bootstrap tooltip
-    recoverButton.setAttribute('data-toggle', 'tooltip');
-    recoverButton.setAttribute('data-placement', 'top');
-    recoverButton.setAttribute('title',
-            "Recover this equation");
-    $(recoverButton).tooltip();
-
-
-    recoverButton.addEventListener("click", function(e) {
-        var formulaNum = e.target.parentNode.getAttribute("formulanum");
-        var cm = currentCM;
-        putIntoCM(cm, "recover " + formulaNum, true);
-        sendToServer(cm);
-    });
-    fullDiv.appendChild(recoverButton);
-}
-
-function createGetCodeButton(fullDiv) {
-    var getcodeButton = document.createElement('button');
-    const recoverClass = "getcode btn btn-default btn-sm glyphicon glyphicon-pencil";
-    //const recoverClass = "getcode";
-    //getcodeButton.innerHTML = "&lt;/&gt;";
-    getcodeButton.className += " " + recoverClass;
-
-    // Add a bootstrap tooltip
-    getcodeButton.setAttribute('aria-hidden', 'true');
-    getcodeButton.setAttribute('data-toggle', 'tooltip');
-    getcodeButton.setAttribute('data-placement', 'top');
-    getcodeButton.setAttribute('title',
-            "Insert LaTeX code for this equation into current input");
-    $(getcodeButton).tooltip();
-
-    getcodeButton.addEventListener("click", function(e) {
-        var formulaNum = e.target.parentNode.getAttribute("formulanum");
-        socket.send("cmd@code " + formulaNum);
-    });
-
-
-    fullDiv.appendChild(getcodeButton);
 }
 
 function mathTreeNodeAbove(cur, topLevel) {
