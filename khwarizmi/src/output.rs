@@ -568,11 +568,32 @@ fn fmt_as_latex(expr: &Expression,
             }
         }
         &Expression::Power(ref b, ref p) => {
-            write!(f, "{{")?;
-            fmt_as_latex(b, f, (expr, false, false), output)?;
-            write!(f, "}}^{{")?;
-            fmt_as_latex(p, f, (expr, true, false), output)?;
-            write!(f, "}}")?;
+            let mut issqrt = false;
+            if let &box Expression::Division(ref top, ref bot) = p {
+                if top == &vec![Expression::Atom(Atom::Natural(1))] && bot.len() == 1 {
+                    if let Expression::Atom(Atom::Natural(root)) = bot[0] {
+
+                        if root == 2 {
+                            write!(f, "\\sqrt{{")?;
+                        } else {
+                            write!(f, "\\sqrt[")?;
+                            fmt_as_latex(&bot[0], f, (expr, false, true), output)?;
+                            write!(f, "]{{")?;
+                        }
+
+                        fmt_as_latex(b, f, (expr, false, true), output)?;
+                        write!(f, "}}")?;
+                        issqrt = true;
+                    }
+                }
+            }
+            if !issqrt {
+                write!(f, "{{")?;
+                fmt_as_latex(b, f, (expr, false, false), output)?;
+                write!(f, "}}^{{")?;
+                fmt_as_latex(p, f, (expr, true, false), output)?;
+                write!(f, "}}")?;
+            }
         }
         &Expression::Negation(ref n) => {
             write!(f, "-")?;
