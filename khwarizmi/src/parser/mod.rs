@@ -34,15 +34,16 @@ pub enum ParseError {
     OperatorDoesNotAcceptSubscripts(FunctionSymbol),
     OperatorDoesNotAcceptSuperscripts(FunctionSymbol),
     FPError(num::ParseFloatError),
+    UnclosedOptionalArgument,
 }
 
 fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
     use Expression as Ex;
     match input {
-        PostMac::Sqrt(radical) => {
+        PostMac::Sqrt(n, radical) => {
             Ok(Ex::Power(box parse_operators(*radical)?,
                          box Ex::Division(vec![Ex::Atom(Atom::Natural(1))],
-                                          vec![Ex::Atom(Atom::Natural(2))])))
+                                          vec![Ex::Atom(Atom::Natural(n as i64))])))
         }
         PostMac::Char(c) => Ok(Ex::Atom(Atom::PlainVariable(c))),
         PostMac::Escaped(string) => Ok(Ex::Atom(Atom::Escaped(string))),

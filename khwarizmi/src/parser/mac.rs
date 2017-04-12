@@ -93,7 +93,7 @@ impl Operator {
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum PostMac {
     Frac(Box<PostMac>, Box<PostMac>),
-    Sqrt(Box<PostMac>),
+    Sqrt(u64, Box<PostMac>),
     List(Vec<PostMac>),
     Standalone(StandaloneSymbol),
     Op(UniOp),
@@ -140,7 +140,7 @@ impl PostMac {
         match self {
             &PostMac::List(ref list) => list.last().expect("No empty lists!").expects_op_after(),
             &PostMac::Frac(_, _) |
-            &PostMac::Sqrt(_) |
+            &PostMac::Sqrt(_, _) |
             &PostMac::Op(UniOp::Std(Operator::RGroup)) |
             &PostMac::Standalone(_) |
             &PostMac::Char(_) |
@@ -159,7 +159,7 @@ impl PostMac {
                     .expects_op_before()
             }
             &PostMac::Frac(_, _) |
-            &PostMac::Sqrt(_) |
+            &PostMac::Sqrt(_, _) |
             &PostMac::Op(UniOp::Std(Operator::LGroup)) |
             &PostMac::Standalone(_) |
             &PostMac::Char(_) |
@@ -216,8 +216,9 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                         PostMac::Frac(box first, box second)
                     }
                     Err(ParseError::LoneControlSequence(KnownCS::sqrt)) => {
+                        let optional_radical = opt_num_arg(&mut list)?;
                         let argument = one_expression(&mut list)?;
-                        PostMac::Sqrt(box argument)
+                        PostMac::Sqrt(optional_radical.unwrap_or(2), box argument)
                     }
                     Err(ParseError::LoneControlSequence(KnownCS::left)) |
                     Err(ParseError::LoneControlSequence(KnownCS::right)) => {
@@ -282,6 +283,30 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                 _ => Ok(PostMac::List(result_list)),
             }
         }
+    }
+}
+
+/// Parses [n] where n is a natural.
+fn opt_num_arg(input: &mut Vec<latex::Token>) -> Result<Option<u64>, ParseError> {
+    let mut num: u64 = 0;
+    if input.last() == Some(&latex::Token::Special(Special::LSquareBracket)) {
+        input.pop();
+        loop {
+            match input.pop() {
+                Some(latex::Token::Char(c)) if c.is_digit(10) => {
+                    num = 10 * num + (c.to_digit(10).unwrap() as u64);
+                }
+                Some(latex::Token::Special(Special::RSquareBracket)) => {
+                    break;
+                }
+                _ => {
+                    return Err(ParseError::UnclosedOptionalArgument);
+                }
+            }
+        }
+        Ok(Some(num))
+    } else {
+        Ok(None)
     }
 }
 
