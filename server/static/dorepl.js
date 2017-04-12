@@ -540,11 +540,11 @@ function executeBatchCommands(cm) {
 function sendOutputLatex() {
     var tosend = "output ";
 
-    var checkedBoxes = $('.math-output>input[type="checkbox"]:checked');
+    var checkedBoxes = $('.math-output>.btn-group>input[type="checkbox"]:checked');
 
     var firstprint = true;
     for (var i=0; i<checkedBoxes.length; i++) {
-        var fullDiv = checkedBoxes[i].parentNode;
+        var fullDiv = checkedBoxes[i].parentNode.parentNode;
         var id = fullDiv.getAttribute('formulanum');
         if (!firstprint) {
             tosend += ', ';
