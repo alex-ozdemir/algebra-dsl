@@ -1,4 +1,4 @@
-#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from)]
+#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from, conservative_impl_trait)]
 #[macro_use]
 extern crate nom;
 mod parser;
@@ -26,13 +26,13 @@ const UNREACH: &'static str = "An option/result that was expected to be Some/Ok 
                                This is a bug!";
 const PLACEHOLDER: &'static str = "@@Placeholder@@";
 
-#[derive(Debug,PartialEq, Eq)]
+#[derive(Debug,PartialEq, Eq, Clone)]
 pub struct AlgebraDSLError {
     err: ErrorVariant,
     msg: String,
 }
 
-#[derive(Debug,PartialEq, Eq)]
+#[derive(Debug,PartialEq, Eq, Clone)]
 pub enum ErrorVariant {
     Parse(ParseError),
     InvalidIdx,
@@ -353,6 +353,13 @@ impl SiblingIndices {
     fn parent(&self) -> &TreeIdxSlice {
         self.parent_idx.as_ref()
     }
+    fn rev_iter(&self) -> Vec<TreeIdx> {
+        self.children.iter().rev().map(|child_idx| {
+            let mut i = self.parent_idx.clone();
+            i.push(*child_idx);
+            i
+        }).collect()
+    }
 }
 
 pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
@@ -413,7 +420,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
     }
 
     /// Delete the specified indices
-    fn delete(&mut self, indices: SiblingIndices) -> Result<(), AlgebraDSLError> {
+    fn delete(&mut self, indices: SiblingIndices) -> Result<Expression, AlgebraDSLError> {
         let cp = self.clone();
         let res = self.replace_with_inner(&indices, None, ErrorVariant::InvalidDelete);
         if let Err(_) = res {
@@ -428,27 +435,29 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
     /// removes the locations specified by indices.
     ///
     /// Does not do any flattening.
+    ///
+    /// Returns the removed components
     fn replace_with_inner(&mut self,
                           indices: &SiblingIndices,
                           expr: Option<Expression>,
                           gen_err: ErrorVariant)
-                          -> Result<(), AlgebraDSLError> {
+                          -> Result<Expression, AlgebraDSLError> {
         use Expression as Ex;
+
         let &SiblingIndices { ref parent_idx, ref children } = indices;
         let parent_ref = self.get_mut(parent_idx.as_ref())?;
         let insert_idx = *children.get(0)
             .ok_or(AlgebraDSLError::from_variant(ErrorVariant::InvalidSiblingIndices))?;
-        let result = match parent_ref.take() {
+        let (result, removed) = match parent_ref.take() {
             Ex::Sum(args) => {
                 if args.len() < children.len() {
                     return Err(AlgebraDSLError::new(gen_err,
                                                     format!("Can't get rid of more \
                                                      things than we have.")));
                 }
-                let mut new_exprs = delete_prod(args, children.as_slice());
+                let (mut new_exprs, removed) = delete_prod(args, children.as_slice());
                 expr.map(|e| new_exprs.insert(insert_idx, e));
-                Ex::sum_many(new_exprs)
-                    .ok_or(AlgebraDSLError::new(gen_err, format!("Empty sum is illegal")))
+                (Ex::sum_many(new_exprs), Ex::sum_many(removed))
             }
             Ex::Division(top, bottom) => {
                 let original_top_len = top.len();
@@ -464,29 +473,32 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
                     .cloned()
                     .filter_map(|i| if i < top.len() { Some(i) } else { None })
                     .collect::<Vec<_>>();
-                let mut new_top = delete_prod(top, top_indices.as_slice());
-                let mut new_bottom = delete_prod(bottom, bottom_indices.as_slice());
+                let (mut new_top, removed_top) = delete_prod(top, top_indices.as_slice());
+                let (mut new_bottom, removed_bottom) = delete_prod(bottom,
+                                                                   bottom_indices.as_slice());
 
                 expr.map(|e| if insert_idx < original_top_len {
                     new_top.insert(insert_idx, e);
                 } else {
                     new_bottom.insert(insert_idx - original_top_len, e);
                 });
-                Ok(Ex::divide_products(new_top, new_bottom))
+                (Ex::divide_products(new_top, new_bottom),
+                 Ex::divide_products_flatten(removed_top, removed_bottom))
             }
             e => {
                 let s = format!("Can't refer to sibling children of the expression `{}`",
                                 e.as_khwarizmi_latex());
-                Err(AlgebraDSLError::new(gen_err, s))
+                return Err(AlgebraDSLError::new(gen_err, s));
             }
         };
-        result.map(|e| { *parent_ref = e; })
+        *parent_ref = result;
+        Ok(removed)
     }
 
     fn make_siblings(&mut self,
                      indices: SiblingIndices,
                      expr: Expression)
-                     -> Result<(), AlgebraDSLError> {
+                     -> Result<Expression, AlgebraDSLError> {
         let cp = self.clone();
         let res = self.replace_with_inner(&indices, Some(expr), ErrorVariant::InvalidMake);
         if let Err(_) = res {
@@ -695,8 +707,7 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
             Ok(())
         }
     }
-
-    fn distribute_power(mut self, whole: &TreeIdx) -> Result<Self, AlgebraDSLError> {
+    fn distribute_power(mut self, whole: &TreeIdxSlice) -> Result<Self, AlgebraDSLError> {
         {
             let location = self.get_mut(whole)?;
             let contents = location.take();
@@ -765,6 +776,25 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
         }
         Ok(self)
     }
+
+    fn distribute_many(mut self,
+                       distributees: &SiblingIndices,
+                       sum: &TreeIdxSlice) -> Result<Self, AlgebraDSLError> {
+        let invalid_idx = AlgebraDSLError::from_variant(ErrorVariant::InvalidIdx);
+        let mut sum_idx = sum.to_owned();
+        // Go through the indices in reverse order
+        for idx in distributees.rev_iter() {
+            idx.last().ok_or(invalid_idx.clone())?;
+            self = self.distribute(&idx, &sum_idx)?;
+            if idx.last().unwrap() < sum_idx.last().unwrap() {
+                // Decrement the final idx of sum
+                let old = sum_idx.pop().unwrap();
+                sum_idx.push(old - 1);
+            }
+        }
+        Ok(self)
+    }
+
 
     /// Takes two indices refering to siblings of a product `term` and `sum`.
     /// Assuming that `sum` refers to a summation, it distrubtes term across the summands
@@ -847,15 +877,13 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
     }
 }
 
-fn delete_prod(mut p: Vec<Expression>, is: &[TreeInt]) -> Vec<Expression> {
-    remove_args(&mut p, is);
-    p
-}
-
-fn remove_args(args: &mut Vec<Expression>, idxs: &[TreeInt]) {
-    for idx in idxs.iter().rev() {
-        args.remove(*idx);
+/// Removes the items specified by `is` from the product `p` and returns them separately
+fn delete_prod(mut p: Vec<Expression>, is: &[TreeInt]) -> (Vec<Expression>, Vec<Expression>) {
+    let mut new = vec![];
+    for idx in is.iter().rev() {
+        new.push(p.remove(*idx));
     }
+    (p, new)
 }
 
 impl FromStr for Expression {
@@ -1167,12 +1195,12 @@ impl Expression {
     }
 
     /// Creates an `Expression` with `top`s divided by `bottom`s
-    fn sum_many(mut summands: Vec<Expression>) -> Option<Expression> {
+    fn sum_many(mut summands: Vec<Expression>) -> Expression {
         let zero = Expression::Atom(Atom::Natural(0));
         match summands.len() {
-            0 => Some(zero),
-            1 => summands.pop(),
-            _ => Some(Expression::Sum(summands)),
+            0 => zero,
+            1 => summands.pop().unwrap(),
+            _ => Expression::Sum(summands),
         }
     }
 
@@ -1268,7 +1296,7 @@ impl Expression {
         }
         //then delete if it is a valid pair
         if should_delete {
-            self.delete(indices)
+            self.delete(indices).map(|_| ())
         } else {
             Err(AlgebraDSLError::from_variant(ErrorVariant::InvalidCancel))
         }

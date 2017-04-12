@@ -269,8 +269,9 @@ fn delete_expr() {
     let v = vec![TreeIdx::from_str("#(mtn:0,1)").unwrap()];
     let idx = before.sibling_indices(v.as_slice()).unwrap();
     let after = Ex::Division(vec![nat(3), var('x'), nat(7)], vec![]);
-    before.delete(idx).unwrap();
+    let removed = before.delete(idx).unwrap();
     assert_expected_eq_actual!(after, before);
+    assert_expected_eq_actual!(nat(4), removed);
 }
 
 #[test]
@@ -777,10 +778,28 @@ fn combine_coeff_div_4() {
 
 #[test]
 fn distribute_flatten_fraction() {
-    let expect = Ex::Sum(vec![Ex::Division(vec![var('x'), nat(6)],vec![var('y')]), prod(vec![var('x'), var('x')])]);
-    let start = prod(vec![var('x'), Ex::Sum(vec![Ex::Division(vec![nat(6)],vec![var('y')]), var('x')])]);
+    let expect = Ex::Sum(vec![Ex::Division(vec![var('x'), nat(6)], vec![var('y')]),
+                              prod(vec![var('x'), var('x')])]);
+    let start = prod(vec![var('x'),
+                          Ex::Sum(vec![Ex::Division(vec![nat(6)], vec![var('y')]), var('x')])]);
     let i1 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
     let i2 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
     let res = start.distribute(&i1, &i2).unwrap();
     assert_expected_eq_actual!(expect, res);
+}
+
+#[test]
+fn distribute_many() {
+    let e = prod(vec![var('s'), var('t'), Ex::Sum(vec![var('x'), var('y')]), var('k')]);
+    let after = Ex::Sum(vec![prod(vec![var('s'), var('t'), var('x'), var('k')]),
+                             prod(vec![var('s'), var('t'), var('y'), var('k')])]);
+    let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
+    let indices: Vec<_> = index_strings.into_iter()
+        .map(TreeIdx::from_str)
+        .map(Result::unwrap)
+        .collect();
+    let siblings = e.sibling_indices(indices.as_slice()).unwrap();
+    let i2 = TreeIdx::from_str("#(mtn:0,2)").unwrap();
+    let e2 = e.distribute_many(&siblings, &i2).unwrap();
+    assert_expected_eq_actual!(after, e2);
 }
