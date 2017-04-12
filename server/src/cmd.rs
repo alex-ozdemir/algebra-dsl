@@ -290,11 +290,16 @@ impl FromStr for Cmd {
                 let mut rest: &str = &s[6..].trim();
                 loop {
                     if let Some(comma_idx) = rest.find(',') {
-                        indices.push(usize::from_str(&rest[..comma_idx])
-                                         .map_err(|_| internal_err())?);
+                        indices.push(usize::from_str(&rest[..comma_idx]).map_err(|_| {
+                                Error::new(Variant::IllFormattedCommand,
+                                           "Output not given a list of numbers".to_string())
+                            })?);
                         rest = rest[comma_idx + 1..].trim();
                     } else {
-                        indices.push(usize::from_str(rest).map_err(|_| internal_err())?);
+                        indices.push(usize::from_str(rest).map_err(|_| {
+                                Error::new(Variant::IllFormattedCommand,
+                                           "Output not given a list of numbers".to_string())
+                            })?);
                         break;
                     }
                 }

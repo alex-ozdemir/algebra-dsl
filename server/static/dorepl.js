@@ -538,10 +538,14 @@ function executeBatchCommands(cm) {
 }
 
 function sendOutputLatex() {
-    var tosend = "output ";
 
     var checkedBoxes = $('.math-output>.btn-group>input[type="checkbox"]:checked');
 
+    if (checkedBoxes.length == 0) {
+        return
+    }
+
+    var tosend = "output ";
     var firstprint = true;
     for (var i=0; i<checkedBoxes.length; i++) {
         var fullDiv = checkedBoxes[i].parentNode.parentNode;

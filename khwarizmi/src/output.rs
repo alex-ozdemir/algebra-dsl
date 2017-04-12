@@ -3,7 +3,7 @@ use super::{Expression, Atom, Math, Equation};
 
 const MROW: &'static str = "mrow";
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum LaTeXOutputType {
     ForUs,
     ForOther,
@@ -569,21 +569,23 @@ fn fmt_as_latex(expr: &Expression,
         }
         &Expression::Power(ref b, ref p) => {
             let mut issqrt = false;
-            if let &box Expression::Division(ref top, ref bot) = p {
-                if top == &vec![Expression::Atom(Atom::Natural(1))] && bot.len() == 1 {
-                    if let Expression::Atom(Atom::Natural(root)) = bot[0] {
+            if output == LaTeXOutputType::ForOther {
+                if let &box Expression::Division(ref top, ref bot) = p {
+                    if top == &vec![Expression::Atom(Atom::Natural(1))] && bot.len() == 1 {
+                        if let Expression::Atom(Atom::Natural(root)) = bot[0] {
 
-                        if root == 2 {
-                            write!(f, "\\sqrt{{")?;
-                        } else {
-                            write!(f, "\\sqrt[")?;
-                            fmt_as_latex(&bot[0], f, (expr, false, true), output)?;
-                            write!(f, "]{{")?;
+                            if root == 2 {
+                                write!(f, "\\sqrt{{")?;
+                            } else {
+                                write!(f, "\\sqrt[")?;
+                                fmt_as_latex(&bot[0], f, (expr, false, true), output)?;
+                                write!(f, "]{{")?;
+                            }
+
+                            fmt_as_latex(b, f, (expr, false, true), output)?;
+                            write!(f, "}}")?;
+                            issqrt = true;
                         }
-
-                        fmt_as_latex(b, f, (expr, false, true), output)?;
-                        write!(f, "}}")?;
-                        issqrt = true;
                     }
                 }
             }
