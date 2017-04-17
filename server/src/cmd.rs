@@ -47,6 +47,7 @@ pub enum Cmd {
     Distribute(Vec<TreeIdx>, TreeIdx),
     DistributePower(TreeIdx),
     Simplify(TreeIdx),
+    Flatten(TreeIdx),
     Flip,
 }
 
@@ -213,6 +214,11 @@ impl Cmd {
             }
             (Cmd::DistributePower(i), Some(old_expr)) => {
                 Ok(Return::Math(old_expr.clone().distribute_power(&i)?))
+            }
+            (Cmd::Flatten(i), Some(old_expr)) => {
+                let mut cp = old_expr.clone();
+                cp.flatten(&i)?;
+                Ok(Return::Math(cp))
             }
             (c, None) => {
                 Err(Error::new(Variant::NeedsExpression,
@@ -391,6 +397,15 @@ impl FromStr for Cmd {
                 } else {
                     let last_index = indices.pop().unwrap();
                     Ok(Cmd::Distribute(indices, last_index))
+                }
+            } else if s.starts_with("flatten") {
+                let (mut indices, rest) = parse_indices(&s[7..].trim())?;
+                if indices.len() != 1 || rest.trim().len() > 0 {
+                    Err(Error::new(Variant::IllFormattedCommand,
+                                   "flatten expects one index".to_string()))
+                } else {
+                    let i = indices.pop().unwrap();
+                    Ok(Cmd::Flatten(i))
                 }
             } else {
                 Err(if Math::from_str(s).is_ok() {

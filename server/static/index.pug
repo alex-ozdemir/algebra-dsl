@@ -204,6 +204,14 @@ html
           #help-replace-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-replace-header")
             .panel-body
               | Replace each of the tags with the given LaTeX code.
+        .panel.panel-default
+          #help-flatten-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-flatten-body" aria-expanded="false" aria-controls="help-flatten-body")
+                | flatten &langle;tag&rangle;
+          #help-flatten-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-flatten-header")
+            .panel-body
+              | Flatten any nested addition, multiplication, or division structure
 
 //- vim: sw=2 sts=2 tw=0
 //- au BufWritePost index.pug !pug -P index.pug
