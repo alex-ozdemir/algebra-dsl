@@ -976,10 +976,13 @@ impl Expression {
     ///    * Any natural constant extracted
     ///    * The first index at which a constant was found
     ///    * The remaining (non-constant) terms
+    /// 
+    /// If handling large integers, will replace the integers with floats.
     fn simplify_product(exprs: Vec<Expression>) -> (f64, i64, Option<usize>, Vec<Expression>) {
         use Expression as Ex;
-        let mut f_acc = 1.0;
-        let mut n_acc = 1;
+        let mut f_acc: f64 = 1.0;
+        let mut n_acc: i64 = 1;
+        let mut overflowed = false;
         let mut new_exprs = vec![];
         let mut first_constant_idx = None;
         for (i, ex) in exprs.into_iter()
@@ -987,7 +990,14 @@ impl Expression {
             .enumerate() {
             match ex {
                 Ex::Atom(Atom::Natural(n)) => {
-                    n_acc *= n;
+                    let (prod, overflow) = n_acc.overflowing_mul(n);
+                    overflowed |= overflow;
+                    if overflowed {
+                        f_acc *= (n_acc as f64) * (n as f64);
+                        n_acc = 1;
+                    } else {
+                        n_acc = prod;
+                    }
                     if first_constant_idx.is_none() {
                         first_constant_idx = Some(i);
                     }
@@ -1040,7 +1050,8 @@ impl Expression {
             }
             Ex::Sum(exprs) => {
                 let mut f_acc = 0.0;
-                let mut n_acc = 0;
+                let mut n_acc: i64 = 0;
+                let mut overflowed = false;
                 let mut new_exprs = vec![];
                 let mut first_id_of_constant = None;
                 for (idx, ex) in exprs.into_iter()
@@ -1048,7 +1059,14 @@ impl Expression {
                     .enumerate() {
                     match ex {
                         Ex::Atom(Atom::Natural(n)) => {
-                            n_acc += n;
+                            let (sum, overflow) = n_acc.overflowing_add(n);
+                            overflowed |= overflow;
+                            if overflowed {
+                                f_acc += (n_acc as f64) + (n as f64);
+                                n_acc = 0;
+                            } else {
+                                n_acc = sum;
+                            }
                             if first_id_of_constant.is_none() {
                                 first_id_of_constant = Some(idx);
                             }
