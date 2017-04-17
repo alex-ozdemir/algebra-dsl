@@ -81,8 +81,7 @@ html
               p.text-warning There was an error in the connection to the server. Download your session and reload this page.
             .modal-footer
               button.btn.btn-primary(type='button', data-dismiss='modal') Close
-    //-#help(style='display:none;')
-    #help2
+    #help
       .panel-group#help-accordion(role="tablist" aria-multiselectable="true")
         .panel.panel-default
           #help-intro-header.panel-heading(role="tab")
@@ -110,7 +109,7 @@ html
           #help-simplify-header.panel-heading(role="tab")
             h4.panel-title
               a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-simplify-body" aria-expanded="false" aria-controls="help-simplify-body")
-                | $ simplify &langle;tag&rangle;
+                | simplify &langle;tag&rangle;
           #help-simplify-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-simplify-header")
             .panel-body
               | Attempt to automatically simplify the tag
