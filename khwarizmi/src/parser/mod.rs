@@ -57,9 +57,10 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
         }
         PostMac::Num(Numeric(natural, None)) => {
             i64::from_str_radix(natural.as_str(), 10)
+                .map(Atom::Natural)
+                .or_else(|_| f64::from_str(natural.as_str()).map(Atom::Floating))
                 .ok()
                 .ok_or(ParseError::InvalidNumericLiteral)
-                .map(Atom::Natural)
                 .map(Ex::Atom)
         }
         PostMac::Num(Numeric(natural, Some(dec))) => {
