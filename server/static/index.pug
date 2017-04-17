@@ -82,25 +82,129 @@ html
             .modal-footer
               button.btn.btn-primary(type='button', data-dismiss='modal') Close
     //-#help(style='display:none;')
-    #help
-      center
-        h1 Help
-      | Khwarizmi is a language based around manipulating an expression or equation. Expressions are represented as trees. Many commands operate on one or more tags (subtrees of the previous expression or equation). To select a tag, click on the previous expression or equation repeatedly until the correct part is highlighted. You can also click and drag to select, making sure to start and end on parts that you #[em want] to be selected.
-      ul
-        li #[strong $ &langle;LaTeX code&rangle;]: Set the current expression or equation
-        li #[strong simplify &langle;tag&rangle;]: Attempt to automatically simplify the tag.
-        li #[strong cancel &langle;tag&rangle; &langle;tag&rangle;]: If the tags are inverses, delete them.
-        li &langle;#[strong +], #[strong -], #[strong /], #[strong *], or #[strong ^]&rangle; #[strong &langle;LaTeX code&rangle;]: Perform the operation to both sides of the previous equation. For example, #[strong +y] will add #[em y] to both sides.
-        li #[strong map &langle;LaTeX code&rangle;]: Replaces each side of the current equation with the given code, replacing any #[em @] symbols with the side of the current equation.
-        li #[strong collapse &langle;tag&rangle; !{'&langle;[number]&rangle;'}]: Collapse a tower of exponents. If a number is given, collapse that many times.
-        li #[strong make &langle;tag(s)&rangle; &langle;LaTeX code&rangle;]: Replace all of the tags with the code. The tags must be part of the same sum or product.
-        li #[strong delete &langle;tag(s)&rangle;]: Deletes the tags.
-        li #[strong flip]: Flips left and right sides of an equation.
-        li #[strong swap &langle;tag&rangle; &langle;tag&rangle;]: Swap the positions of the two tags.
-        li #[strong distribute &langle;tags&rangle; &langle;tag&rangle;]: Distribute the first terms over the summation provided by the last.
-        li #[strong distribute-pow &langle;tag&rangle;]: Distribute this power over the inner product.
-        li #[strong replace &langle;tag(s)&rangle; &langle;LaTeX code&rangle;]: Replace each of the tags with the given LaTeX code.
-
+    #help2
+      .panel-group#help-accordion(role="tablist" aria-multiselectable="true")
+        .panel.panel-default
+          #help-intro-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-intro-body" aria-expanded="true" aria-controls="help-intro-body")
+                | Help
+          #help-intro-body.panel-collapse.collapse.in(role="tabpanel" aria-labelledby="help-intro-header")
+            .panel-body
+              | Khwarizmi is a language based around manipulating an expression
+              | or equation. Expressions are represented as trees. Many
+              | commands operate on one or more tags (subtrees of the previous
+              | expression or equation). To select a tag, click on the previous
+              | expression or equation repeatedly until the correct part is
+              | highlighted. You can also click and drag to select, making sure
+              | to start and end on parts that you #[em want] to be selected.
+        .panel.panel-default
+          #help-new-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-new-body" aria-expanded="false" aria-controls="help-new-body")
+                | $ &langle;LaTeX code&rangle;
+          #help-new-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-new-header")
+            .panel-body
+              | Set the current expression or equation
+        .panel.panel-default
+          #help-simplify-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-simplify-body" aria-expanded="false" aria-controls="help-simplify-body")
+                | $ simplify &langle;tag&rangle;
+          #help-simplify-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-simplify-header")
+            .panel-body
+              | Attempt to automatically simplify the tag
+        .panel.panel-default
+          #help-cancel-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-cancel-body" aria-expanded="false" aria-controls="help-cancel-body")
+                | cancel &langle;tag&rangle; &langle;tag&rangle;
+          #help-cancel-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-cancel-header")
+            .panel-body
+              | If the tags are inverses, delete them.
+        .panel.panel-default
+          #help-mapspec-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-mapspec-body" aria-expanded="false" aria-controls="help-mapspec-body")
+                | +, /, *, or ^ &langle;LaTeX code&rangle;
+          #help-mapspec-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-mapspec-header")
+            .panel-body
+              | Perform the operation to both sides of the previous equation.
+              | For example, #[strong +y] will add #[em y] to both sides.
+        .panel.panel-default
+          #help-map-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-map-body" aria-expanded="false" aria-controls="help-map-body")
+                | map &langle;LaTeX code&rangle;
+          #help-map-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-map-header")
+            .panel-body
+              | Replaces each side of the current equation with the given code,
+              | replacing any #[em @] symbols with the side of the current
+              | equation.
+        .panel.panel-default
+          #help-collapse-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-collapse-body" aria-expanded="false" aria-controls="help-collapse-body")
+                | collapse &langle;tag&rangle; !{'&langle;[number]&rangle;'}
+          #help-collapse-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-collapse-header")
+            .panel-body
+              | Collapse a tower of exponents. If a number is given, collapse that many times.
+        .panel.panel-default
+          #help-make-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-make-body" aria-expanded="false" aria-controls="help-make-body")
+                | make &langle;tag(s)&rangle; &langle;LaTeX code&rangle;
+          #help-make-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-make-header")
+            .panel-body
+              | Replace all of the tags with the code. The tags must be part of the same sum or product.
+        .panel.panel-default
+          #help-delete-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-delete-body" aria-expanded="false" aria-controls="help-delete-body")
+                | delete &langle;tag(s)&rangle;
+          #help-delete-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-delete-header")
+            .panel-body
+              | Deletes the tags.
+        .panel.panel-default
+          #help-flip-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-flip-body" aria-expanded="false" aria-controls="help-flip-body")
+                | flip
+          #help-flip-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-flip-header")
+            .panel-body
+              | Flips left and right sides of an equation.
+        .panel.panel-default
+          #help-swap-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-swap-body" aria-expanded="false" aria-controls="help-swap-body")
+                | swap &langle;tag&rangle; &langle;tag&rangle;
+          #help-swap-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-swap-header")
+            .panel-body
+              | Swap the positions of the two tags.
+        .panel.panel-default
+          #help-distribute-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-distribute-body" aria-expanded="false" aria-controls="help-distribute-body")
+                | distribute &langle;tags&rangle; &langle;tag&rangle;
+          #help-distribute-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-distribute-header")
+            .panel-body
+              | Distribute the first terms over the summation provided by the last.
+        .panel.panel-default
+          #help-distributepow-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-distributepow-body" aria-expanded="false" aria-controls="help-distributepow-body")
+                | distribute-pow &langle;tag&rangle;
+          #help-distributepow-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-distributepow-header")
+            .panel-body
+              | Distribute this power over the inner product.
+        .panel.panel-default
+          #help-replace-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-replace-body" aria-expanded="false" aria-controls="help-replace-body")
+                | replace &langle;tag(s)&rangle; &langle;LaTeX code&rangle;
+          #help-replace-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-replace-header")
+            .panel-body
+              | Replace each of the tags with the given LaTeX code.
 
 //- vim: sw=2 sts=2 tw=0
 //- au BufWritePost index.pug !pug -P index.pug
