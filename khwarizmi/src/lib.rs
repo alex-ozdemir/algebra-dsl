@@ -1138,8 +1138,11 @@ impl Expression {
                             .map(Atom::Natural)
                             .unwrap_or(Atom::Floating((n as f64).powf(n2 as f64))))
                     }
+                    (e, Ex::Atom(Atom::Floating(1.0))) => e,
+                    (e, Ex::Atom(Atom::Natural(1))) => e,
+                    (_, Ex::Atom(Atom::Floating(0.0))) |
+                    (_, Ex::Atom(Atom::Natural(0))) => Ex::Atom(Atom::Natural(1)),
                     (e1, e2) => Ex::Power(box e1, box e2),
-
                 }
             }
             Ex::LimitOp(sym, sub, sup, op) => {
