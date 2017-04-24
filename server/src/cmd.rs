@@ -40,6 +40,7 @@ pub enum Cmd {
     Output(Vec<usize>),
     Recover(usize),
     GetCode(usize),
+    Factor(TreeIdx, Expression),
     Feedback(String, String),
     Replace(Vec<TreeIdx>, ExprOrIdx),
     Collapse(TreeIdx, Option<usize>),
@@ -115,6 +116,9 @@ impl Cmd {
                 let sibs = old_expr.sibling_indices(indices.as_slice())?;
                 expr.delete(sibs)?;
                 Ok(Return::Math(expr))
+            }
+            (Cmd::Factor(index, expr), Some(old_expr)) => {
+                Ok(Return::Math(old_expr.clone().factor(&index, expr)?))
             }
             (Cmd::Cancel(indices), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
@@ -261,6 +265,15 @@ impl FromStr for Cmd {
                                    format!("Rest isn't empty, it's `{}`", rest)))
                 } else {
                     Ok(Cmd::Delete(indices))
+                }
+            } else if s.starts_with("factor") {
+                let (mut indices, rest) = parse_indices(&s[6..].trim())?;
+                if indices.len() != 1 {
+                    Err(Error::new(Variant::IllFormattedCommand,
+                                   format!("Expected a single sum index for factor")))
+                } else {
+                    let expr = Expression::from_str(rest.trim())?;
+                    Ok(Cmd::Factor(indices.pop().unwrap(), expr))
                 }
             } else if s.starts_with("cancel") {
                 let (indices, rest) = parse_indices(&s[6..].trim())?;

@@ -527,8 +527,23 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
 
     /// Try to factor `expr` out of each term in `self` at `idx`.
     #[allow(unused_variables)]
-    fn factor(self, idx: &TreeIdxSlice, expr: Self) -> Result<Self, AlgebraDSLError> {
-        unimplemented!()
+    fn factor(mut self, idx: &TreeIdxSlice, expr: Expression) -> Result<Self, AlgebraDSLError> {
+        {
+            let r = self.get_mut(idx)?;
+            let sum_to_factor = r.take();
+            *r = match sum_to_factor {
+                Expression::Sum(summands) => {
+                    let mut simplified_summands = vec![];
+                    for e in summands.into_iter().map(|e| Expression::divide_flatten(e, expr.clone())) {
+                        simplified_summands.push(e.simplify(&TreeIdx::from_vec(vec![]))?);
+                    }
+                    Expression::multiply_flatten(expr, Expression::Sum(simplified_summands))
+                }
+                e => e,
+            };
+        }
+        idx.parent().map(|p| self.flatten(p).ok());
+        Ok(self)
     }
 
     /// Looks at the expression indicated by `index` and merges it with any associative children of
@@ -1264,6 +1279,16 @@ impl Expression {
             (1, 0) => top.pop().expect(UNREACH),
             (0, _) => Expression::Division(vec![one], bottom),
             (_, _) => Expression::Division(top, bottom),
+        }
+    }
+
+    /// Divide Expressions and flatten
+    fn divide_flatten(top: Expression, bottom: Expression) -> Self {
+        match bottom {
+            Expression::Division(bottom_top, bottom_bottom) =>
+                Expression::multiply_flatten(top, Expression::Division(bottom_bottom, bottom_top)),
+            e =>
+                Expression::multiply_flatten(top, Expression::Division(vec![], vec![e])),
         }
     }
 

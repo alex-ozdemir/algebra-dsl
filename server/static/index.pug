@@ -191,6 +191,14 @@ html
                 | summation provided by the last.
               p When given a single tag, distribute the power over an inner product.
         .panel.panel-default
+          #help-factor-header.panel-heading(role="tab")
+            h4.panel-title
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-factor-body" aria-expanded="false" aria-controls="help-factor-body")
+                | factor &langle;tag&rangle; &langle;LaTeX code&rangle;
+          #help-factor-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-factor-header")
+            .panel-body
+              | Factor some LaTeX expression out of the indicated sum
+        .panel.panel-default
           #help-replace-header.panel-heading(role="tab")
             h4.panel-title
               a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-replace-body" aria-expanded="false" aria-controls="help-replace-body")
