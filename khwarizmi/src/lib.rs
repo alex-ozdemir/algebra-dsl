@@ -179,6 +179,9 @@ impl TreeIdx {
             Ok(TreeIdx(v))
         }
     }
+    pub fn make_empty() -> Self {
+        TreeIdx::from_vec(Vec::new())
+    }
     fn from_vec(v: Vec<TreeInt>) -> Self {
         TreeIdx(v)
     }
@@ -193,9 +196,6 @@ impl TreeIdx {
     }
     fn remove(&mut self, index: usize) -> TreeInt {
         self.0.remove(index)
-    }
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 }
 
@@ -534,8 +534,9 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
             *r = match sum_to_factor {
                 Expression::Sum(summands) => {
                     let mut simplified_summands = vec![];
-                    for e in summands.into_iter().map(|e| Expression::divide_flatten(e, expr.clone())) {
-                        simplified_summands.push(e.simplify(&TreeIdx::from_vec(vec![]))?);
+                    for e in summands.into_iter()
+                        .map(|e| Expression::divide_flatten(e, expr.clone())) {
+                        simplified_summands.push(e.simplify(&TreeIdx::make_empty())?);
                     }
                     Expression::multiply_flatten(expr, Expression::Sum(simplified_summands))
                 }
@@ -636,8 +637,8 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
     /// Collapses a tower of exponents
     /// (x^y)^z => x^(yz)
     /// Does this process `howmany` times.
-    fn collapse(&mut self, index: &TreeIdx, howmany: usize) -> Result<(), AlgebraDSLError> {
-        let mut tree = self.get(index.as_ref())?.clone();
+    fn collapse(&mut self, index: &TreeIdxSlice, howmany: usize) -> Result<(), AlgebraDSLError> {
+        let mut tree = self.get(index)?.clone();
         for _ in 0..howmany {
             tree = match tree {
                 Expression::Power(box big_base, box outer_exp) => {
@@ -1169,6 +1170,9 @@ impl Expression {
 
                 let float = top_float / bottom_float;
                 let (r_top_nat, r_bottom_nat) = reduce_division(top_nat, bottom_nat);
+                if float == 0.0 || r_top_nat == 0 {
+                    return Ex::Atom(Atom::Natural(0));
+                }
                 if float != 1.0 {
                     let net_float = float * (r_top_nat as f64) / (r_bottom_nat as f64);
                     top_exprs.insert(ci_1.unwrap_or(0), Ex::Atom(Atom::Floating(net_float)));
@@ -1285,10 +1289,10 @@ impl Expression {
     /// Divide Expressions and flatten
     fn divide_flatten(top: Expression, bottom: Expression) -> Self {
         match bottom {
-            Expression::Division(bottom_top, bottom_bottom) =>
-                Expression::multiply_flatten(top, Expression::Division(bottom_bottom, bottom_top)),
-            e =>
-                Expression::multiply_flatten(top, Expression::Division(vec![], vec![e])),
+            Expression::Division(bottom_top, bottom_bottom) => {
+                Expression::multiply_flatten(top, Expression::Division(bottom_bottom, bottom_top))
+            }
+            e => Expression::multiply_flatten(top, Expression::Division(vec![], vec![e])),
         }
     }
 
@@ -1511,7 +1515,7 @@ impl Expression {
                            neg_j: bool,
                            index_i: TreeIdx,
                            index_j: TreeIdx,
-                           idx: &TreeIdx)
+                           idx: &TreeIdxSlice)
                            -> Result<(), AlgebraDSLError> {
         let mut coeff_i;
         let mut coeff_j;
@@ -1561,7 +1565,7 @@ impl Expression {
             println!("{:?}", new_expr);
             let sibs = self.sibling_indices(vec![index_i, index_j].as_slice())?;
             self.make_siblings(sibs, new_expr)?;
-            if let Expression::Sum(new_args) = self.get(idx.as_ref())?.clone() {
+            if let Expression::Sum(new_args) = self.get(idx)?.clone() {
                 return self.combine_in_sum(new_args, idx);
             }
             return Ok(());
@@ -1577,7 +1581,7 @@ impl Expression {
                             .simplify_constants();
                     let sibs = self.sibling_indices(vec![index_i, index_j].as_slice())?;
                     self.make_siblings(sibs, new_expr)?;
-                    if let Expression::Sum(new_args) = self.get(idx.as_ref())?.clone() {
+                    if let Expression::Sum(new_args) = self.get(idx)?.clone() {
                         return self.combine_in_sum(new_args, idx);
                     }
                     return Ok(());
@@ -1595,7 +1599,7 @@ impl Expression {
                     println!("{:?}", new_expr);
                     let sibs = self.sibling_indices(vec![index_i, index_j].as_slice())?;
                     self.make_siblings(sibs, new_expr)?;
-                    if let Expression::Sum(new_args) = self.get(idx.as_ref())?.clone() {
+                    if let Expression::Sum(new_args) = self.get(idx)?.clone() {
                         return self.combine_in_sum(new_args, idx);
                     }
                     return Ok(());
@@ -1606,7 +1610,7 @@ impl Expression {
     }
     fn combine_in_sum(&mut self,
                       args: Vec<Expression>,
-                      idx: &TreeIdx)
+                      idx: &TreeIdxSlice)
                       -> Result<(), AlgebraDSLError> {
         for i in 1..args.len() {
             for j in 0..i {
@@ -1614,9 +1618,9 @@ impl Expression {
                 let expr_j;
                 let mut neg_i = false;
                 let mut neg_j = false;
-                let mut index_i = idx.clone();
+                let mut index_i = idx.to_owned();
                 index_i.push(i);
-                let mut index_j = idx.clone();
+                let mut index_j = idx.to_owned();
                 index_j.push(j);
                 //handle negation
                 if let Expression::Negation(interior) = args[i].clone() {
@@ -1695,15 +1699,15 @@ impl Expression {
                          second: &Vec<Expression>,
                          i: usize,
                          j: usize,
-                         idx: &TreeIdx,
+                         idx: &TreeIdxSlice,
                          is_cancel: bool,
                          offset_i: usize,
                          offset_j: usize)
                          -> Result<bool, AlgebraDSLError> {
         use Expression as Ex;
-        let mut index_i = idx.clone();
+        let mut index_i = idx.to_owned();
         index_i.push(offset_i + i);
-        let mut index_j = idx.clone();
+        let mut index_j = idx.to_owned();
         index_j.push(offset_j + j);
         //need to inflate some stuff
         let inf_first_i = Ex::Power(box first[i].clone(), box Ex::Atom(Atom::Natural(1)));
@@ -1718,7 +1722,7 @@ impl Expression {
                 let new_expr = Expression::Power(base_i, box new_pow).simplify_constants();
                 let sibs = self.sibling_indices(vec![index_i, index_j].as_slice())?;
                 self.make_siblings(sibs, new_expr)?;
-                if let Expression::Division(new_top, new_bot) = self.get(idx.as_ref())?.clone() {
+                if let Expression::Division(new_top, new_bot) = self.get(idx)?.clone() {
                     self.combine_in_div(new_top, new_bot, idx)?;
                     return Ok(true);
                 }
@@ -1733,7 +1737,7 @@ impl Expression {
                 let new_expr = Expression::Power(base_i, box new_pow).simplify_constants();
                 let sibs = self.sibling_indices(vec![index_i, index_j].as_slice())?;
                 self.make_siblings(sibs, new_expr)?;
-                if let Expression::Division(new_top, new_bot) = self.get(idx.as_ref())?.clone() {
+                if let Expression::Division(new_top, new_bot) = self.get(idx)?.clone() {
                     self.combine_in_div(new_top, new_bot, idx)?;
                     return Ok(true);
                 }
@@ -1748,7 +1752,7 @@ impl Expression {
                 let new_expr = Expression::Power(base_i, box new_pow).simplify_constants();
                 let sibs = self.sibling_indices(vec![index_i, index_j].as_slice())?;
                 self.make_siblings(sibs, new_expr)?;
-                if let Expression::Division(new_top, new_bot) = self.get(idx.as_ref())?.clone() {
+                if let Expression::Division(new_top, new_bot) = self.get(idx)?.clone() {
                     self.combine_in_div(new_top, new_bot, idx)?;
                     return Ok(true);
                 }
@@ -1763,7 +1767,7 @@ impl Expression {
                 let new_expr = Expression::Power(base_i, box new_pow).simplify_constants();
                 let sibs = self.sibling_indices(vec![index_i, index_j].as_slice())?;
                 self.make_siblings(sibs, new_expr)?;
-                if let Expression::Division(new_top, new_bot) = self.get(idx.as_ref())?.clone() {
+                if let Expression::Division(new_top, new_bot) = self.get(idx)?.clone() {
                     self.combine_in_div(new_top, new_bot, idx)?;
                     return Ok(true);
                 }
@@ -1774,7 +1778,7 @@ impl Expression {
     fn combine_in_div(&mut self,
                       top: Vec<Expression>,
                       bot: Vec<Expression>,
-                      idx: &TreeIdx)
+                      idx: &TreeIdxSlice)
                       -> Result<(), AlgebraDSLError> {
         for i in 1..top.len() {
             for j in 0..i {
@@ -1799,17 +1803,17 @@ impl Expression {
         }
         Ok(())
     }
-    fn combine_coeff(&mut self, idx: &TreeIdx) -> Result<(), AlgebraDSLError> {
+    fn combine_coeff(&mut self, idx: &TreeIdxSlice) -> Result<(), AlgebraDSLError> {
         //Looks at the given associative structure, and combines terms like
         //2x + 3x -> 5x and x^2/x -> x
-        let expr = self.get(idx.as_ref())?.clone();
+        let expr = self.get(idx)?.clone();
         match expr {
             Expression::Sum(args) => self.combine_in_sum(args, idx),
             Expression::Division(top, bot) => self.combine_in_div(top, bot, idx),
             _ => Err(AlgebraDSLError::from_variant(ErrorVariant::InvalidIdx)),
         }
     }
-    fn simplify(mut self, idx: &TreeIdx) -> Result<Self, AlgebraDSLError> {
+    fn simplify(mut self, idx: &TreeIdxSlice) -> Result<Self, AlgebraDSLError> {
         match self.get(idx.as_ref())? {//expr {
             &Expression::Sum(_) => {
                 self.combine_coeff(idx)?;
@@ -1968,42 +1972,70 @@ impl Math {
             Ex(ex) => Ex(ex.map(template)?),
         })
     }
-    pub fn simplify(self, idx: &TreeIdx) -> Result<Self, AlgebraDSLError> {
-        //Attempts to simplify a given location in the tree, deterministically
+    pub fn combine_coeff(&mut self, idx: &TreeIdxSlice) -> Result<(), AlgebraDSLError> {
         use self::Math::*;
         match self {
-            Eq(Equation { left, right }) => {
-                if idx.is_empty() {
-                    Ok(Eq(Equation {
-                              left: left.simplify(idx)?,
-                              right: right.simplify(idx)?,
-                          }))
-                } else if idx.get(0) == Some(0 as usize) {
-                    let mut idx = idx.clone();
-                    idx.remove(0);
-                    Ok(Eq(Equation {
-                              left: left.simplify(&idx)?,
-                              right: right,
-                          }))
-                } else {
-                    let mut idx = idx.clone();
-                    idx.remove(0);
-                    Ok(Eq(Equation {
-                              left: left,
-                              right: right.simplify(&idx)?,
-                          }))
+            &mut Eq(Equation { ref mut left, ref mut right }) => {
+                match idx.first() {
+                    None => {
+                        left.combine_coeff(idx)?;
+                        right.combine_coeff(idx)?;
+                    }
+                    Some(0) => {
+                        left.combine_coeff(idx.rest())?;
+                    }
+                    Some(1) => {
+                        right.combine_coeff(idx.rest())?;
+                    }
+                    Some(_) => {
+                        return Err(AlgebraDSLError::from_variant(ErrorVariant::InvalidIdx));
+                    }
                 }
+                Ok(())
             }
-            Ex(ex) => Ok(Ex(ex.simplify(&idx)?)),
+            &mut Ex(ref mut ex) => {
+                ex.combine_coeff(idx)?;
+                Ok(())
+            }
         }
+    }
+    pub fn simplify_powers(&mut self, idx: &TreeIdxSlice) -> Result<(), AlgebraDSLError> {
+        use self::Math::*;
+        match self {
+            &mut Eq(Equation { ref mut left, ref mut right }) => {
+                match idx.first() {
+                    None => {
+                        left.collapse(idx, 1)?;
+                        right.collapse(idx, 1)?;
+                    }
+                    Some(0) => {
+                        left.collapse(idx.rest(), 1)?;
+                    }
+                    Some(1) => {
+                        right.collapse(idx.rest(), 1)?;
+                    }
+                    Some(_) => {
+                        return Err(AlgebraDSLError::from_variant(ErrorVariant::InvalidIdx));
+                    }
+                }
+                Ok(())
+            }
+            &mut Ex(ref mut ex) => {
+                ex.collapse(idx, 1)?;
+                Ok(())
+            }
+        }
+    }
+    pub fn simplify(mut self, idx: &TreeIdxSlice) -> Result<Self, AlgebraDSLError> {
+        //Attempts to simplify a given location in the tree, deterministically
+        self.combine_coeff(idx).ok(); // Ignore Error
+        self.simplify_powers(idx).ok(); // Ignore Error
+        Ok(self.simplify_constants())
     }
     pub fn cancel_inverse(&mut self, mut sibs: SiblingIndices) -> Result<(), AlgebraDSLError> {
         use self::Math::*;
         match self {
-            &mut Eq(Equation {
-                        ref mut left,
-                        ref mut right,
-                    }) => {
+            &mut Eq(Equation { ref mut left, ref mut right }) => {
                 if sibs.parent().first() == Some(0 as usize) {
                     sibs.parent_idx.remove(0);
                     left.cancel_inverse(sibs)?;

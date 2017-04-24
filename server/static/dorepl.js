@@ -97,7 +97,17 @@ function createCM() {
 function sendToServer(cmBox) {
     cmBox.setOption('readOnly', true);
     cmBox.setOption('cursorBlinkRate', -1);
-    socket.send("cmd@" + cmBox.getValue());
+    var cmd = "cmd@" + cmBox.getValue();
+    var msg = {
+      'cmd': cmd,
+      'options': {
+        'constants': document.getElementById('constants').checked,
+        'inverses': document.getElementById('inverses').checked,
+        'powers': document.getElementById('powers').checked,
+      }
+    };
+    console.log(msg);
+    socket.send(JSON.stringify(msg));
 }
 
 function mouseDownCallback(event) {

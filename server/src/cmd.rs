@@ -5,7 +5,6 @@ use std::str::FromStr;
 use khwarizmi::{AlgebraDSLError as Error, ErrorVariant as Variant, Expression, Indexable,
                 LatexWriter, Math, TreeIdx, KhwarizmiOutput};
 
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Return {
     Math(Math),
@@ -399,11 +398,11 @@ impl FromStr for Cmd {
                                    "distribute expects indices".to_string()))
                 } else {
                     let last_index = indices.pop().unwrap();
-                    Ok( if indices.len() == 0 {
+                    Ok(if indices.len() == 0 {
                         Cmd::DistributePower(last_index)
                     } else {
                         Cmd::Distribute(indices, last_index)
-                    } )
+                    })
                 }
             } else if s.starts_with("flatten") {
                 let (mut indices, rest) = parse_indices(&s[7..].trim())?;

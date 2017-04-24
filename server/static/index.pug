@@ -38,6 +38,13 @@ html
         button(type="button" class="btn btn-default btn-sm" onclick="openhelp(this)") Close Help
         button(type="button" class="btn btn-default btn-sm" data-toggle="modal" data-target="#feedbackModal") Send feedback!
 
+        input#constants(type='checkbox', aria-label='Enable Constant Simplification')
+        label(for='constants' checked) Constants
+        input#inverses(type='checkbox', aria-label='Enable Inverses Simplification')
+        label(for='inverses') Inverses
+        input#powers(type='checkbox', aria-label='Enable Power Simplification')
+        label(for='powers') Powers
+
       #repl
 
       #model-output.output.math-output.new-math-output

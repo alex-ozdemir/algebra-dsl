@@ -808,7 +808,7 @@ fn distribute_many() {
 fn flatten_negation_in_division() {
     let mut start = Ex::Division(vec![Ex::Negation(box prod(vec![nat(4), var('x')]))],
                                  vec![var('y')]);
-    let expect = Ex::Negation(box Ex::Division(vec![nat(4), var('x')],vec![var('y')]));
+    let expect = Ex::Negation(box Ex::Division(vec![nat(4), var('x')], vec![var('y')]));
     let i1 = TreeIdx::from_str("#(mtn:0)").unwrap();
     start.flatten(&i1).unwrap();
     assert_expected_eq_actual!(expect, start);

@@ -3,6 +3,10 @@ extern crate iron;
 extern crate router;
 extern crate mount;
 extern crate staticfile;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+extern crate serde_json;
 
 extern crate khwarizmi;
 
@@ -20,7 +24,7 @@ use websocket::{Server, Message, Sender, Receiver};
 
 mod cmd;
 
-use khwarizmi::Math;
+use khwarizmi::{Math, TreeIdx};
 
 // Where do we store our messages?
 const REPORTFILE: &'static str = "feedback.txt";
@@ -33,12 +37,34 @@ fn send_mainpage(_: &mut Request) -> IronResult<Response> {
                        File::open(Path::new("static/index.html")).unwrap())))
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct TextMsg {
+    options: AutoSimplifyOptions,
+    cmd: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct AutoSimplifyOptions {
+    constants: bool,
+    inverses: bool,
+    powers: bool,
+}
 
 /// Perform the simplifications that should happen automatically
 ///
 /// For now, just constant simplification
-fn auto_simplify(e: Math) -> Math {
-    e.simplify_constants()
+fn auto_simplify(m: Math, opts: &AutoSimplifyOptions) -> Math {
+    let mut maybe_m = Some(m.clone());
+    if opts.inverses {
+        maybe_m.as_mut().map(|m| m.combine_coeff(&TreeIdx::make_empty()));
+    }
+    if opts.powers {
+        maybe_m.as_mut().map(|m| m.simplify_powers(&TreeIdx::make_empty()));
+    }
+    if opts.constants {
+        maybe_m = maybe_m.map(|m| m.simplify_constants());
+    }
+    maybe_m.unwrap_or(m)
 }
 
 
@@ -98,14 +124,15 @@ fn main() {
                     }
                     Type::Text => {
                         let string = std::str::from_utf8(&*message.payload).unwrap();
-                        println!("Received {}", string);
-                        let output = match cmd::Cmd::from_str(string) {
+                        println!("Received: \"{:?}\"", string);
+                        let msg: TextMsg = serde_json::from_str(string).unwrap();
+                        let output = match cmd::Cmd::from_str(&msg.cmd) {
                             Ok(cmd) => cmd.execute(history.last(), &history),
                             Err(e) => Err(e),
                         };
                         let (math_to_send, other_msg) = match output {
                             Ok(cmd::Return::Math(e)) => {
-                                let simpler = auto_simplify(e);
+                                let simpler = auto_simplify(e, &msg.options);
                                 history.push(simpler.clone());
                                 (Some(simpler), None)
                             }
