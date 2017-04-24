@@ -125,7 +125,7 @@ html
           #help-mapspec-header.panel-heading(role="tab")
             h4.panel-title
               a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-mapspec-body" aria-expanded="false" aria-controls="help-mapspec-body")
-                | +, /, *, or ^ &langle;LaTeX code&rangle;
+                | {+, -, /, *, ^} &langle;LaTeX code&rangle;
           #help-mapspec-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-mapspec-header")
             .panel-body
               | Perform the operation to both sides of the previous equation.
@@ -184,18 +184,12 @@ html
           #help-distribute-header.panel-heading(role="tab")
             h4.panel-title
               a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-distribute-body" aria-expanded="false" aria-controls="help-distribute-body")
-                | distribute &langle;tags&rangle; &langle;tag&rangle;
+                | distribute [&langle;tags&rangle;] &langle;tag&rangle;
           #help-distribute-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-distribute-header")
             .panel-body
-              | Distribute the first terms over the summation provided by the last.
-        .panel.panel-default
-          #help-distributepow-header.panel-heading(role="tab")
-            h4.panel-title
-              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-distributepow-body" aria-expanded="false" aria-controls="help-distributepow-body")
-                | distribute-pow &langle;tag&rangle;
-          #help-distributepow-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-distributepow-header")
-            .panel-body
-              | Distribute this power over the inner product.
+              p When given many tags, distribute the first terms over the
+                | summation provided by the last.
+              p When given a single tag, distribute the power over an inner product.
         .panel.panel-default
           #help-replace-header.panel-heading(role="tab")
             h4.panel-title

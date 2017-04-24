@@ -519,6 +519,12 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
         self.replace(index, Expression::from_str(expr)?)
     }
 
+    /// Try to factor `expr` out of each term in `self` at `idx`.
+    #[allow(unused_variables)]
+    fn factor(self, idx: &TreeIdxSlice, expr: Self) -> Result<Self, AlgebraDSLError> {
+        unimplemented!()
+    }
+
     /// Looks at the expression indicated by `index` and merges it with any associative children of
     /// the same type.
     ///

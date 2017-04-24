@@ -34,8 +34,8 @@ pub enum Cmd {
     New(Math),
     Make(Vec<TreeIdx>, ExprOrIdx),
     Delete(Vec<TreeIdx>),
-    Map(Op, ExprOrIdx),
-    FullMap(ExprOrIdx),
+    Apply(Op, ExprOrIdx),
+    FullApply(ExprOrIdx),
     Swap(TreeIdx, TreeIdx),
     Output(Vec<usize>),
     Recover(usize),
@@ -132,7 +132,7 @@ impl Cmd {
                 expr.swap(&i1, &i2)?;
                 Ok(Return::Math(expr))
             }
-            (Cmd::Map(op, new_expr), Some(e)) => {
+            (Cmd::Apply(op, new_expr), Some(e)) => {
                 let map_string = match op {
                     Op::Times => format!("@ * ({})", new_expr.as_expr(last)?.as_khwarizmi_latex()),
                     Op::Plus => format!("@ + ({})", new_expr.as_expr(last)?.as_khwarizmi_latex()),
@@ -141,9 +141,9 @@ impl Cmd {
                     Op::Power => format!("@ ^ ({})", new_expr.as_expr(last)?.as_khwarizmi_latex()),
                 };
                 let template = ExprOrIdx::from_str(&map_string).unwrap();
-                Cmd::FullMap(template).execute(Some(e), history)
+                Cmd::FullApply(template).execute(Some(e), history)
             }
-            (Cmd::FullMap(template), Some(old_expr)) => {
+            (Cmd::FullApply(template), Some(old_expr)) => {
                 let expr = old_expr.clone();
                 Ok(Return::Math(expr.map(template.as_expr(last)?)?))
             }
@@ -288,9 +288,9 @@ impl FromStr for Cmd {
                     let idx = indices.pop().unwrap();
                     Ok(Cmd::Simplify(idx))
                 }
-            } else if s.starts_with("map") {
-                let template = ExprOrIdx::from_str(&s[3..].trim())?;
-                Ok(Cmd::FullMap(template))
+            } else if s.starts_with("apply") {
+                let template = ExprOrIdx::from_str(&s[5..].trim())?;
+                Ok(Cmd::FullApply(template))
             } else if s.starts_with("output") {
                 let mut indices = Vec::new();
                 let mut rest: &str = &s[6..].trim();
@@ -320,23 +320,23 @@ impl FromStr for Cmd {
             } else if s.starts_with("+") {
                 let rest = &s[1..].trim();
                 let expr = ExprOrIdx::from_str(rest)?;
-                Ok(Cmd::Map(Op::Plus, expr))
+                Ok(Cmd::Apply(Op::Plus, expr))
             } else if s.starts_with("-") {
                 let rest = &s[1..].trim();
                 let expr = ExprOrIdx::from_str(rest)?;
-                Ok(Cmd::Map(Op::Minus, expr))
+                Ok(Cmd::Apply(Op::Minus, expr))
             } else if s.starts_with("/") {
                 let rest = &s[1..].trim();
                 let expr = ExprOrIdx::from_str(rest)?;
-                Ok(Cmd::Map(Op::Div, expr))
+                Ok(Cmd::Apply(Op::Div, expr))
             } else if s.starts_with("*") {
                 let rest = &s[1..].trim();
                 let expr = ExprOrIdx::from_str(rest)?;
-                Ok(Cmd::Map(Op::Times, expr))
+                Ok(Cmd::Apply(Op::Times, expr))
             } else if s.starts_with("^") {
                 let rest = &s[1..].trim();
                 let expr = ExprOrIdx::from_str(rest)?;
-                Ok(Cmd::Map(Op::Power, expr))
+                Ok(Cmd::Apply(Op::Power, expr))
             } else if s.starts_with("$") {
                 Ok(Cmd::New(Math::from_str(&s[1..].trim())?))
             } else if s.starts_with("code") {
@@ -379,16 +379,6 @@ impl FromStr for Cmd {
                 Ok(Cmd::Collapse(idx, n))
             } else if s == "flip" {
                 Ok(Cmd::Flip)
-            } else if s.starts_with("distribute-pow") {
-                let (mut indices, rest) = parse_indices(&s[14..].trim())?;
-                if indices.len() != 1 || rest.trim().len() > 0 {
-                    Err(Error::new(Variant::IllFormattedCommand,
-                                   "distribute-pow expects one index (the whole power)"
-                                       .to_string()))
-                } else {
-                    let i = indices.pop().unwrap();
-                    Ok(Cmd::DistributePower(i))
-                }
             } else if s.starts_with("distribute") {
                 let (mut indices, rest) = parse_indices(&s[10..].trim())?;
                 if indices.len() == 0 || rest.trim().len() > 0 {
@@ -396,7 +386,11 @@ impl FromStr for Cmd {
                                    "distribute expects indices".to_string()))
                 } else {
                     let last_index = indices.pop().unwrap();
-                    Ok(Cmd::Distribute(indices, last_index))
+                    Ok( if indices.len() == 0 {
+                        Cmd::DistributePower(last_index)
+                    } else {
+                        Cmd::Distribute(indices, last_index)
+                    } )
                 }
             } else if s.starts_with("flatten") {
                 let (mut indices, rest) = parse_indices(&s[7..].trim())?;
