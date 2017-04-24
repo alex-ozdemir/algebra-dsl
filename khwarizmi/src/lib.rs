@@ -191,6 +191,12 @@ impl TreeIdx {
     fn get(&self, i: usize) -> Option<TreeInt> {
         self.0.get(i).cloned()
     }
+    fn remove(&mut self, index: usize) -> TreeInt {
+        self.0.remove(index)
+    }
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl Deref for TreeIdx {
@@ -1942,18 +1948,49 @@ impl Math {
         use self::Math::*;
         match self {
             Eq(Equation { left, right }) => {
-                Ok(Eq(Equation {
-                    left: left.simplify(idx)?,
-                    right: right.simplify(idx)?,
-                }))
+                if idx.is_empty() {
+                    Ok(Eq(Equation {
+                              left: left.simplify(idx)?,
+                              right: right.simplify(idx)?,
+                          }))
+                } else if idx.get(0) == Some(0 as usize) {
+                    let mut idx = idx.clone();
+                    idx.remove(0);
+                    Ok(Eq(Equation {
+                              left: left.simplify(&idx)?,
+                              right: right,
+                          }))
+                } else {
+                    let mut idx = idx.clone();
+                    idx.remove(0);
+                    Ok(Eq(Equation {
+                              left: left,
+                              right: right.simplify(&idx)?,
+                          }))
+                }
             }
-            Ex(ex) => Ok(Ex(ex.simplify(idx)?)),
+            Ex(ex) => Ok(Ex(ex.simplify(&idx)?)),
         }
     }
-    pub fn cancel_inverse(&mut self, sibs: SiblingIndices) -> Result<(), AlgebraDSLError> {
+    pub fn cancel_inverse(&mut self, mut sibs: SiblingIndices) -> Result<(), AlgebraDSLError> {
         use self::Math::*;
         match self {
-            &mut Eq(_) => Ok(()),
+            &mut Eq(Equation {
+                        ref mut left,
+                        ref mut right,
+                    }) => {
+                if sibs.parent().first() == Some(0 as usize) {
+                    sibs.parent_idx.remove(0);
+                    left.cancel_inverse(sibs)?;
+                    Ok(())
+                } else if sibs.parent().first() == Some(1 as usize) {
+                    sibs.parent_idx.remove(0);
+                    right.cancel_inverse(sibs)?;
+                    Ok(())
+                } else {
+                    Ok(())
+                }
+            }
             &mut Ex(ref mut ex) => {
                 ex.cancel_inverse(sibs)?;
                 Ok(())
