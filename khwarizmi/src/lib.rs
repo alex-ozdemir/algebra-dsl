@@ -1,4 +1,5 @@
-#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from, conservative_impl_trait)]
+#![feature(box_syntax, box_patterns, slice_patterns, advanced_slice_patterns, try_from,
+           conservative_impl_trait)]
 #[macro_use]
 extern crate nom;
 mod parser;
@@ -354,11 +355,15 @@ impl SiblingIndices {
         self.parent_idx.as_ref()
     }
     fn rev_iter(&self) -> Vec<TreeIdx> {
-        self.children.iter().rev().map(|child_idx| {
-            let mut i = self.parent_idx.clone();
-            i.push(*child_idx);
-            i
-        }).collect()
+        self.children
+            .iter()
+            .rev()
+            .map(|child_idx| {
+                let mut i = self.parent_idx.clone();
+                i.push(*child_idx);
+                i
+            })
+            .collect()
     }
 }
 
@@ -525,6 +530,9 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
                 Expression::Sum(summands.into_iter()
                     .flat_map(|e| match e {
                         Expression::Sum(more_summands) => more_summands,
+                        Expression::Negation(box Expression::Sum(negated_summands)) => {
+                            negated_summands.into_iter().map(Expression::negate_flatten).collect()
+                        }
                         e => vec![e],
                     })
                     .collect())
@@ -532,11 +540,21 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
             Expression::Division(top, bottom) => {
                 let mut new_top = vec![];
                 let mut new_bottom = vec![];
+                let mut negative = false;
                 top.into_iter()
                     .map(|e| match e {
                         Expression::Division(t, b) => {
                             new_top.extend(t.into_iter());
                             new_bottom.extend(b.into_iter());
+                        }
+                        Expression::Negation(box e) => {
+                            negative = !negative;
+                            if let Expression::Division(t, b) = e {
+                                new_top.extend(t.into_iter());
+                                new_bottom.extend(b.into_iter());
+                            } else {
+                                new_top.push(e);
+                            }
                         }
                         e => new_top.push(e),
                     })
@@ -547,10 +565,24 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
                             new_bottom.extend(t.into_iter());
                             new_top.extend(b.into_iter());
                         }
+                        Expression::Negation(box e) => {
+                            negative = !negative;
+                            if let Expression::Division(t, b) = e {
+                                new_bottom.extend(t.into_iter());
+                                new_top.extend(b.into_iter());
+                            } else {
+                                new_bottom.push(e);
+                            }
+                        }
                         e => new_bottom.push(e),
                     })
                     .count();
-                Expression::divide_products_flatten(new_top, new_bottom)
+                if negative {
+                    Expression::Negation(box Expression::divide_products_flatten(new_top,
+                                                                                 new_bottom))
+                } else {
+                    Expression::divide_products_flatten(new_top, new_bottom)
+                }
             }
             e => e,
         };
@@ -779,7 +811,8 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
 
     fn distribute_many(mut self,
                        distributees: &SiblingIndices,
-                       sum: &TreeIdxSlice) -> Result<Self, AlgebraDSLError> {
+                       sum: &TreeIdxSlice)
+                       -> Result<Self, AlgebraDSLError> {
         let invalid_idx = AlgebraDSLError::from_variant(ErrorVariant::InvalidIdx);
         let mut sum_idx = sum.to_owned();
         // Go through the indices in reverse order
@@ -969,6 +1002,13 @@ impl Expression {
         Expression::Power(box self, box expr)
     }
 
+    pub fn negate_flatten(self) -> Self {
+        match self {
+            Expression::Negation(box e) => e,
+            e => Expression::Negation(box e),
+        }
+    }
+
     /// Simplifies constant expressions in this product.
     ///
     /// ## Returns
@@ -976,7 +1016,7 @@ impl Expression {
     ///    * Any natural constant extracted
     ///    * The first index at which a constant was found
     ///    * The remaining (non-constant) terms
-    /// 
+    ///
     /// If handling large integers, will replace the integers with floats.
     fn simplify_product(exprs: Vec<Expression>) -> (f64, i64, Option<usize>, Vec<Expression>) {
         use Expression as Ex;
