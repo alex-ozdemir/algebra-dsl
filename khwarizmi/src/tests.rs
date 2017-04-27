@@ -824,3 +824,15 @@ fn flatten_negation_in_sum() {
     start.flatten(&i1).unwrap();
     assert_expected_eq_actual!(expect, start);
 }
+
+#[test]
+fn distribute_fraction() {
+    let e = Ex::Division(vec![Ex::Sum(vec![var('x'), var('y')])], vec![var('a')]);
+    let after = Ex::Sum(vec![Ex::Division(vec![var('x')], vec![var('a')]),
+                             Ex::Division(vec![var('y')], vec![var('a')])]);
+    let i1 = TreeIdx::from_str("#(mtn:0,1)").unwrap();
+    let i2 = TreeIdx::from_str("#(mtn:0,0)").unwrap();
+    let e2 = e.distribute(&i1, &i2).unwrap();
+    assert_expected_eq_actual!(after, e2);
+}
+

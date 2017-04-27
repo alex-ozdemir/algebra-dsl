@@ -885,18 +885,23 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
                 .ok_or(AlgebraDSLError::from_variant(ErrorVariant::InvalidIdx))?;
             let left_multiply = term_idx < sum_idx;
             match &mut contents {
-                &mut Expression::Division(ref mut top, _) => {
-                    if term_idx < top.len() && sum_idx < top.len() {
-                        let term_expr = top[term_idx].clone();
+                &mut Expression::Division(ref mut top, ref mut bottom) => {
+                    let top_len = top.len();
+                    if term_idx < top.len() + bottom.len() && sum_idx < top.len() {
+                        let term_expr = if term_idx < top_len {
+                            top[term_idx].clone()
+                        } else {
+                            bottom[term_idx - top_len].clone()
+                        };
                         match &mut top[sum_idx] {
                             &mut Expression::Sum(ref mut summands) => {
                                 // Multiply each summand by the term
                                 for summand in summands.iter_mut() {
                                     let contents = summand.take();
-                                    *summand = if left_multiply {
-                                        Expression::multiply_flatten(term_expr.clone(), contents)
-                                    } else {
-                                        Expression::multiply_flatten(contents, term_expr.clone())
+                                    *summand = match (left_multiply, term_idx < top_len) {
+                                        (true, true) => Expression::multiply_flatten(term_expr.clone(), contents),
+                                        (false, true) => Expression::multiply_flatten(contents, term_expr.clone()),
+                                        (_, false) => Expression::divide_flatten(contents, term_expr.clone()),
                                     };
                                 }
                             }
@@ -908,7 +913,11 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
                                                                         sum)));
                             }
                         }
-                        top.remove(term_idx);
+                        if term_idx < top_len {
+                            top.remove(term_idx);
+                        } else {
+                            bottom.remove(term_idx - top_len);
+                        }
                     } else {
                         return Err(AlgebraDSLError::new(ErrorVariant::InvalidIdx,
                                                         format!("Index {} does not refer to a \
