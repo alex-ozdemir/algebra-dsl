@@ -24,7 +24,7 @@ use websocket::{Server, Message, Sender, Receiver};
 
 mod cmd;
 
-use khwarizmi::{Math, TreeIdx, Expression};
+use khwarizmi::{Math, TreeIdx};
 
 // Where do we store our messages?
 const REPORTFILE: &'static str = "feedback.txt";
