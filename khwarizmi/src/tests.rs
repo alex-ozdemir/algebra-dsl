@@ -160,7 +160,8 @@ fn make_siblings() {
     let mut before = Ex::Division(vec![nat(3), nat(4), var('x'), nat(7)], vec![]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
     let after = Ex::Division(vec![nat(84), var('x')], vec![]);
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -176,7 +177,8 @@ fn replace_division_all_top() {
     let mut before = Ex::Division(vec![nat(3), nat(4), nat(7)], vec![]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,2)"];
     let after = nat(84);
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -191,7 +193,8 @@ fn replace_division_end_of_top() {
     let mut before = Ex::Division(vec![nat(3), nat(4), nat(7)], vec![]);
     let index_strings = vec!["#(mtn:0,1)", "#(mtn:0,2)"];
     let after = Ex::Division(vec![nat(3), nat(21)], vec![]);
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -206,7 +209,8 @@ fn replace_division_all_bottom() {
     let mut before = Ex::Division(vec![nat(3), nat(4)], vec![nat(6), nat(7)]);
     let index_strings = vec!["#(mtn:0,2)", "#(mtn:0,3)"];
     let after = Ex::Division(vec![nat(3), nat(4)], vec![nat(42)]);
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -221,7 +225,8 @@ fn replace_division_mid_top_mid_bottom() {
     let mut before = Ex::Division(vec![nat(3), nat(4), nat(4)], vec![nat(6), nat(4), nat(7)]);
     let index_strings = vec!["#(mtn:0,1)", "#(mtn:0,4)"];
     let after = Ex::Division(vec![nat(3), nat(42), nat(4)], vec![nat(6), nat(7)]);
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -236,7 +241,8 @@ fn make_siblings_sum() {
     let mut before = Ex::Sum(vec![nat(3), nat(4), var('x'), nat(7)]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
     let after = Ex::Sum(vec![nat(84), var('x')]);
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -252,7 +258,8 @@ fn make_siblings_sum_flatten() {
     let mut before = Ex::Sum(vec![nat(3), nat(4), var('x'), nat(7)]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
     let after = Ex::Sum(vec![var('z'), nat(84), var('x')]);
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -594,7 +601,8 @@ fn cancel_inverse_div() {
     let expect = Ex::Division(vec![var('y')], vec![]);
     let mut actual = Ex::Division(vec![var('x'), var('y')], vec![var('x')]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,2)"];
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -608,7 +616,8 @@ fn cancel_inverse_sum() {
     let expect = var('y');
     let mut actual = Ex::Sum(vec![var('x'), var('y'), Ex::Negation(box var('x'))]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,2)"];
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -622,7 +631,8 @@ fn cancel_inverse_sum_fail() {
     let expect = AlgebraDSLError::from_variant(ErrorVariant::InvalidCancel);
     let mut expr = Ex::Sum(vec![var('x'), var('y'), Ex::Negation(box var('x'))]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)"];
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -636,7 +646,8 @@ fn cancel_inverse_div_fail() {
     let expect = AlgebraDSLError::from_variant(ErrorVariant::InvalidCancel);
     let mut expr = Ex::Division(vec![var('x'), var('y')], vec![var('x')]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)"];
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
@@ -794,7 +805,8 @@ fn distribute_many() {
     let after = Ex::Sum(vec![prod(vec![var('s'), var('t'), var('x'), var('k')]),
                              prod(vec![var('s'), var('t'), var('y'), var('k')])]);
     let index_strings = vec!["#(mtn:0,0)", "#(mtn:0,1)", "#(mtn:0,3)"];
-    let indices: Vec<_> = index_strings.into_iter()
+    let indices: Vec<_> = index_strings
+        .into_iter()
         .map(TreeIdx::from_str)
         .map(Result::unwrap)
         .collect();
