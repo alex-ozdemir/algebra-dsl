@@ -24,7 +24,7 @@ use websocket::{Server, Message, Sender, Receiver};
 
 mod cmd;
 
-use khwarizmi::{Math, TreeIdx};
+use khwarizmi::{Math, TreeIdx, Expression};
 
 // Where do we store our messages?
 const REPORTFILE: &'static str = "feedback.txt";
@@ -64,6 +64,7 @@ fn auto_simplify(m: Math, opts: &AutoSimplifyOptions) -> Math {
     if opts.constants {
         maybe_m = maybe_m.map(|m| m.simplify_constants());
     }
+    maybe_m = maybe_m.map(Math::reduce_identities);
     maybe_m.unwrap_or(m)
 }
 

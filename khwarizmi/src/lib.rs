@@ -1038,7 +1038,20 @@ impl Expression {
     pub fn inflate_power(self, expr: Expression) -> Self {
         Expression::Power(box self, box expr)
     }
-
+    pub fn is_zero(&self) -> bool {
+        match self {
+            &Expression::Atom(Atom::Floating(0.0)) |
+            &Expression::Atom(Atom::Natural(0)) => true,
+            _ => false,
+        }
+    }
+    pub fn is_one(&self) -> bool {
+        match self {
+            &Expression::Atom(Atom::Floating(1.0)) |
+            &Expression::Atom(Atom::Natural(1)) => true,
+            _ => false,
+        }
+    }
     pub fn negate_flatten(self) -> Self {
         match self {
             Expression::Negation(box e) => e,
@@ -1390,8 +1403,7 @@ impl Expression {
     }
     fn cancel_inverse(&mut self, indices: SiblingIndices) -> Result<(), AlgebraDSLError> {
         //check whether the sibling indices refer to a valid pair of inverses
-        let should_delete;
-        {
+        let should_delete = {
             let &SiblingIndices { ref parent_idx, ref children } = &indices;
             if children.len() != 2 {
                 //Cancel 2 at a time
@@ -1403,8 +1415,8 @@ impl Expression {
             let mut child1_idx = parent_idx.clone();
             child1_idx.push(*children.get(1)
                 .ok_or(AlgebraDSLError::from_variant(ErrorVariant::InternalError))?);
-            should_delete = self.are_inverses(&parent_idx, &child0_idx, &child1_idx)?;
-        }
+            self.are_inverses(&parent_idx, &child0_idx, &child1_idx)?
+        };
         //then delete if it is a valid pair
         if should_delete {
             self.delete(indices).map(|_| ())
@@ -1839,6 +1851,47 @@ impl Expression {
             _ => Ok(self),
         }
     }
+    pub fn reduce_identities(self) -> Self {
+        match self {
+            Expression::Negation(box z@Expression::Atom(Atom::Natural(0))) => z,
+            Expression::Negation(box z@Expression::Atom(Atom::Floating(0.0))) => z,
+            Expression::Division(mut top, mut bottom) => {
+                if top.iter().any(Expression::is_zero) {
+                    Expression::Atom(Atom::Natural(0))
+                } else {
+                    top.retain(|e| !e.is_one());
+                    bottom.retain(|e| !e.is_one());
+                    if top.len() == 1 && bottom.len() == 0 {
+                        top.pop().unwrap()
+                    } else if top.len() == 0 && bottom.len() == 0 {
+                        Expression::Atom(Atom::Natural(1))
+                    } else {
+                        Expression::Division(top, bottom)
+                    }
+                }
+            }
+            Expression::Sum(mut summands) => {
+                summands.retain(|e| !e.is_zero());
+                if summands.len() == 0 {
+                    Expression::Atom(Atom::Natural(0))
+                } else if summands.len() == 1 {
+                    summands.pop().unwrap()
+                } else {
+                    Expression::Sum(summands)
+                }
+            }
+            Expression::Power(box base, box power) => {
+                if power.is_zero() {
+                    Expression::Atom(Atom::Natural(1))
+                } else if power.is_one() {
+                    base
+                } else {
+                    Expression::Power(box base, box power)
+                }
+            }
+            e => e,
+        }
+    }
 }
 
 impl Indexable for Expression {
@@ -1956,6 +2009,16 @@ impl Math {
         match self {
             Eq(eq) => Eq(eq.simplify_constants()),
             Ex(ex) => Ex(ex.simplify_constants()),
+        }
+    }
+    pub fn reduce_identities(self) -> Self {
+        use self::Math::*;
+        match self {
+            Eq(Equation{ left, right }) => Eq(Equation{
+                left: left.reduce_identities(),
+                right: right.reduce_identities(),
+            }),
+            Ex(ex) => Ex(ex.reduce_identities()),
         }
     }
     pub fn from_str(s: &str) -> Result<Self, AlgebraDSLError> {

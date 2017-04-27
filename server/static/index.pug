@@ -138,11 +138,11 @@ html
               | Perform the operation to both sides of the previous equation.
               | For example, #[strong +y] will add #[em y] to both sides.
         .panel.panel-default
-          #help-map-header.panel-heading(role="tab")
+          #help-apply-header.panel-heading(role="tab")
             h4.panel-title
-              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-map-body" aria-expanded="false" aria-controls="help-map-body")
-                | map &langle;LaTeX code&rangle;
-          #help-map-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-map-header")
+              a(role="button" data-toggle="collapse" data-parent="#help-accordion" href="#help-apply-body" aria-expanded="false" aria-controls="help-apply-body")
+                | apply &langle;LaTeX code&rangle;
+          #help-apply-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-apply-header")
             .panel-body
               | Replaces each side of the current equation with the given code,
               | replacing any #[em @] symbols with the side of the current
@@ -194,8 +194,7 @@ html
                 | distribute [&langle;tags&rangle;] &langle;tag&rangle;
           #help-distribute-body.panel-collapse.collapse(role="tabpanel" aria-labelledby="help-distribute-header")
             .panel-body
-              p When given many tags, distribute the first terms over the
-                | summation provided by the last.
+              p When given many tags, distribute the first terms over the summation provided by the last.
               p When given a single tag, distribute the power over an inner product.
         .panel.panel-default
           #help-factor-header.panel-heading(role="tab")
