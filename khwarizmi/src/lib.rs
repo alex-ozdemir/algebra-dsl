@@ -1871,7 +1871,7 @@ impl Expression {
         }
     }
     fn simplify(mut self, idx: &TreeIdxSlice) -> Result<Self, AlgebraDSLError> {
-        match self.get(idx.as_ref())? {//expr {
+        match self.get(idx.as_ref())? {
             &Expression::Sum(_) => {
                 self.combine_coeff(idx)?;
                 Ok(self)
@@ -1883,6 +1883,11 @@ impl Expression {
             &Expression::Power(box Expression::Power(_, _), _) => {
                 self.collapse(idx, 1)?;
                 Ok(self)
+            }
+            &Expression::Negation(_) => {
+                let mut inner_idx = idx.to_owned();
+                inner_idx.push(0);
+                self.simplify(&inner_idx)
             }
             _ => Ok(self),
         }
