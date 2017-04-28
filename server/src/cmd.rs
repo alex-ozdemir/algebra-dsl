@@ -39,7 +39,7 @@ pub enum Cmd {
     Output(Vec<usize>),
     Recover(usize),
     GetCode(usize),
-    Factor(TreeIdx, Expression),
+    Factor(TreeIdx, ExprOrIdx),
     Feedback(String, String),
     Replace(Vec<TreeIdx>, ExprOrIdx),
     Collapse(TreeIdx, Option<usize>),
@@ -117,7 +117,7 @@ impl Cmd {
                 Ok(Return::Math(expr))
             }
             (Cmd::Factor(index, expr), Some(old_expr)) => {
-                Ok(Return::Math(old_expr.clone().factor(&index, expr)?))
+                Ok(Return::Math(old_expr.clone().factor(&index, expr.as_expr(last)?)?))
             }
             (Cmd::Cancel(indices), Some(old_expr)) => {
                 let mut expr = old_expr.clone();
@@ -271,7 +271,7 @@ impl FromStr for Cmd {
                     Err(Error::new(Variant::IllFormattedCommand,
                                    format!("Expected a single sum index for factor")))
                 } else {
-                    let expr = Expression::from_str(rest.trim())?;
+                    let expr = ExprOrIdx::from_str(rest.trim())?;
                     Ok(Cmd::Factor(indices.pop().unwrap(), expr))
                 }
             } else if s.starts_with("cancel") {

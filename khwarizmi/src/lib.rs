@@ -1902,6 +1902,9 @@ impl Expression {
                     } else if top.len() == 0 && bottom.len() == 0 {
                         Expression::Atom(Atom::Natural(1))
                     } else {
+                        if top.len() == 0 {
+                            top.push(Expression::Atom(Atom::Natural(1)));
+                        }
                         Expression::Division(top, bottom)
                     }
                 }
