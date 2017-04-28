@@ -83,7 +83,7 @@ impl ExprOrIdx {
 impl FromStr for ExprOrIdx {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if !s.starts_with("*") {
+        if !s.starts_with("$") {
                 Err(Error::from_variant(Variant::InternalError))
             } else {
                 TreeIdx::from_str(&s[1..].trim())
