@@ -794,9 +794,17 @@ pub trait Indexable: fmt::Display + fmt::Debug + Clone + KhwarizmiOutput {
                             if let Expression::Division(top, bot) = e {
                                 let mut newtop = top.into_iter()
                                     .map(|t| t.inflate_power(power.clone()))
+                                    .map(|mut t| {
+                                        t.collapse(&TreeIdx::make_empty(), 1).ok();
+                                        t
+                                    })
                                     .collect();
                                 let newbot = bot.into_iter()
                                     .map(|t| t.inflate_power(power.clone()))
+                                    .map(|mut t| {
+                                        t.collapse(&TreeIdx::make_empty(), 1).ok();
+                                        t
+                                    })
                                     .collect();
                                 match power {
                                     Expression::Atom(Atom::Natural(n)) => {
