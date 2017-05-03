@@ -307,7 +307,16 @@ socket.onmessage = function(event) {
 
         newMathOutput.querySelector(".getcode").addEventListener("click", function(e) {
             var formulaNum = $(e.target).closest("[formulanum]").attr("formulanum");
-            socket.send("cmd@code " + formulaNum);
+
+            var msg = {
+              'cmd': ('cmd@code '+formulaNum),
+              'options': {
+                'constants': document.getElementById('constants').checked,
+                'inverses': document.getElementById('inverses').checked,
+                'powers': document.getElementById('powers').checked,
+              }
+            };
+            socket.send(JSON.stringify(msg));
         });
 
         $( newMathOutput ).find( '[data-toggle="tooltip"]' ).tooltip({
