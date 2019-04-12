@@ -5,16 +5,18 @@ use FunctionSymbol;
 
 // This macro is an assertion with nicely formatted failure output
 macro_rules! assert_expected_eq_actual {
-    ($a:expr, $b:expr) => ({
+    ($a:expr, $b:expr) => {{
         let (a, b) = (&$a, &$b);
-        assert!(*a == *b,
-                "\nExpected `{:?}` is not equal to Actual `{:?}`\
-                 \nAssertion: `assert_expected_eq_actual!({}, {})`",
-                *a,
-                *b,
-                stringify!($a),
-                stringify!($b));
-    })
+        assert!(
+            *a == *b,
+            "\nExpected `{:?}` is not equal to Actual `{:?}`\
+             \nAssertion: `assert_expected_eq_actual!({}, {})`",
+            *a,
+            *b,
+            stringify!($a),
+            stringify!($b)
+        );
+    }};
 }
 
 fn nat(i: i64) -> Ex {
@@ -64,17 +66,23 @@ fn negation() {
 
 #[test]
 fn negation_and_addition() {
-    let expected =
-        Ex::Sum(vec![Ex::Negation(box var('x')), nat(2), nat(9), Ex::Negation(box nat(7))]);
+    let expected = Ex::Sum(vec![
+        Ex::Negation(box var('x')),
+        nat(2),
+        nat(9),
+        Ex::Negation(box nat(7)),
+    ]);
     assert_expected_eq_actual!(Ok(expected), parse_expr("-x +  2+9-7"));
 }
 
 #[test]
 fn double_negation_and_addition() {
-    let expected = Ex::Sum(vec![Ex::Negation(box Ex::Negation(box var('x'))),
-                                nat(2),
-                                nat(9),
-                                Ex::Negation(box nat(7))]);
+    let expected = Ex::Sum(vec![
+        Ex::Negation(box Ex::Negation(box var('x'))),
+        nat(2),
+        nat(9),
+        Ex::Negation(box nat(7)),
+    ]);
     assert_expected_eq_actual!(Ok(expected), parse_expr("--x +  2+9-7"));
 }
 
@@ -134,15 +142,19 @@ fn single_frac_with_braces() {
 
 #[test]
 fn multi_frac() {
-    let expected = Ex::Division(vec![Ex::Division(vec![nat(4)], vec![var('x')])],
-                                vec![nat(2)]);
+    let expected = Ex::Division(
+        vec![Ex::Division(vec![nat(4)], vec![var('x')])],
+        vec![nat(2)],
+    );
     assert_expected_eq_actual!(Ok(expected), parse_expr("\\frac{\\frac4x}{2}"));
 }
 
 #[test]
 fn multi_frac_spaces() {
-    let expected = Ex::Division(vec![Ex::Division(vec![nat(4)], vec![var('x')])],
-                                vec![nat(2)]);
+    let expected = Ex::Division(
+        vec![Ex::Division(vec![nat(4)], vec![var('x')])],
+        vec![nat(2)],
+    );
     assert_expected_eq_actual!(Ok(expected), parse_expr("  \\frac { \\frac 4 x } { 2 } "));
 }
 
@@ -193,8 +205,10 @@ fn sin() {
 
 #[test]
 fn sin_with_power() {
-    let expected = Ex::Power(box Ex::Application(box FunctionSymbol::sin.as_expr(), box var('x')),
-                             box nat(2));
+    let expected = Ex::Power(
+        box Ex::Application(box FunctionSymbol::sin.as_expr(), box var('x')),
+        box nat(2),
+    );
     assert_expected_eq_actual!(Ok(expected), parse_expr("\\sin^2 x"));
 }
 
@@ -207,24 +221,30 @@ fn log_with_power_and_sub() {
 
 #[test]
 fn cot_with_power() {
-    let expected = Ex::Power(box Ex::Application(box FunctionSymbol::cot.as_expr(), box var('x')),
-                             box float(2.6));
+    let expected = Ex::Power(
+        box Ex::Application(box FunctionSymbol::cot.as_expr(), box var('x')),
+        box float(2.6),
+    );
     assert_expected_eq_actual!(Ok(expected), parse_expr("\\cot^{2.6} x"));
 }
 
 #[test]
 fn integral_with_bounds() {
-    let expected = Ex::LimitOp(OperatorSymbol::int,
-                               Some(box nat(0)),
-                               Some(box nat(2)),
-                               box Ex::Division(vec![var('x'), var('d'), var('x')], vec![]));
+    let expected = Ex::LimitOp(
+        OperatorSymbol::int,
+        Some(box nat(0)),
+        Some(box nat(2)),
+        box Ex::Division(vec![var('x'), var('d'), var('x')], vec![]),
+    );
     assert_expected_eq_actual!(Ok(expected), parse_expr("\\int_0^2 x dx"));
 }
 
 #[test]
 fn powers_and_fracs() {
-    let expected = Ex::Power(box Ex::Sum(vec![var('x'), Ex::Division(vec![nat(1)], vec![nat(2)])]),
-                             box Ex::Division(vec![nat(3)], vec![nat(4)]));
+    let expected = Ex::Power(
+        box Ex::Sum(vec![var('x'), Ex::Division(vec![nat(1)], vec![nat(2)])]),
+        box Ex::Division(vec![nat(3)], vec![nat(4)]),
+    );
     assert_expected_eq_actual!(Ok(expected), parse_expr("(x + \\frac12)^{3/4}"));
 }
 
@@ -256,7 +276,10 @@ fn error_on_unmatch() {
 
 #[test]
 fn negation_and_multiplication() {
-    let expected = Ex::Negation(box Ex::Division(vec![var('x'), nat(2), nat(9), nat(7)], vec![]));
+    let expected = Ex::Negation(box Ex::Division(
+        vec![var('x'), nat(2), nat(9), nat(7)],
+        vec![],
+    ));
     assert_expected_eq_actual!(Ok(expected), parse_expr("-x*2*9*7"));
 }
 

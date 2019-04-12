@@ -1,8 +1,8 @@
-extern crate websocket;
 extern crate iron;
-extern crate router;
 extern crate mount;
+extern crate router;
 extern crate staticfile;
+extern crate websocket;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
@@ -11,14 +11,14 @@ extern crate serde_json;
 extern crate khwarizmi;
 
 use iron::mime;
-use iron::{Iron, Request, Response, IronResult, status};
+use iron::{status, Iron, IronResult, Request, Response};
 use mount::Mount;
 use staticfile::Static;
 use std::fs::File;
 use std::path::Path;
 use std::str::FromStr;
 use std::thread;
-use websocket::header::{Headers,WebSocketProtocol};
+use websocket::header::{Headers, WebSocketProtocol};
 use websocket::server::sync::Server;
 use websocket::{Message, OwnedMessage};
 
@@ -31,10 +31,11 @@ const REPORTFILE: &'static str = "feedback.txt";
 
 // The HTTP server handler
 fn send_mainpage(_: &mut Request) -> IronResult<Response> {
-
-    Ok(Response::with((status::Ok,
-                       mime::Mime(mime::TopLevel::Text, mime::SubLevel::Html, Vec::new()),
-                       File::open(Path::new("static/index.html")).unwrap())))
+    Ok(Response::with((
+        status::Ok,
+        mime::Mime(mime::TopLevel::Text, mime::SubLevel::Html, Vec::new()),
+        File::open(Path::new("static/index.html")).unwrap(),
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -56,10 +57,14 @@ struct AutoSimplifyOptions {
 fn auto_simplify(m: Math, opts: &AutoSimplifyOptions) -> Math {
     let mut maybe_m = Some(m.clone());
     if opts.inverses {
-        maybe_m.as_mut().map(|m| m.combine_coeff(&TreeIdx::make_empty()));
+        maybe_m
+            .as_mut()
+            .map(|m| m.combine_coeff(&TreeIdx::make_empty()));
     }
     if opts.powers {
-        maybe_m.as_mut().map(|m| m.simplify_powers(&TreeIdx::make_empty()));
+        maybe_m
+            .as_mut()
+            .map(|m| m.simplify_powers(&TreeIdx::make_empty()));
     }
     if opts.constants {
         maybe_m = maybe_m.map(|m| m.simplify_constants());
@@ -68,16 +73,15 @@ fn auto_simplify(m: Math, opts: &AutoSimplifyOptions) -> Math {
     maybe_m.unwrap_or(m)
 }
 
-
 fn main() {
     // Start listening for http connections
     thread::spawn(move || {
-
         let mut router = router::Router::new();
         router.get("/", send_mainpage, "mainpage");
 
         let mut mount = Mount::new();
-        mount.mount("/", router)
+        mount
+            .mount("/", router)
             .mount("/static/", Static::new(Path::new("static")));
 
         Iron::new(mount).http("0.0.0.0:8080").unwrap();
@@ -123,28 +127,24 @@ fn main() {
                                 history.push(simpler.clone());
                                 (Some(simpler), None)
                             }
-                            Ok(cmd::Return::LaTeXBlock(s)) => {
-                                (history.last()
-                                     .cloned()
-                                     .map(|last| {
-                                         history.push(last.clone());
-                                         last
-                                     }),
-                                 Some(format!("LaTeXBlock@{}", s)))
-                            }
+                            Ok(cmd::Return::LaTeXBlock(s)) => (
+                                history.last().cloned().map(|last| {
+                                    history.push(last.clone());
+                                    last
+                                }),
+                                Some(format!("LaTeXBlock@{}", s)),
+                            ),
                             Ok(cmd::Return::LaTeXLine(code)) => {
                                 (None, Some(format!("LaTeXLine@{}", code)))
                             }
                             Ok(cmd::Return::NoReturn) => (None, None),
-                            Err(e) => {
-                                (history.last()
-                                     .cloned()
-                                     .map(|last| {
-                                         history.push(last.clone());
-                                         last
-                                     }),
-                                 Some(format!("Err@{}", e)))
-                            }
+                            Err(e) => (
+                                history.last().cloned().map(|last| {
+                                    history.push(last.clone());
+                                    last
+                                }),
+                                Some(format!("Err@{}", e)),
+                            ),
                         };
                         let check_math_checkbox = other_msg.is_none();
                         if let Some(msg) = other_msg {

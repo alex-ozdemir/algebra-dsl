@@ -154,15 +154,17 @@ impl FunctionSymbol {
         }
     }
     pub fn as_expr(self) -> Expression {
-        Expression::Atom(Atom::Symbol(Symbol::Operator(OperatorSymbol::Function(self))))
+        Expression::Atom(Atom::Symbol(Symbol::Operator(OperatorSymbol::Function(
+            self,
+        ))))
     }
     pub fn accepts_subscripts(self) -> bool {
         use FunctionSymbol::*;
         match self {
             lg | ln | log => true,
             exp => false,
-            sin | cos | tan | csc | sec | cot | arcsin | arccos | arctan | sinh | cosh | tanh |
-            coth => false,
+            sin | cos | tan | csc | sec | cot | arcsin | arccos | arctan | sinh | cosh | tanh
+            | coth => false,
         }
     }
     pub fn accepts_superscripts(self) -> bool {
@@ -170,8 +172,8 @@ impl FunctionSymbol {
         match self {
             lg | ln | log => true,
             exp => false,
-            sin | cos | tan | csc | sec | cot | arcsin | arccos | arctan | sinh | cosh | tanh |
-            coth => true,
+            sin | cos | tan | csc | sec | cot | arcsin | arccos | arctan | sinh | cosh | tanh
+            | coth => true,
         }
     }
 }
@@ -350,23 +352,57 @@ impl Symbol {
             "liminf" => Some(Symbol::Operator(OperatorSymbol::liminf)),
             "max" => Some(Symbol::Operator(OperatorSymbol::max)),
             "pm" => Some(Symbol::Operator(OperatorSymbol::pm)),
-            "arccos" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::arccos))),
-            "cos" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::cos))),
-            "csc" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::csc))),
-            "exp" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::exp))),
-            "sinh" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::sinh))),
-            "arcsin" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::arcsin))),
-            "cosh" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::cosh))),
-            "lg" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::lg))),
-            "ln" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::ln))),
-            "arctan" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::arctan))),
-            "cot" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::cot))),
-            "log" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::log))),
-            "sec" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::sec))),
-            "tan" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::tan))),
-            "coth" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::coth))),
-            "sin" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::sin))),
-            "tanh" => Some(Symbol::Operator(OperatorSymbol::Function(FunctionSymbol::tanh))),
+            "arccos" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::arccos,
+            ))),
+            "cos" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::cos,
+            ))),
+            "csc" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::csc,
+            ))),
+            "exp" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::exp,
+            ))),
+            "sinh" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::sinh,
+            ))),
+            "arcsin" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::arcsin,
+            ))),
+            "cosh" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::cosh,
+            ))),
+            "lg" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::lg,
+            ))),
+            "ln" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::ln,
+            ))),
+            "arctan" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::arctan,
+            ))),
+            "cot" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::cot,
+            ))),
+            "log" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::log,
+            ))),
+            "sec" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::sec,
+            ))),
+            "tan" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::tan,
+            ))),
+            "coth" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::coth,
+            ))),
+            "sin" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::sin,
+            ))),
+            "tanh" => Some(Symbol::Operator(OperatorSymbol::Function(
+                FunctionSymbol::tanh,
+            ))),
             _ => None,
         }
     }

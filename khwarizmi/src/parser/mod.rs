@@ -4,12 +4,14 @@
 
 pub mod latex;
 pub mod mac;
-use self::latex::{Token, Special};
+use self::latex::{Special, Token};
+use self::mac::{KnownCS, Numeric, Operator, PostMac, UniOp};
 use std::num;
 use std::str::FromStr;
-use {Equation, Expression, Symbol, Atom, StandaloneSymbol, OperatorSymbol, FunctionSymbol,
-     PLACEHOLDER};
-use self::mac::{PostMac, UniOp, Operator, KnownCS, Numeric};
+use {
+    Atom, Equation, Expression, FunctionSymbol, OperatorSymbol, StandaloneSymbol, Symbol,
+    PLACEHOLDER,
+};
 
 const UNREACH: &'static str = "An option/result that was expected to be Some/Ok was not.\n\
                                This is a bug!";
@@ -40,11 +42,13 @@ pub enum ParseError {
 fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
     use Expression as Ex;
     match input {
-        PostMac::Sqrt(n, radical) => {
-            Ok(Ex::Power(box parse_operators(*radical)?,
-                         box Ex::Division(vec![Ex::Atom(Atom::Natural(1))],
-                                          vec![Ex::Atom(Atom::Natural(n as i64))])))
-        }
+        PostMac::Sqrt(n, radical) => Ok(Ex::Power(
+            box parse_operators(*radical)?,
+            box Ex::Division(
+                vec![Ex::Atom(Atom::Natural(1))],
+                vec![Ex::Atom(Atom::Natural(n as i64))],
+            ),
+        )),
         PostMac::Char(c) => Ok(Ex::Atom(Atom::PlainVariable(c))),
         PostMac::Escaped(string) => Ok(Ex::Atom(Atom::Escaped(string))),
         PostMac::Placeholder => Ok(Ex::Atom(Atom::Escaped(PLACEHOLDER.to_string()))),
@@ -55,14 +59,12 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
             let parsed_bottom = parse_operators(*bottom)?;
             Ok(Ex::divide(parsed_top, parsed_bottom))
         }
-        PostMac::Num(Numeric(natural, None)) => {
-            i64::from_str_radix(natural.as_str(), 10)
-                .map(Atom::Natural)
-                .or_else(|_| f64::from_str(natural.as_str()).map(Atom::Floating))
-                .ok()
-                .ok_or(ParseError::InvalidNumericLiteral)
-                .map(Ex::Atom)
-        }
+        PostMac::Num(Numeric(natural, None)) => i64::from_str_radix(natural.as_str(), 10)
+            .map(Atom::Natural)
+            .or_else(|_| f64::from_str(natural.as_str()).map(Atom::Floating))
+            .ok()
+            .ok_or(ParseError::InvalidNumericLiteral)
+            .map(Ex::Atom),
         PostMac::Num(Numeric(natural, Some(dec))) => {
             let s = format!("{}.{}", natural, dec);
             f64::from_str(s.as_str())
@@ -82,17 +84,20 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                 //                         expression_stack);
                 match token {
                     PostMac::Op(next_op) => {
-                        while operator_stack.last().expect(UNREACH).right_precedence() >
-                              next_op.left_precedence() {
+                        while operator_stack.last().expect(UNREACH).right_precedence()
+                            > next_op.left_precedence()
+                        {
                             let combinator = operator_stack.pop().expect(UNREACH);
                             let second = expression_stack.pop().ok_or(ParseError::OperatorError)?;
-                            let new_expr = if combinator.arity()
-                                .ok_or_else(|| ParseError::UnmatchGrouping(combinator.clone()))? ==
-                                              1 {
+                            let new_expr = if combinator
+                                .arity()
+                                .ok_or_else(|| ParseError::UnmatchGrouping(combinator.clone()))?
+                                == 1
+                            {
                                 combine1(second, combinator)?
                             } else {
-                                let first = expression_stack.pop()
-                                    .ok_or(ParseError::OperatorError)?;
+                                let first =
+                                    expression_stack.pop().ok_or(ParseError::OperatorError)?;
                                 combine2(first, combinator, second)
                             };
                             expression_stack.push(new_expr);
@@ -109,14 +114,16 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
                     }
                     expr => expression_stack.push(parse_operators(expr)?),
                 };
-                if let &[_.., UniOp::Std(Operator::LGroup), UniOp::Std(Operator::RGroup)] =
-                    operator_stack.as_slice() {
+                if let &[.., UniOp::Std(Operator::LGroup), UniOp::Std(Operator::RGroup)] =
+                    operator_stack.as_slice()
+                {
                     operator_stack.pop();
                     operator_stack.pop();
                 }
             }
-            debug_assert!(&operator_stack[..] ==
-                          &[UniOp::Std(Operator::Begin), UniOp::Std(Operator::End)]);
+            debug_assert!(
+                &operator_stack[..] == &[UniOp::Std(Operator::Begin), UniOp::Std(Operator::End)]
+            );
             if expression_stack.len() == 1 {
                 Ok(expression_stack.pop().expect(UNREACH))
             } else {
@@ -127,37 +134,34 @@ fn parse_operators(input: PostMac) -> Result<Expression, ParseError> {
 }
 
 macro_rules! combine_associative {
-    ($left:ident, $operation:path, $right: ident) => {
-        {
-            match ($left, $right) {
-                ($operation(mut a), $operation(b)) => {
-                    a.extend(b);
-                    $operation(a)
-                },
-                ($operation(mut a), b) => {
-                    a.push(b);
-                    $operation(a)
-                },
-                (a, $operation(mut b)) => {
-                    b.insert(0, a);
-                    $operation(b)
-                },
-                (a, b) => $operation(vec![a, b]),
+    ($left:ident, $operation:path, $right: ident) => {{
+        match ($left, $right) {
+            ($operation(mut a), $operation(b)) => {
+                a.extend(b);
+                $operation(a)
             }
+            ($operation(mut a), b) => {
+                a.push(b);
+                $operation(a)
+            }
+            (a, $operation(mut b)) => {
+                b.insert(0, a);
+                $operation(b)
+            }
+            (a, b) => $operation(vec![a, b]),
         }
-    };
+    }};
 }
 
 fn post_process_all(exprs: Vec<Expression>) -> Result<Vec<Expression>, ParseError> {
-    exprs.into_iter()
-        .fold(Ok(Vec::new()), |earlier, this| {
-            earlier.and_then(|mut vec| {
-                post_process(this).map(|post_this| {
-                    vec.push(post_this);
-                    vec
-                })
+    exprs.into_iter().fold(Ok(Vec::new()), |earlier, this| {
+        earlier.and_then(|mut vec| {
+            post_process(this).map(|post_this| {
+                vec.push(post_this);
+                vec
             })
         })
+    })
 }
 
 fn post_process(expr: Expression) -> Result<Expression, ParseError> {
@@ -203,18 +207,22 @@ fn combine1(expr: Expression, op: UniOp) -> Result<Expression, ParseError> {
     Ok(match op {
         UniOp::Std(Neg) => Expression::Negation(box expr),
         UniOp::LimitOp(sym, sub, sup) => {
-            let sub_expr = match sub { // I don't use map because `?` doesn't work in || {}
+            let sub_expr = match sub {
+                // I don't use map because `?` doesn't work in || {}
                 Some(box sub) => Some(parse_operators(sub)?),
                 None => None,
             };
-            let sup_expr = match sup { // I don't use map because `?` doesn't work in || {}
+            let sup_expr = match sup {
+                // I don't use map because `?` doesn't work in || {}
                 Some(box sup) => Some(parse_operators(sup)?),
                 None => None,
             };
-            Expression::LimitOp(sym,
-                                sub_expr.map(Box::new),
-                                sup_expr.map(Box::new),
-                                box expr)
+            Expression::LimitOp(
+                sym,
+                sub_expr.map(Box::new),
+                sup_expr.map(Box::new),
+                box expr,
+            )
         }
         _ => panic!("Combine1 called with non-unary operator"),
     })

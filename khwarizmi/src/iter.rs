@@ -1,4 +1,4 @@
-use super::{MathRef, Expression, TreeIdx};
+use super::{Expression, MathRef, TreeIdx};
 
 pub struct ChildIter<'a> {
     parent: MathRef<'a>,
@@ -53,7 +53,9 @@ impl<'a> Iterator for ChildIter<'a> {
             _ => None,
         };
         let idx_and_res = res.map(|r| (override_idx.clone().unwrap_or(idx), r));
-        override_idx.map(|i| { self.next_idx = i; });
+        override_idx.map(|i| {
+            self.next_idx = i;
+        });
         self.next_idx += 1;
         idx_and_res
     }
@@ -87,10 +89,9 @@ impl<'a> Iterator for ExpressionIter<'a> {
         loop {
             let new_child_iter = match self.iter_stack.last_mut() {
                 None => return None,
-                Some(last) => {
-                    last.next()
-                        .map(|(i, e)| (i, ChildIter::new(MathRef::Ex(e)), e))
-                }
+                Some(last) => last
+                    .next()
+                    .map(|(i, e)| (i, ChildIter::new(MathRef::Ex(e)), e)),
             };
             match new_child_iter {
                 None => {

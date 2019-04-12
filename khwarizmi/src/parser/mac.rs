@@ -1,4 +1,4 @@
-use super::{ParseError, Token, Special, Symbol, StandaloneSymbol, OperatorSymbol, latex};
+use super::{latex, OperatorSymbol, ParseError, Special, StandaloneSymbol, Symbol, Token};
 
 /// The Control Sequences that our system handles. A small set of macros along with a *bunch* of
 /// symbols.
@@ -32,7 +32,6 @@ impl KnownCS {
         }
     }
 }
-
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Operator {
@@ -139,33 +138,29 @@ impl PostMac {
     pub fn expects_op_after(&self) -> bool {
         match self {
             &PostMac::List(ref list) => list.last().expect("No empty lists!").expects_op_after(),
-            &PostMac::Frac(_, _) |
-            &PostMac::Sqrt(_, _) |
-            &PostMac::Op(UniOp::Std(Operator::RGroup)) |
-            &PostMac::Standalone(_) |
-            &PostMac::Char(_) |
-            &PostMac::Escaped(_) |
-            &PostMac::Placeholder |
-            &PostMac::Num(_) => true,
+            &PostMac::Frac(_, _)
+            | &PostMac::Sqrt(_, _)
+            | &PostMac::Op(UniOp::Std(Operator::RGroup))
+            | &PostMac::Standalone(_)
+            | &PostMac::Char(_)
+            | &PostMac::Escaped(_)
+            | &PostMac::Placeholder
+            | &PostMac::Num(_) => true,
             &PostMac::Op(_) => false,
         }
     }
     /// Return whether there should be an operator before this type of LaTeX construct.
     pub fn expects_op_before(&self) -> bool {
         match self {
-            &PostMac::List(ref list) => {
-                list.first()
-                    .expect("No empty lists!")
-                    .expects_op_before()
-            }
-            &PostMac::Frac(_, _) |
-            &PostMac::Sqrt(_, _) |
-            &PostMac::Op(UniOp::Std(Operator::LGroup)) |
-            &PostMac::Standalone(_) |
-            &PostMac::Char(_) |
-            &PostMac::Escaped(_) |
-            &PostMac::Placeholder |
-            &PostMac::Num(_) => true,
+            &PostMac::List(ref list) => list.first().expect("No empty lists!").expects_op_before(),
+            &PostMac::Frac(_, _)
+            | &PostMac::Sqrt(_, _)
+            | &PostMac::Op(UniOp::Std(Operator::LGroup))
+            | &PostMac::Standalone(_)
+            | &PostMac::Char(_)
+            | &PostMac::Escaped(_)
+            | &PostMac::Placeholder
+            | &PostMac::Num(_) => true,
             &PostMac::Op(_) => false,
         }
     }
@@ -210,8 +205,8 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
             let mut result_list = vec![];
             while let Some(next) = list.pop() {
                 let next = match to_known(next) {
-                    Err(ParseError::LoneControlSequence(KnownCS::dfrac)) |
-                    Err(ParseError::LoneControlSequence(KnownCS::frac)) => {
+                    Err(ParseError::LoneControlSequence(KnownCS::dfrac))
+                    | Err(ParseError::LoneControlSequence(KnownCS::frac)) => {
                         let (first, second) = two_expressions(&mut list)?;
                         PostMac::Frac(box first, box second)
                     }
@@ -220,8 +215,8 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                         let argument = one_expression(&mut list)?;
                         PostMac::Sqrt(optional_radical.unwrap_or(2), box argument)
                     }
-                    Err(ParseError::LoneControlSequence(KnownCS::left)) |
-                    Err(ParseError::LoneControlSequence(KnownCS::right)) => {
+                    Err(ParseError::LoneControlSequence(KnownCS::left))
+                    | Err(ParseError::LoneControlSequence(KnownCS::right)) => {
                         continue;
                     }
                     e @ Err(_) => return e,
@@ -263,7 +258,8 @@ pub fn to_known(input: latex::Token) -> Result<PostMac, ParseError> {
                     (last, mut next) => {
                         last.map(|last| result_list.push(last));
                         // Potentially insert multiplication
-                        let op_expected = result_list.last()
+                        let op_expected = result_list
+                            .last()
                             .map(PostMac::expects_op_after)
                             .unwrap_or(false);
                         let implicit_times = op_expected && next.expects_op_before();
@@ -311,22 +307,20 @@ fn opt_num_arg(input: &mut Vec<latex::Token>) -> Result<Option<u64>, ParseError>
 }
 
 fn one_expression(input: &mut Vec<latex::Token>) -> Result<PostMac, ParseError> {
-    let first = to_known(input.pop()
-        .ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
+    let first = to_known(input.pop().ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
     Ok(first)
 }
 
 fn two_expressions(input: &mut Vec<latex::Token>) -> Result<(PostMac, PostMac), ParseError> {
-    let first = to_known(input.pop()
-        .ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
-    let second = to_known(input.pop()
-        .ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
+    let first = to_known(input.pop().ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
+    let second = to_known(input.pop().ok_or(ParseError::FracNotFollowedByTwoExprs)?)?;
     Ok((first, second))
 }
 
-pub fn merge_numerics(Numeric(mut l_pre, l_post): Numeric,
-                      Numeric(r_pre, r_post): Numeric)
-                      -> Result<Numeric, ParseError> {
+pub fn merge_numerics(
+    Numeric(mut l_pre, l_post): Numeric,
+    Numeric(r_pre, r_post): Numeric,
+) -> Result<Numeric, ParseError> {
     match (l_post, r_post) {
         (Some(_), Some(_)) => Err(ParseError::DoubleDecimalPoint),
         (Some(mut l_post), None) => {

@@ -1,5 +1,5 @@
+use super::{Atom, Equation, Expression, Math};
 use std::fmt::{self, Write};
-use super::{Expression, Atom, Math, Equation};
 
 const MROW: &'static str = "mrow";
 
@@ -61,15 +61,19 @@ impl KhwarizmiOutput for Equation {
         impl<'a> fmt::Display for DisplaysAsLatex<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 write!(f, "")?;
-                fmt_as_latex(&self.0.left,
-                             f,
-                             (&self.0.left, false, true),
-                             LaTeXOutputType::ForUs)?;
+                fmt_as_latex(
+                    &self.0.left,
+                    f,
+                    (&self.0.left, false, true),
+                    LaTeXOutputType::ForUs,
+                )?;
                 write!(f, " = ")?;
-                fmt_as_latex(&self.0.right,
-                             f,
-                             (&self.0.right, false, true),
-                             LaTeXOutputType::ForUs)
+                fmt_as_latex(
+                    &self.0.right,
+                    f,
+                    (&self.0.right, false, true),
+                    LaTeXOutputType::ForUs,
+                )
             }
         }
         format!("{}", DisplaysAsLatex(self))
@@ -112,15 +116,19 @@ impl LatexWriter {
                 write!(f, "  ")?;
                 match self.0 {
                     &Math::Eq(ref eq) => {
-                        fmt_as_latex(&eq.left,
-                                     f,
-                                     (&eq.left, false, true),
-                                     LaTeXOutputType::ForOther)?;
+                        fmt_as_latex(
+                            &eq.left,
+                            f,
+                            (&eq.left, false, true),
+                            LaTeXOutputType::ForOther,
+                        )?;
                         write!(f, " &= ")?;
-                        fmt_as_latex(&eq.right,
-                                     f,
-                                     (&eq.right, false, true),
-                                     LaTeXOutputType::ForOther)?;
+                        fmt_as_latex(
+                            &eq.right,
+                            f,
+                            (&eq.right, false, true),
+                            LaTeXOutputType::ForOther,
+                        )?;
                     }
                     &Math::Ex(ref ex) => {
                         fmt_as_latex(&ex, f, (&ex, false, true), LaTeXOutputType::ForOther)?;
@@ -153,118 +161,85 @@ fn capture(expr1: &Expression, expr2: &Expression, alt: bool, top: bool) -> bool
     if !alt {
         // Left capture
         match expr1 {
-            &Expression::Sum(_) => {
-                match expr2 {
-                    &Expression::Sum(_) => true,
-                    _ => false,
-                }
-            }
-            ref d @ &Expression::Division(_, _) if d.is_product() => {
-                match expr2 {
-                    ref d2 @ &Expression::Division(_, _) if d2.is_product() => true,
-                    &Expression::Sum(_) => true,
-                    &Expression::Negation(_) => true,
-                    _ => false,
-                }
-            }
-            &Expression::Negation(_) => {
-                match expr2 {
-                    &Expression::Sum(_) => true,
-                    _ => false,
-                }
-            }
-            &Expression::Application(_, _) => {
-                match expr2 {
-                    _ => false,
-                }
-            }
-            &Expression::LimitOp(_, _, _, _) => {
-                match expr2 {
-                    _ => false,
-                }
-            }
-            &Expression::Division(_, ref d) => {
-                match expr2 {
-                    ref d2 @ &Expression::Division(_, _) if d2.is_product() => true,
-                    &Expression::Sum(_) |
-                    &Expression::Negation(_) => d.len() > 1,
-                    _ => false,
-                }
-            }
-            &Expression::Power(_, _) => {
-                match expr2 {
-                    &Expression::Sum(_) => true,
-                    &Expression::Power(_, _) => true,
-                    &Expression::Negation(_) => true,
-                    &Expression::Division(_, _) => true,
-                    _ => false,
-                }
-            }
-            &Expression::Subscript(_, _) => {
-                match expr2 {
-                    &Expression::Atom(_) => false,
-                    _ => true,
-                }
-            }
+            &Expression::Sum(_) => match expr2 {
+                &Expression::Sum(_) => true,
+                _ => false,
+            },
+            ref d @ &Expression::Division(_, _) if d.is_product() => match expr2 {
+                ref d2 @ &Expression::Division(_, _) if d2.is_product() => true,
+                &Expression::Sum(_) => true,
+                &Expression::Negation(_) => true,
+                _ => false,
+            },
+            &Expression::Negation(_) => match expr2 {
+                &Expression::Sum(_) => true,
+                _ => false,
+            },
+            &Expression::Application(_, _) => match expr2 {
+                _ => false,
+            },
+            &Expression::LimitOp(_, _, _, _) => match expr2 {
+                _ => false,
+            },
+            &Expression::Division(_, ref d) => match expr2 {
+                ref d2 @ &Expression::Division(_, _) if d2.is_product() => true,
+                &Expression::Sum(_) | &Expression::Negation(_) => d.len() > 1,
+                _ => false,
+            },
+            &Expression::Power(_, _) => match expr2 {
+                &Expression::Sum(_) => true,
+                &Expression::Power(_, _) => true,
+                &Expression::Negation(_) => true,
+                &Expression::Division(_, _) => true,
+                _ => false,
+            },
+            &Expression::Subscript(_, _) => match expr2 {
+                &Expression::Atom(_) => false,
+                _ => true,
+            },
             &Expression::Atom(_) => false,
         }
     } else {
         // right capture
         match expr1 {
-            &Expression::Sum(_) => {
-                match expr2 {
-                    _ => false,
-                }
-            }
-            ref d @ &Expression::Division(_, _) if d.is_product() => {
-                match expr2 {
-                    _ => false,
-                }
-            }
-            &Expression::Negation(_) => {
-                match expr2 {
-                    _ => false,
-                }
-            }
-            &Expression::Application(_, _) => {
-                match expr2 {
-                    _ => true,
-                }
-            }
-            &Expression::LimitOp(_, _, _, _) => {
-                match expr2 {
-                    _ => false,
-                }
-            }
-            &Expression::Division(ref n, _) => {
-                match expr2 {
-                    ref d2 @ &Expression::Division(_, _) if d2.is_product() => true,
-                    &Expression::Sum(_) |
-                    &Expression::Negation(_) => n.len() > 1,
-                    _ => false,
-                }
-            }
-            &Expression::Power(_, _) => {
-                match expr2 {
-                    _ => false,
-                }
-            }
-            &Expression::Subscript(_, _) => {
-                match expr2 {
-                    _ => false,
-                }
-            }
+            &Expression::Sum(_) => match expr2 {
+                _ => false,
+            },
+            ref d @ &Expression::Division(_, _) if d.is_product() => match expr2 {
+                _ => false,
+            },
+            &Expression::Negation(_) => match expr2 {
+                _ => false,
+            },
+            &Expression::Application(_, _) => match expr2 {
+                _ => true,
+            },
+            &Expression::LimitOp(_, _, _, _) => match expr2 {
+                _ => false,
+            },
+            &Expression::Division(ref n, _) => match expr2 {
+                ref d2 @ &Expression::Division(_, _) if d2.is_product() => true,
+                &Expression::Sum(_) | &Expression::Negation(_) => n.len() > 1,
+                _ => false,
+            },
+            &Expression::Power(_, _) => match expr2 {
+                _ => false,
+            },
+            &Expression::Subscript(_, _) => match expr2 {
+                _ => false,
+            },
             &Expression::Atom(_) => false,
         }
     }
 }
 
-fn fmt_prod_as_math_ml(exprs: &[Expression],
-                       f: &mut fmt::Formatter,
-                       prev_index: &str,
-                       prev_precedence: (&Expression, bool, bool),
-                       start_idx: usize)
-                       -> Result<(), fmt::Error> {
+fn fmt_prod_as_math_ml(
+    exprs: &[Expression],
+    f: &mut fmt::Formatter,
+    prev_index: &str,
+    prev_precedence: (&Expression, bool, bool),
+    start_idx: usize,
+) -> Result<(), fmt::Error> {
     let len = exprs.len();
     let iter = exprs.iter().enumerate();
     for (i, e) in iter {
@@ -274,10 +249,10 @@ fn fmt_prod_as_math_ml(exprs: &[Expression],
         if i < len - 1 {
             let e_next = &exprs[i + 1];
             match e_next {
-                &Expression::Atom(Atom::Floating(_)) |
-                &Expression::Atom(Atom::Natural(_)) |
-                &Expression::Power(box Expression::Atom(Atom::Floating(_)), _) |
-                &Expression::Power(box Expression::Atom(Atom::Natural(_)), _) => {
+                &Expression::Atom(Atom::Floating(_))
+                | &Expression::Atom(Atom::Natural(_))
+                | &Expression::Power(box Expression::Atom(Atom::Floating(_)), _)
+                | &Expression::Power(box Expression::Atom(Atom::Natural(_)), _) => {
                     write!(f, "<mo>&#x022C5;</mo>")?
                 }
                 _ => write!(f, "<mo>&#8290;</mo>")?,
@@ -287,49 +262,52 @@ fn fmt_prod_as_math_ml(exprs: &[Expression],
     Ok(())
 }
 
-fn fmt_as_math_ml(expr: &Expression,
-                  f: &mut fmt::Formatter,
-                  prev_index: &str,
-                  prev_precedence: (&Expression, bool, bool))
-                  -> Result<(), fmt::Error> {
-    write!(f,
-           "<{} mathTreeNode=\"{}\"{}>",
-           MROW,
-           prev_index,
-           match expr {
-               &Expression::Sum(..) => " multiparent=\"true\"",
-               &Expression::Division(_, ref b) if b.len() == 0 => " multiparent=\"true\"",
-               _ => "",
-           })?;
+fn fmt_as_math_ml(
+    expr: &Expression,
+    f: &mut fmt::Formatter,
+    prev_index: &str,
+    prev_precedence: (&Expression, bool, bool),
+) -> Result<(), fmt::Error> {
+    write!(
+        f,
+        "<{} mathTreeNode=\"{}\"{}>",
+        MROW,
+        prev_index,
+        match expr {
+            &Expression::Sum(..) => " multiparent=\"true\"",
+            &Expression::Division(_, ref b) if b.len() == 0 => " multiparent=\"true\"",
+            _ => "",
+        }
+    )?;
 
-    if capture(prev_precedence.0,
-               expr,
-               prev_precedence.1,
-               prev_precedence.2) {
+    if capture(
+        prev_precedence.0,
+        expr,
+        prev_precedence.1,
+        prev_precedence.2,
+    ) {
         write!(f, "<mo form=\"prefix\">(</mo>")?;
     }
     match expr {
         &Expression::Atom(ref atom) => {
             match prev_precedence.0 {
-                &Expression::Sum(_) => {
-                    match atom {
-                        &Atom::Natural(n) => {
-                            if n < 0 {
-                                write!(f, "<mo>-</mo><mn>{}</mn>", -n)?
-                            } else {
-                                write!(f, "{}", atom)?
-                            }
+                &Expression::Sum(_) => match atom {
+                    &Atom::Natural(n) => {
+                        if n < 0 {
+                            write!(f, "<mo>-</mo><mn>{}</mn>", -n)?
+                        } else {
+                            write!(f, "{}", atom)?
                         }
-                        &Atom::Floating(n) => {
-                            if n < 0.0 {
-                                write!(f, "<mo>-</mo><mn>{}</mn>", -n)?
-                            } else {
-                                write!(f, "{}", atom)?
-                            }
-                        }
-                        _ => write!(f, "{}", atom)?,
                     }
-                }
+                    &Atom::Floating(n) => {
+                        if n < 0.0 {
+                            write!(f, "<mo>-</mo><mn>{}</mn>", -n)?
+                        } else {
+                            write!(f, "{}", atom)?
+                        }
+                    }
+                    _ => write!(f, "{}", atom)?,
+                },
                 _ => write!(f, "{}", atom)?,
             };
         }
@@ -338,7 +316,6 @@ fn fmt_as_math_ml(expr: &Expression,
             if let &box Expression::Division(ref top, ref bot) = p {
                 if top == &vec![Expression::Atom(Atom::Natural(1))] && bot.len() == 1 {
                     if let Expression::Atom(Atom::Natural(root)) = bot[0] {
-
                         if root == 2 {
                             write!(f, "<msqrt>")?;
                         } else {
@@ -497,20 +474,23 @@ fn fmt_as_math_ml(expr: &Expression,
             fmt_as_math_ml(expr, f, &base_string, (expr, false, false))?;
         }
     }
-    if capture(prev_precedence.0,
-               expr,
-               prev_precedence.1,
-               prev_precedence.2) {
+    if capture(
+        prev_precedence.0,
+        expr,
+        prev_precedence.1,
+        prev_precedence.2,
+    ) {
         write!(f, "<mo form=\"postfix\">)</mo>")?;
     }
     write!(f, "</mrow>")
 }
 
-fn fmt_prod_as_latex(exprs: &[Expression],
-                     f: &mut fmt::Formatter,
-                     prev_precedence: (&Expression, bool, bool),
-                     output: LaTeXOutputType)
-                     -> Result<(), fmt::Error> {
+fn fmt_prod_as_latex(
+    exprs: &[Expression],
+    f: &mut fmt::Formatter,
+    prev_precedence: (&Expression, bool, bool),
+    output: LaTeXOutputType,
+) -> Result<(), fmt::Error> {
     let len = exprs.len();
     let iter = exprs.iter().enumerate();
     for (i, e) in iter {
@@ -520,10 +500,10 @@ fn fmt_prod_as_latex(exprs: &[Expression],
             fmt_as_latex(e, f, prev_precedence, output)?;
             let e_next = &exprs[i + 1];
             match e_next {
-                &Expression::Atom(Atom::Floating(_)) |
-                &Expression::Atom(Atom::Natural(_)) |
-                &Expression::Power(box Expression::Atom(Atom::Floating(_)), _) |
-                &Expression::Power(box Expression::Atom(Atom::Natural(_)), _) => {
+                &Expression::Atom(Atom::Floating(_))
+                | &Expression::Atom(Atom::Natural(_))
+                | &Expression::Power(box Expression::Atom(Atom::Floating(_)), _)
+                | &Expression::Power(box Expression::Atom(Atom::Natural(_)), _) => {
                     write!(f, "\\cdot")?
                 }
                 _ => {}
@@ -536,44 +516,44 @@ fn fmt_prod_as_latex(exprs: &[Expression],
 /// Format this expression as LaTeX.
 ///
 ///    * `output`: whether this is bound for a LaTeX compiler (true) or our system (false)
-fn fmt_as_latex(expr: &Expression,
-                f: &mut fmt::Formatter,
-                prev_precedence: (&Expression, bool, bool),
-                output: LaTeXOutputType)
-                -> Result<(), fmt::Error> {
-    if capture(prev_precedence.0,
-               expr,
-               prev_precedence.1,
-               prev_precedence.2) {
-        write!(f,
-               "{}(",
-               match output {
-                   LaTeXOutputType::ForUs => "",
-                   LaTeXOutputType::ForOther => "\\left",
-               })?;
+fn fmt_as_latex(
+    expr: &Expression,
+    f: &mut fmt::Formatter,
+    prev_precedence: (&Expression, bool, bool),
+    output: LaTeXOutputType,
+) -> Result<(), fmt::Error> {
+    if capture(
+        prev_precedence.0,
+        expr,
+        prev_precedence.1,
+        prev_precedence.2,
+    ) {
+        write!(
+            f,
+            "{}(",
+            match output {
+                LaTeXOutputType::ForUs => "",
+                LaTeXOutputType::ForOther => "\\left",
+            }
+        )?;
     }
     match expr {
-        &Expression::Atom(ref atom) => {
-            match atom {
-                &Atom::PlainVariable(c) => write!(f, "{}", c)?,
-                &Atom::Natural(n) => write!(f, "{}", n)?,
-                &Atom::Floating(r) => write!(f, "{}", r)?,
-                &Atom::Symbol(sym) => write!(f, "{} ", sym.as_latex())?,
-                &Atom::Escaped(ref s) => {
-                    match output {
-                        LaTeXOutputType::ForUs => write!(f, "%{}%", s),
-                        LaTeXOutputType::ForOther => write!(f, "{}", s),
-                    }?
-                }
-            }
-        }
+        &Expression::Atom(ref atom) => match atom {
+            &Atom::PlainVariable(c) => write!(f, "{}", c)?,
+            &Atom::Natural(n) => write!(f, "{}", n)?,
+            &Atom::Floating(r) => write!(f, "{}", r)?,
+            &Atom::Symbol(sym) => write!(f, "{} ", sym.as_latex())?,
+            &Atom::Escaped(ref s) => match output {
+                LaTeXOutputType::ForUs => write!(f, "%{}%", s),
+                LaTeXOutputType::ForOther => write!(f, "{}", s),
+            }?,
+        },
         &Expression::Power(ref b, ref p) => {
             let mut issqrt = false;
             if output == LaTeXOutputType::ForOther {
                 if let &box Expression::Division(ref top, ref bot) = p {
                     if top == &vec![Expression::Atom(Atom::Natural(1))] && bot.len() == 1 {
                         if let Expression::Atom(Atom::Natural(root)) = bot[0] {
-
                             if root == 2 {
                                 write!(f, "\\sqrt{{")?;
                             } else {
@@ -678,16 +658,20 @@ fn fmt_as_latex(expr: &Expression,
             fmt_as_latex(expr, f, (expr, false, false), output)?;
         }
     }
-    if capture(prev_precedence.0,
-               expr,
-               prev_precedence.1,
-               prev_precedence.2) {
-        write!(f,
-               "{})",
-               match output {
-                   LaTeXOutputType::ForUs => "",
-                   LaTeXOutputType::ForOther => "\\right",
-               })?;
+    if capture(
+        prev_precedence.0,
+        expr,
+        prev_precedence.1,
+        prev_precedence.2,
+    ) {
+        write!(
+            f,
+            "{})",
+            match output {
+                LaTeXOutputType::ForUs => "",
+                LaTeXOutputType::ForOther => "\\right",
+            }
+        )?;
     }
     Ok(())
 }
