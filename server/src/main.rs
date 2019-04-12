@@ -18,9 +18,9 @@ use std::fs::File;
 use std::path::Path;
 use std::str::FromStr;
 use std::thread;
-use websocket::header::WebSocketProtocol;
-use websocket::message::Type;
-use websocket::{Server, Message, Sender, Receiver};
+use websocket::header::{Headers,WebSocketProtocol};
+use websocket::server::sync::Server;
+use websocket::{Message, OwnedMessage};
 
 mod cmd;
 
@@ -74,7 +74,7 @@ fn main() {
     thread::spawn(move || {
 
         let mut router = router::Router::new();
-        router.get("/", send_mainpage);
+        router.get("/", send_mainpage, "mainpage");
 
         let mut mount = Mount::new();
         mount.mount("/", router)
@@ -86,47 +86,33 @@ fn main() {
     // Start listening for WebSocket connections
     let ws_server = Server::bind("0.0.0.0:2794").unwrap();
 
-    for connection in ws_server {
+    for connection in ws_server.filter_map(Result::ok) {
         // Spawn a new thread for each connection.
         thread::spawn(move || {
-            let request = connection.unwrap().read_request().unwrap(); // Get the request
-            let headers = request.headers.clone(); // Keep the headers so we can check them
+            let mut headers = Headers::new();
+            headers.set(WebSocketProtocol(vec!["rust-websocket".to_string()]));
+            let client = connection.accept_with(&headers).unwrap();
 
-            request.validate().unwrap(); // Validate the request
-
-            let mut response = request.accept(); // Form a response
-
-            if let Some(&WebSocketProtocol(ref protocols)) = headers.get() {
-                if protocols.contains(&("rust-websocket".to_string())) {
-                    // We have a protocol we want to use
-                    response.headers
-                        .set(WebSocketProtocol(vec!["rust-websocket".to_string()]));
-                }
-            }
-
-            let client = response.send().unwrap(); // Send the response
-
-            let (mut sender, mut receiver) = client.split();
+            let (mut receiver, mut sender) = client.split().unwrap();
 
             let mut formula_num = 0;
             let mut history: Vec<Math> = vec![];
             for message in receiver.incoming_messages() {
-                let message: Message = message.unwrap();
+                let message: OwnedMessage = message.unwrap();
 
-                match message.opcode {
-                    Type::Close => {
+                match message {
+                    OwnedMessage::Close(_) => {
                         let message = Message::close();
                         sender.send_message(&message).unwrap();
                         return;
                     }
-                    Type::Ping => {
-                        let message = Message::pong(message.payload);
+                    OwnedMessage::Ping(payload) => {
+                        let message = Message::pong(payload);
                         sender.send_message(&message).unwrap();
                     }
-                    Type::Text => {
-                        let string = std::str::from_utf8(&*message.payload).unwrap();
+                    OwnedMessage::Text(string) => {
                         println!("Received: \"{:?}\"", string);
-                        let msg: TextMsg = serde_json::from_str(string).unwrap();
+                        let msg: TextMsg = serde_json::from_str(&string).unwrap();
                         let output = match cmd::Cmd::from_str(&msg.cmd) {
                             Ok(cmd) => cmd.execute(history.last(), &history),
                             Err(e) => Err(e),

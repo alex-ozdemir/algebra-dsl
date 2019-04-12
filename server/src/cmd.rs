@@ -234,7 +234,7 @@ impl Cmd {
 /// Parses any indices at the beginning of `s` and returns the indices and the rest of `s`
 fn parse_indices(s: &str) -> Result<(Vec<TreeIdx>, &str), Error> {
     let mut indices = Vec::new();
-    let mut rest = s.trim_left();
+    let mut rest = s.trim_start();
     while rest.starts_with("#") {
         let idx_end = rest.find(')')
             .ok_or_else(|| {
@@ -252,7 +252,7 @@ impl FromStr for Cmd {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.starts_with("cmd@") {
-            let s: &str = &s[4..].trim_left();
+            let s: &str = &s[4..].trim_start();
             if s.starts_with("make") {
                 let (indices, rest) = parse_indices(&s[4..].trim())?;
                 let expr = ExprOrIdx::from_str(rest.trim())?;
